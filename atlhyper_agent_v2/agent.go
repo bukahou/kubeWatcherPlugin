@@ -107,11 +107,6 @@ func New() (*Agent, error) {
 			sloQueryRepo = chquery.NewSLOQueryRepository(chClient)
 			dashboardRepo = chrepo.NewDashboardRepository(metricsQueryRepo, traceQueryRepo, sloQueryRepo, logQueryRepo)
 			log.Info("ClickHouse 客户端初始化完成", "endpoint", cfg.ClickHouse.Endpoint)
-
-			// 枚举契约自检: otel_traces 的 SpanKind / StatusCode 取值由 Collector
-			// 的 exporter 决定，升级后可能变化。取值不符时查询会静默返回空行，
-			// 这里主动探测一次并告警（异步执行，不阻塞启动）。
-			go chquery.VerifyTraceEnumContract(context.Background(), chClient)
 		}
 	}
 
@@ -174,6 +169,13 @@ func New() (*Agent, error) {
 func (a *Agent) Run(ctx context.Context) error {
 	if err := a.scheduler.Start(ctx); err != nil {
 		return err
+	}
+
+	// 枚举契约自检: otel_traces / otel_logs 的枚举字符串由 Collector exporter 或
+	// 上报方 SDK 决定，取值不符时查询会静默返回空行。启动时查一次并每 10 分钟重跑 ——
+	// 被观测应用往往在 Agent 启动之后才开始上报，只查一次会错过。
+	if a.chClient != nil {
+		go chquery.RunEnumContractChecks(ctx, a.chClient, 10*time.Minute)
 	}
 
 	// 启动健康检查 HTTP 服务器（供 K8s liveness/readiness 探针使用）
