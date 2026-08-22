@@ -98,17 +98,17 @@ func (r *traceRepository) ListTraces(ctx context.Context, service, operation str
 	query := fmt.Sprintf(`
 		SELECT TraceId,
 		       min(Timestamp) AS ts,
-		       if(argMinIf(ServiceName, Timestamp, SpanKind = 'SPAN_KIND_SERVER') != '',
-		          argMinIf(ServiceName, Timestamp, SpanKind = 'SPAN_KIND_SERVER'),
+		       if(argMinIf(ServiceName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`) != '',
+		          argMinIf(ServiceName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`),
 		          argMinIf(ServiceName, Timestamp, ParentSpanId = '')) AS rootSvc,
-		       if(argMinIf(SpanName, Timestamp, SpanKind = 'SPAN_KIND_SERVER') != '',
-		          argMinIf(SpanName, Timestamp, SpanKind = 'SPAN_KIND_SERVER'),
+		       if(argMinIf(SpanName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`) != '',
+		          argMinIf(SpanName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`),
 		          argMinIf(SpanName, Timestamp, ParentSpanId = '')) AS rootOp,
 		       max(Duration) / 1e6 AS durationMs,
 		       count() AS spanCount,
 		       count(DISTINCT ServiceName) AS serviceCount,
 		       groupArray(DISTINCT ServiceName) AS services,
-		       countIf(StatusCode = 'STATUS_CODE_ERROR') > 0 AS hasError,
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) > 0 AS hasError,
 		       anyIf(
 		           Events.Attributes[indexOf(Events.Name, 'exception')]['exception.type'],
 		           indexOf(Events.Name, 'exception') > 0
@@ -287,7 +287,7 @@ func (r *traceRepository) ListServices(ctx context.Context, since time.Duration,
 	sec := traceTimeSec(since, startTime, endTime)
 	timeConds, timeArgs := traceTimeCondition("Timestamp", since, startTime, endTime)
 
-	whereClause := "SpanKind = 'SPAN_KIND_SERVER'"
+	whereClause := "SpanKind = " + apm.SQLSpanKindServer
 	for _, c := range timeConds {
 		whereClause += " AND " + c
 	}
@@ -297,8 +297,8 @@ func (r *traceRepository) ListServices(ctx context.Context, since time.Duration,
 		       if(ResourceAttributes['service.namespace'] != '', ResourceAttributes['service.namespace'], if(ResourceAttributes['k8s.namespace.name'] != '', ResourceAttributes['k8s.namespace.name'], 'default')) AS ns,
 		       anyLast(ResourceAttributes['deployment.environment']) AS env,
 		       count() AS spanCount,
-		       countIf(StatusCode = 'STATUS_CODE_ERROR') AS errorCount,
-		       1 - countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS successRate,
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) AS errorCount,
+		       1 - countIf(StatusCode = `+apm.SQLStatusCodeError+`) / count() AS successRate,
 		       avg(Duration) / 1e6 AS avgMs,
 		       quantile(0.50)(Duration) / 1e6 AS p50Ms,
 		       quantile(0.99)(Duration) / 1e6 AS p99Ms,
@@ -341,7 +341,7 @@ func (r *traceRepository) ListOperations(ctx context.Context, since time.Duratio
 	sec := traceTimeSec(since, startTime, endTime)
 	timeConds, timeArgs := traceTimeCondition("Timestamp", since, startTime, endTime)
 
-	whereClause := "SpanKind = 'SPAN_KIND_SERVER'"
+	whereClause := "SpanKind = " + apm.SQLSpanKindServer
 	for _, c := range timeConds {
 		whereClause += " AND " + c
 	}
@@ -350,8 +350,8 @@ func (r *traceRepository) ListOperations(ctx context.Context, since time.Duratio
 		SELECT ServiceName,
 		       SpanName AS operation,
 		       count() AS spanCount,
-		       countIf(StatusCode = 'STATUS_CODE_ERROR') AS errorCount,
-		       1 - countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS successRate,
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) AS errorCount,
+		       1 - countIf(StatusCode = `+apm.SQLStatusCodeError+`) / count() AS successRate,
 		       avg(Duration) / 1e6 AS avgMs,
 		       quantile(0.50)(Duration) / 1e6 AS p50Ms,
 		       quantile(0.99)(Duration) / 1e6 AS p99Ms,
@@ -395,7 +395,7 @@ func (r *traceRepository) GetTopology(ctx context.Context, since time.Duration, 
 	sec := traceTimeSec(since, startTime, endTime)
 	timeConds, timeArgs := traceTimeCondition("Timestamp", since, startTime, endTime)
 
-	svcWhere := "SpanKind = 'SPAN_KIND_SERVER'"
+	svcWhere := "SpanKind = " + apm.SQLSpanKindServer
 	for _, c := range timeConds {
 		svcWhere += " AND " + c
 	}
@@ -405,7 +405,7 @@ func (r *traceRepository) GetTopology(ctx context.Context, since time.Duration, 
 		SELECT ServiceName,
 		       if(ResourceAttributes['service.namespace'] != '', ResourceAttributes['service.namespace'], if(ResourceAttributes['k8s.namespace.name'] != '', ResourceAttributes['k8s.namespace.name'], 'default')) AS ns,
 		       count() / %d AS rps,
-		       1 - countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS successRate,
+		       1 - countIf(StatusCode = `+apm.SQLStatusCodeError+`) / count() AS successRate,
 		       quantile(0.99)(Duration) / 1e6 AS p99Ms
 		FROM otel_traces
 		WHERE %s
@@ -465,7 +465,7 @@ func (r *traceRepository) GetTopology(ctx context.Context, since time.Duration, 
 		       concat(if(t2.ResourceAttributes['service.namespace'] != '', t2.ResourceAttributes['service.namespace'], if(t2.ResourceAttributes['k8s.namespace.name'] != '', t2.ResourceAttributes['k8s.namespace.name'], 'default')), '/', t2.ServiceName) AS target,
 		       count() AS callCount,
 		       avg(t2.Duration) / 1e6 AS avgMs,
-		       countIf(t2.StatusCode = 'STATUS_CODE_ERROR') / count() AS errorRate
+		       countIf(t2.StatusCode = `+apm.SQLStatusCodeError+`) / count() AS errorRate
 		FROM otel_traces t1
 		JOIN otel_traces t2 ON t1.SpanId = t2.ParentSpanId AND t1.TraceId = t2.TraceId
 		WHERE %s
@@ -499,7 +499,7 @@ func (r *traceRepository) GetTopology(ctx context.Context, since time.Duration, 
 	}
 
 	// DB 节点: 从 CLIENT span 中提取数据库调用
-	dbWhere := "SpanKind = 'SPAN_KIND_CLIENT' AND SpanAttributes['db.system'] != ''"
+	dbWhere := "SpanKind = " + apm.SQLSpanKindClient + " AND SpanAttributes['db.system'] != ''"
 	for _, c := range timeConds {
 		dbWhere += " AND " + c
 	}
@@ -511,7 +511,7 @@ func (r *traceRepository) GetTopology(ctx context.Context, since time.Duration, 
 		       SpanAttributes['db.name'] AS dbName,
 		       count() AS callCount,
 		       avg(Duration) / 1e6 AS avgMs,
-		       countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS errorRate
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) / count() AS errorRate
 		FROM otel_traces
 		WHERE %s
 		GROUP BY ServiceName, ns, dbSystem, dbName
@@ -569,7 +569,7 @@ func (r *traceRepository) GetTopology(ctx context.Context, since time.Duration, 
 func (r *traceRepository) GetHTTPStats(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.HTTPStats, error) {
 	timeConds, timeArgs := traceTimeCondition("Timestamp", since, startTime, endTime)
 
-	whereClause := "SpanKind = 'SPAN_KIND_SERVER' AND SpanAttributes['http.response.status_code'] != '' AND ServiceName = ?"
+	whereClause := "SpanKind = " + apm.SQLSpanKindServer + " AND SpanAttributes['http.response.status_code'] != '' AND ServiceName = ?"
 	for _, c := range timeConds {
 		whereClause += " AND " + c
 	}
@@ -610,7 +610,7 @@ func (r *traceRepository) GetHTTPStats(ctx context.Context, service string, sinc
 func (r *traceRepository) GetDBStats(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.DBOperationStats, error) {
 	timeConds, timeArgs := traceTimeCondition("Timestamp", since, startTime, endTime)
 
-	whereClause := "SpanKind = 'SPAN_KIND_CLIENT' AND SpanAttributes['db.system'] != '' AND ServiceName = ?"
+	whereClause := "SpanKind = " + apm.SQLSpanKindClient + " AND SpanAttributes['db.system'] != '' AND ServiceName = ?"
 	for _, c := range timeConds {
 		whereClause += " AND " + c
 	}
@@ -623,7 +623,7 @@ func (r *traceRepository) GetDBStats(ctx context.Context, service string, since 
 		       count() AS callCount,
 		       avg(Duration) / 1e6 AS avgMs,
 		       quantile(0.99)(Duration) / 1e6 AS p99Ms,
-		       countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS errorRate
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) / count() AS errorRate
 		FROM otel_traces
 		WHERE %s
 		GROUP BY dbSystem, dbName, operation, tableName
@@ -678,12 +678,12 @@ func (r *traceRepository) GetServiceTimeSeries(ctx context.Context, service stri
 	query := fmt.Sprintf(`
 		SELECT toStartOfInterval(Timestamp, INTERVAL %d SECOND) AS bucket,
 		       count() / %d AS rps,
-		       1 - countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS successRate,
+		       1 - countIf(StatusCode = `+apm.SQLStatusCodeError+`) / count() AS successRate,
 		       avg(Duration) / 1e6 AS avgMs,
 		       quantile(0.99)(Duration) / 1e6 AS p99Ms,
-		       countIf(StatusCode = 'STATUS_CODE_ERROR') AS errorCount
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) AS errorCount
 		FROM otel_traces
-		WHERE SpanKind = 'SPAN_KIND_SERVER'
+		WHERE SpanKind = `+apm.SQLSpanKindServer+`
 		  AND ServiceName = ?
 		  AND Timestamp >= now() - INTERVAL %d SECOND
 		GROUP BY bucket

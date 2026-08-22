@@ -152,7 +152,7 @@ func TestPushSnapshot_ServerError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPollCommands_HasCommand(t *testing.T) {
-	respBody := `{"has_command":true,"command":{"id":"cmd-1","action":"scale","namespace":"default","name":"nginx","params":{"replicas":3}}}`
+	respBody := `{"hasCommand":true,"command":{"id":"cmd-1","action":"scale","namespace":"default","name":"nginx","params":{"replicas":3}}}`
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

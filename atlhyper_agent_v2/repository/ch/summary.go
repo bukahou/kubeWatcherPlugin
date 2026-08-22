@@ -8,6 +8,7 @@ import (
 	"AtlHyper/atlhyper_agent_v2/repository"
 	"AtlHyper/atlhyper_agent_v2/repository/ch/query"
 	"AtlHyper/atlhyper_agent_v2/sdk"
+	"AtlHyper/model_v3/apm"
 )
 
 // summaryRepository OTel 概览仓库（ClickHouse 聚合查询）
@@ -31,10 +32,10 @@ func (r *summaryRepository) GetAPMSummary(ctx context.Context) (totalServices, h
 		FROM (
 		    SELECT ServiceName,
 		           count()                       AS span_cnt,
-		           countIf(StatusCode = 'STATUS_CODE_ERROR') / count() AS err_rate,
+		           countIf(StatusCode = ` + apm.SQLStatusCodeError + `) / count() AS err_rate,
 		           quantile(0.99)(Duration)       AS p99_ns
 		    FROM otel_traces
-		    WHERE SpanKind = 'SPAN_KIND_SERVER' AND Timestamp >= now() - INTERVAL 5 MINUTE
+		    WHERE SpanKind = ` + apm.SQLSpanKindServer + ` AND Timestamp >= now() - INTERVAL 5 MINUTE
 		    GROUP BY ServiceName
 		)
 	`

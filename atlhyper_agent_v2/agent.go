@@ -107,6 +107,11 @@ func New() (*Agent, error) {
 			sloQueryRepo = chquery.NewSLOQueryRepository(chClient)
 			dashboardRepo = chrepo.NewDashboardRepository(metricsQueryRepo, traceQueryRepo, sloQueryRepo, logQueryRepo)
 			log.Info("ClickHouse 客户端初始化完成", "endpoint", cfg.ClickHouse.Endpoint)
+
+			// 枚举契约自检: otel_traces 的 SpanKind / StatusCode 取值由 Collector
+			// 的 exporter 决定，升级后可能变化。取值不符时查询会静默返回空行，
+			// 这里主动探测一次并告警（异步执行，不阻塞启动）。
+			go chquery.VerifyTraceEnumContract(context.Background(), chClient)
 		}
 	}
 

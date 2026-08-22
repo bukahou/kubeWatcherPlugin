@@ -74,9 +74,9 @@ type SpanEvent struct {
 	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
-func (s *Span) IsError() bool  { return s.StatusCode == "STATUS_CODE_ERROR" }
-func (s *Span) IsServer() bool { return s.SpanKind == "SPAN_KIND_SERVER" }
-func (s *Span) IsClient() bool { return s.SpanKind == "SPAN_KIND_CLIENT" }
+func (s *Span) IsError() bool  { return s.StatusCode == StatusCodeError }
+func (s *Span) IsServer() bool { return s.SpanKind == SpanKindServer }
+func (s *Span) IsClient() bool { return s.SpanKind == SpanKindClient }
 func (s *Span) IsRoot() bool   { return s.ParentSpanId == "" }
 
 // ============================================================
