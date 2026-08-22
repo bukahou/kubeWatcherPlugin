@@ -77,7 +77,7 @@ export function mockGetDependencies(serviceName: string): Dependency[] {
       }
       const dep = depMap.get(depName)!;
       dep.durations.push(span.durationMs);
-      if (span.statusCode === "STATUS_CODE_ERROR") dep.errorCount++;
+      if (span.statusCode === "Error") dep.errorCount++;
     }
   }
 

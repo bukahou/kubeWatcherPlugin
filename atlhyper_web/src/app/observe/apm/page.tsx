@@ -27,6 +27,7 @@ import { ServiceOverview } from "./components/ServiceOverview";
 import { TraceWaterfall } from "./components/TraceWaterfall";
 import { ServiceTopology } from "./components/ServiceTopology";
 import { filterTraceForService } from "./components/trace-utils";
+import { isErrorSpan } from "@/lib/otel";
 
 type ViewState =
   | { level: "services" }
@@ -86,7 +87,7 @@ function ApmPageContent() {
           durationMs: detail.durationMs,
           spanCount: detail.spanCount,
           serviceCount: detail.serviceCount,
-          hasError: rootSpan.statusCode === "STATUS_CODE_ERROR",
+          hasError: isErrorSpan(rootSpan),
           timestamp: rootSpan.timestamp,
         }]);
       }

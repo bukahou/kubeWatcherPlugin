@@ -6,6 +6,7 @@ import type { TraceDetail, Span } from "@/types/model/apm";
 import type { ApmTranslations } from "@/types/i18n";
 import { formatDurationMs } from "@/lib/format";
 import { SERVICE_COLORS } from "./waterfall-utils";
+import { isErrorSpan, STATUS_CODE } from "@/lib/otel";
 
 interface TraceMetadataProps {
   t: ApmTranslations;
@@ -54,7 +55,7 @@ export function TraceMetadata({ t, trace }: TraceMetadataProps) {
 
       agg.spanCount++;
       agg.totalMs += span.durationMs;
-      if (span.statusCode === "STATUS_CODE_ERROR") agg.errorCount++;
+      if (isErrorSpan(span)) agg.errorCount++;
 
       const res = span.resource;
       if (res?.podName) agg.pods.add(res.podName);
@@ -69,7 +70,7 @@ export function TraceMetadata({ t, trace }: TraceMetadataProps) {
       agg.percent = (agg.totalMs / totalMs) * 100;
     }
 
-    const errors = trace.spans.filter(s => s.statusCode === "STATUS_CODE_ERROR");
+    const errors = trace.spans.filter(isErrorSpan);
 
     const timestamps = trace.spans.map(s => new Date(s.timestamp).getTime());
     const start = new Date(Math.min(...timestamps)).toLocaleString();
@@ -233,7 +234,7 @@ function ErrorCard({ span, t }: { span: Span; t: ApmTranslations }) {
         </>
       )}
       {!span.error && (
-        <div className="text-xs text-muted">{t.statusCode}: STATUS_CODE_ERROR</div>
+        <div className="text-xs text-muted">{t.statusCode}: {STATUS_CODE.error}</div>
       )}
     </div>
   );

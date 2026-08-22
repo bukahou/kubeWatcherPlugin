@@ -2,10 +2,10 @@
 
 import { X } from "lucide-react";
 import type { Span, TraceDetail } from "@/types/model/apm";
-import { isSpanError } from "@/types/model/apm";
 import type { ApmTranslations } from "@/types/i18n";
 import { formatDurationMs } from "@/lib/format";
 import { SpanLogs } from "./SpanLogs";
+import { formatSpanKind, formatStatusCode, isErrorSpan } from "@/lib/otel";
 
 // ============================================================
 // SpanDrawer — structured attribute display
@@ -68,12 +68,12 @@ export function SpanDrawer({
               </MetricCard>
               <MetricCard label={t.spanKind}>
                 <span className="text-sm font-medium text-default">
-                  {span.spanKind.replace("SPAN_KIND_", "")}
+                  {formatSpanKind(span.spanKind)}
                 </span>
               </MetricCard>
               <MetricCard label={t.statusCode}>
-                <span className={`text-sm font-medium ${isSpanError(span) ? "text-red-400" : "text-emerald-400"}`}>
-                  {span.statusCode.replace("STATUS_CODE_", "")}
+                <span className={`text-sm font-medium ${isErrorSpan(span) ? "text-red-400" : "text-emerald-400"}`}>
+                  {formatStatusCode(span.statusCode)}
                 </span>
               </MetricCard>
               <MetricCard label={t.duration}>

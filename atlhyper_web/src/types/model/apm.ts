@@ -54,11 +54,11 @@ export interface Span {
   spanId: string;
   parentSpanId: string;
   spanName: string;
-  spanKind: string;       // "SPAN_KIND_SERVER" | "SPAN_KIND_CLIENT" | ...
+  spanKind: string;       // "Server" | "Client" | "Internal" ... 见 @/lib/otel
   serviceName: string;
   duration: number;       // nanoseconds
   durationMs: number;     // milliseconds
-  statusCode: string;     // "STATUS_CODE_UNSET" | "STATUS_CODE_ERROR"
+  statusCode: string;     // "Unset" | "Ok" | "Error" 见 @/lib/otel
   statusMessage: string;
 
   http?: SpanHTTP;
@@ -234,10 +234,6 @@ export interface DBOperationStats {
 // Helper functions
 // ============================================================
 
-export function isSpanError(span: Span): boolean {
-  return span.statusCode === "STATUS_CODE_ERROR";
-}
-
-export function isServerSpan(span: Span): boolean {
-  return span.spanKind === "SPAN_KIND_SERVER";
-}
+// span 判定函数统一由 @/lib/otel 提供（单一信任源）。
+// 此处曾有 isSpanError / isServerSpan 的重复实现，硬编码了旧版枚举字面量，
+// Collector 升级后恒为 false，已移除。

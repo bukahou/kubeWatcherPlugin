@@ -2,9 +2,9 @@
 
 import { ChevronRight, ChevronDown } from "lucide-react";
 import type { Span } from "@/types/model/apm";
-import { isSpanError } from "@/types/model/apm";
 import { formatDurationMs } from "@/lib/format";
 import { countDescendants, type SpanNode } from "./waterfall-utils";
+import { isErrorSpan } from "@/lib/otel";
 
 interface SpanRowProps {
   node: SpanNode;
@@ -38,7 +38,7 @@ export function SpanRow({
     : 100;
   const childCount = countDescendants(node);
   const hasChildren = node.children.length > 0;
-  const isError = isSpanError(span);
+  const isError = isErrorSpan(span);
 
   const barIsWide = width > 15;
   const barH = 24;

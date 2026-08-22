@@ -206,11 +206,11 @@ function generateTrace(
     spanId: gatewaySpanId,
     parentSpanId: "",
     spanName: pattern.gatewayEndpoint,
-    spanKind: "SPAN_KIND_SERVER",
+    spanKind: "Server",
     serviceName: gateway.name,
     duration: Math.round(gatewayDurationMs * 1e6),
     durationMs: Math.round(gatewayDurationMs * 100) / 100,
-    statusCode: isError ? "STATUS_CODE_ERROR" : "STATUS_CODE_UNSET",
+    statusCode: isError ? "Error" : "Unset",
     statusMessage: isError ? "Internal Server Error" : "",
     http: {
       method: pattern.gatewayEndpoint.split(" ")[0],
@@ -253,11 +253,11 @@ function generateTrace(
     spanId: authClientId,
     parentSpanId: gatewaySpanId,
     spanName: "POST",
-    spanKind: "SPAN_KIND_CLIENT",
+    spanKind: "Client",
     serviceName: gateway.name,
     duration: Math.round(authDurationMs * 1e6),
     durationMs: Math.round(authDurationMs * 100) / 100,
-    statusCode: "STATUS_CODE_UNSET",
+    statusCode: "Unset",
     statusMessage: "",
     http: {
       method: "POST",
@@ -276,11 +276,11 @@ function generateTrace(
     spanId: authServerId,
     parentSpanId: authClientId,
     spanName: "POST /token/verify",
-    spanKind: "SPAN_KIND_SERVER",
+    spanKind: "Server",
     serviceName: auth.name,
     duration: Math.round((authDurationMs - 1) * 1e6),
     durationMs: Math.round((authDurationMs - 1) * 100) / 100,
-    statusCode: "STATUS_CODE_UNSET",
+    statusCode: "Unset",
     statusMessage: "",
     http: {
       method: "POST",
@@ -309,11 +309,11 @@ function generateTrace(
       spanId: clientId,
       parentSpanId: gatewaySpanId,
       spanName: pattern.gatewayEndpoint.split(" ")[0],
-      spanKind: "SPAN_KIND_CLIENT",
+      spanKind: "Client",
       serviceName: gateway.name,
       duration: Math.round(dsDurationMs * 1e6),
       durationMs: Math.round(dsDurationMs * 100) / 100,
-      statusCode: dsIsError ? "STATUS_CODE_ERROR" : "STATUS_CODE_UNSET",
+      statusCode: dsIsError ? "Error" : "Unset",
       statusMessage: "",
       http: {
         method: pattern.gatewayEndpoint.split(" ")[0],
@@ -334,11 +334,11 @@ function generateTrace(
       spanId: serverId,
       parentSpanId: clientId,
       spanName: ds.endpoint,
-      spanKind: "SPAN_KIND_SERVER",
+      spanKind: "Server",
       serviceName: ds.service.name,
       duration: Math.round(serverDurationMs * 1e6),
       durationMs: Math.round(serverDurationMs * 100) / 100,
-      statusCode: dsIsError ? "STATUS_CODE_ERROR" : "STATUS_CODE_UNSET",
+      statusCode: dsIsError ? "Error" : "Unset",
       statusMessage: dsIsError ? "Database query failed" : "",
       http: {
         method: ds.endpoint.split(" ")[0],
@@ -380,11 +380,11 @@ function generateTrace(
         spanId: dbSpanId,
         parentSpanId: serverId,
         spanName: `SELECT geass_v2.${table}`,
-        spanKind: "SPAN_KIND_CLIENT",
+        spanKind: "Client",
         serviceName: ds.service.name,
         duration: Math.round(dbDurationMs * 1e6),
         durationMs: Math.round(dbDurationMs * 100) / 100,
-        statusCode: "STATUS_CODE_UNSET",
+        statusCode: "Unset",
         statusMessage: "",
         db: {
           system: "mysql",
@@ -494,11 +494,11 @@ function buildServiceStats(): APMService[] {
 
   for (const trace of ALL_TRACES) {
     for (const span of trace.spans) {
-      if (span.spanKind !== "SPAN_KIND_SERVER") continue;
+      if (span.spanKind !== "Server") continue;
       const entry = svcMap.get(span.serviceName);
       if (!entry) continue;
       entry.durations.push(span.durationMs);
-      if (span.statusCode === "STATUS_CODE_ERROR") entry.errors++;
+      if (span.statusCode === "Error") entry.errors++;
     }
   }
 
@@ -560,10 +560,10 @@ function buildTopology(): Topology {
         });
       }
       const node = nodeMap.get(span.serviceName)!;
-      if (span.spanKind === "SPAN_KIND_SERVER") {
+      if (span.spanKind === "Server") {
         node.rpsCount++;
         node.p99Durations.push(span.durationMs);
-        if (span.statusCode === "STATUS_CODE_ERROR") node.errors++;
+        if (span.statusCode === "Error") node.errors++;
       }
 
       // DB spans create database nodes
@@ -604,7 +604,7 @@ function buildTopology(): Topology {
       const edge = edgeMap.get(edgeKey)!;
       edge.callCount++;
       edge.totalMs += span.durationMs;
-      if (span.statusCode === "STATUS_CODE_ERROR") edge.errorCount++;
+      if (span.statusCode === "Error") edge.errorCount++;
     }
   }
 
