@@ -1,6 +1,6 @@
 # SLO Ingress 契约设计
 
-> 状态: 执行中
+> 状态: 已完成（2026-08-23）
 > 创建时间: 2026-08-23
 > 范围: SLO 模块（仅 Ingress，Mesh 移除）
 
@@ -179,12 +179,12 @@ Hubble 无 host label）。
 
 ## 实施阶段
 
-- Phase 1: Collector 加 scrape + transform — ✅ 完成
-- Phase 2: 验证 ClickHouse 中 `ingress_*` 数据与 label 齐全
-- Phase 3: 改 Agent `slo.go`（TDD，先写断言）+ 契约自检扩展
-- Phase 4: HTTPRoute 域名映射
-- Phase 5: 删除 Mesh 相关代码（Agent / model / Master / 前端）
-- Phase 6: 端到端验收 —— SLO 页显示 5 个后端服务
+- Phase 1: Collector 加 scrape + transform — 完成
+- Phase 2: 验证 ClickHouse 中 ingress_* 数据与 label 齐全 — 完成
+- Phase 3: 改 Agent slo.go + 契约自检扩展 — 完成 (16cbd2c, d528129)
+- Phase 4: HTTPRoute 域名映射 + avgMs — 完成 (6e110f0)
+- Phase 5: 删除 Mesh（后端 af2f65d / 前端见 git log）— 完成
+- Phase 6: 端到端验收 — 完成，见下
 
 ## 验收
 
@@ -193,3 +193,46 @@ Hubble 无 host label）。
 3. Agent 契约自检输出 `[契约自检] 通过 table=otel_metrics_sum column=status_class`
 4. **抽象验证（纸面演练）**：列出"换成 Nginx Ingress"需改动的文件，
    清单中不得出现 `slo.go`
+
+
+## 实施结果（2026-08-23 生产实测）
+
+| serviceKey | displayName | RPS | 成功率 | avgMs | P99 |
+|---|---|---|---|---|---|
+| argocd/argocd-server | argocd.bukahou.com | 159.7 | 99.88 | 39.1 | 785 |
+| atlhyper/atlhyper-web | bukahou.com | 2159.5 | 99.68 | 313.5 | 686 |
+| geass-v3/geass-gateway | geass-api.bukahou.com | 2125.7 | 100 | 6.4 | 357 |
+| akasha/akasha | akasha.bukahou.com | 8.5 | 100 | 40.2 | 240 |
+| geass-v2/geass-web | geass.bukahou.com | 830.4 | 97.65 | 50.3 | 1122 |
+
+Agent 契约自检输出（每 10 分钟一轮）：
+
+```
+[契约自检] 通过 table=otel_metrics_sum column=Attributes['status_class'] 实际=2,3,4,5
+```
+
+### 与原设计的三处偏差
+
+1. **契约单位改为毫秒**（原计划秒）—— OTTL 无法改写 histogram 的
+   ExplicitBounds 数组，Collector 侧做不了换算。若让各实现自报单位，
+   Agent 就得知道底下是谁，等于放弃抽象。故契约直接规定毫秒
+   （正好是 IngressSLO 的 P*Ms 字段所需单位），指标名相应去掉 `_seconds`。
+
+2. **histogram 指标名无后缀** —— OTel Prometheus receiver 在 scrape 阶段
+   就把 `_bucket` / `_count` / `_sum` 三联合并成单个 histogram 指标
+   （`envoy_cluster_upstream_rq_time`），落 otel_metrics_histogram 表。
+   按 Prometheus 三联写的改名规则永远匹配不上 —— 这是实施中才发现的。
+
+3. **契约自检需带过滤条件** —— otel_metrics_sum 千万行级，裸
+   `SELECT DISTINCT` 全表扫描直至 i/o timeout（线上实测）。enumContract
+   新增 filter 字段，用「指标名 + 15 分钟窗口」收敛扫描范围。
+
+### 抽象验证（纸面演练）
+
+假设换成 Nginx Ingress，需要改动：
+
+- collector.yaml 的 transform 加一组 where 分支
+- 本文档「实现适配表」加一行
+
+**slo.go 不动。** TestIngressSQL_NoVendorNames 持续守护这条边界 ——
+它断言生成的 SQL 不含 traefik / envoy / istio / cilium 等任何实现名。
