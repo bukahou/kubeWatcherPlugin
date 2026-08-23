@@ -14,13 +14,18 @@
 > 实测发现面板上每个数字都是错的（counter delta 跨 envoy 实例污染，偏差 24000 倍）；
 > 域名显示成 serviceKey；缺燃烧率。存储决策（emptyDir）待用户拍板，Phase 1–3 不依赖它。
 
-- Phase 1: 多实例聚合修复 + 真实域名 — 🔄 进行中
-  - slo.go 四个 build*Query 加 service.instance.id 分区
-  - 直方图逐实例差分后逐桶相加
-  - buildDomainSLOV2Fallback 用 DisplayName
-  - RouteUpdater 改消费 Agent 域名映射（Ingress → HTTPRoute，ServiceKey 统一 {ns}/{svc}）
-- Phase 2: 燃烧率 + 事件计数口径预算 + 目标模型（去 time_range，加 window_days）— 待办
-- Phase 3: 面板重构（SLO 清单表 + 多窗口燃烧率 + Good/Bad 计数）— 待办
+- Phase 1: 多实例聚合修复 + 真实域名 — ✅ 完成（上线验证）
+  - 五处查询（count/latency/history/summary/timeSeries）按 service.instance.id 分区
+  - V1/V2 handler 域名改用 DisplayName
+  - 验收：手工 SQL 与 API 逐服务对齐 —— atlhyper-web 3256、geass-gateway 895(123 个 5xx)、
+    argocd 85、geass-web 59(1 个 5xx)、akasha 18，全部一致（修复前 geass-gateway 显示 4494 万）
+- Phase 2: 燃烧率 + 事件计数口径预算 + 目标模型 — ✅ 完成（上线验证）
+  - 四窗口燃烧率（Google SRE 阈值），Agent 窗口集改 1h/6h/24h/3d/7d（删 30d：TTL 只有 7 天）
+  - 预算改「允许错 N 个 / 已经错 M 个」，目标改一域名一套（去 time_range，加 window_days）
+  - 首屏换 SLO 清单表；目标弹窗改配窗口天数
+  - 线上：agent v0.6.0 / controller v0.4.9 / web v0.5.8
+- Phase 3: 详情页补多窗口燃烧率表 + Good/Bad 计数 — 待办
+  （清单表已含 1h/6h 两列与 已错/允许；详情页 OverviewTab 尚未补四窗口全表）
 - Phase 4: 存储（依赖 emptyDir 决策 B/C）— 待决策
 
 ---
