@@ -52,6 +52,9 @@ export const MOCK_NODES: NodeMetrics[] = [
         readIOPS: 120,
         writeIOPS: 85,
         ioUtilPct: 8.5,
+        awaitReadMs: 6.2,
+        awaitWriteMs: 14.8,
+        queueDepth: 0.18,
       },
       {
         device: "sda1",
@@ -65,6 +68,9 @@ export const MOCK_NODES: NodeMetrics[] = [
         readIOPS: 180,
         writeIOPS: 150,
         ioUtilPct: 15.2,
+        awaitReadMs: 1.8,
+        awaitWriteMs: 3.1,
+        queueDepth: 0.28,
       },
     ],
     networks: [
@@ -166,6 +172,9 @@ export const MOCK_NODES: NodeMetrics[] = [
         readIOPS: 1800,
         writeIOPS: 1400,
         ioUtilPct: 45.8,
+        awaitReadMs: 0.4,
+        awaitWriteMs: 0.6,
+        queueDepth: 0.74,
       },
     ],
     networks: [
@@ -283,6 +292,9 @@ export const MOCK_NODES: NodeMetrics[] = [
         readIOPS: 1000,
         writeIOPS: 800,
         ioUtilPct: 22.4,
+        awaitReadMs: 0.4,
+        awaitWriteMs: 0.6,
+        queueDepth: 0.39,
       },
       {
         device: "sdb1",
@@ -296,6 +308,9 @@ export const MOCK_NODES: NodeMetrics[] = [
         readIOPS: 1200,
         writeIOPS: 900,
         ioUtilPct: 35.2,
+        awaitReadMs: 1.8,
+        awaitWriteMs: 3.1,
+        queueDepth: 0.58,
       },
     ],
     networks: [

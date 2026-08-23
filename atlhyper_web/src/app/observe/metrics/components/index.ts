@@ -15,3 +15,5 @@ export { VMStatCard } from "./VMStatCard";
 export { ClusterOverviewChart } from "./ClusterOverviewChart";
 export { SummaryCard } from "./SummaryCard";
 export { NodeCard } from "./NodeCard";
+export { HardwareMatrix } from "./HardwareMatrix";
+export { HardwareSummaryTiles } from "./HardwareSummaryTiles";

@@ -33,6 +33,11 @@ type NodeMetrics struct {
 
 	Kernel string `json:"kernel,omitempty"`
 	Uptime int64  `json:"uptime,omitempty"`
+
+	// 硬件健康（Phase 1a）。Hardware 为 nil 表示上报方（旧版 Agent）不采集，
+	// Master 判定时按「无数据」处理，不得视为正常。
+	HardwareProfile HardwareProfile `json:"hardwareProfile,omitempty"`
+	Hardware        *NodeHardware   `json:"hardware,omitempty"`
 }
 
 type NodeCPU struct {
@@ -44,7 +49,8 @@ type NodeCPU struct {
 	Load5     float64   `json:"load5"`
 	Load15    float64   `json:"load15"`
 	Cores     int       `json:"cores"`
-	FreqHz    []float64 `json:"freqHz,omitempty"`
+	FreqHz    []float64 `json:"freqHz,omitempty"`    // 各核当前频率（node_cpu_scaling_frequency_hertz）
+	FreqMaxHz float64   `json:"freqMaxHz,omitempty"` // 标称最高频率（node_cpu_scaling_frequency_max_hertz）
 }
 
 type NodeMemory struct {
@@ -71,6 +77,9 @@ type NodeDisk struct {
 	ReadIOPS         float64 `json:"readIOPS"`
 	WriteIOPS        float64 `json:"writeIOPS"`
 	IOUtilPct        float64 `json:"ioUtilPct"`
+	AwaitReadMs      float64 `json:"awaitReadMs"`  // 平均读延迟 = read_time 速率 ÷ reads_completed 速率
+	AwaitWriteMs     float64 `json:"awaitWriteMs"` // 平均写延迟
+	QueueDepth       float64 `json:"queueDepth"`   // 平均在途请求数 = io_time_weighted 速率
 }
 
 type NodeNetwork struct {
@@ -97,6 +106,7 @@ type NodeTemperature struct {
 
 type TempSensor struct {
 	Chip     string  `json:"chip"`
+	ChipName string  `json:"chipName,omitempty"` // node_hwmon_chip_names 的可读名（coretemp / nvme / rp1_adc ...）
 	Sensor   string  `json:"sensor"`
 	CurrentC float64 `json:"currentC"`
 	MaxC     float64 `json:"maxC"`

@@ -29,6 +29,12 @@ export async function getClusterNodeMetrics(clusterId: string) {
   };
 }
 
+export async function getHardwareHealth(clusterId: string) {
+  if (getDataSourceMode("metrics") === "mock") return mock.mockGetHardwareHealth();
+  const res = await observe.getMetricsHardware(clusterId);
+  return res.data.data;
+}
+
 export async function getNodeMetricsHistory(clusterId: string, nodeName: string, hours?: number) {
   if (getDataSourceMode("metrics") === "mock") return mock.mockGetNodeMetricsHistory(nodeName, hours);
   // 历史数据使用 SQLite 直读（快速，无需 Command 机制）

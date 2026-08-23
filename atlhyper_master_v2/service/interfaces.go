@@ -48,6 +48,8 @@ type QueryK8s interface {
 type QueryOTel interface {
 	GetOTelSnapshot(ctx context.Context, clusterID string) (*cluster.OTelSnapshot, error)
 	GetOTelTimeline(ctx context.Context, clusterID string, since time.Time) ([]cluster.OTelEntry, error)
+	// GetHardwareHealth 硬件健康矩阵（阈值判定已在 Master 完成，前端只渲染）
+	GetHardwareHealth(ctx context.Context, clusterID string) (*model.HardwareHealthResponse, error)
 }
 
 // QuerySLO SLO 服务网格查询 + SLO 目标/路由映射查询

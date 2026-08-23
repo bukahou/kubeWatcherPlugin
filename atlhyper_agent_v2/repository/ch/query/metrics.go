@@ -224,6 +224,14 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 		Timestamp: time.Now(),
 	}
 
+	// hwmon chip 可读名只有一张小表，先同步查一次，温度 / 硬件 / 画像三处共用
+	chipNameByPath := r.queryChipNames(ctx, ip)
+	chipNames := make([]string, 0, len(chipNameByPath))
+	for _, name := range chipNameByPath {
+		chipNames = append(chipNames, name)
+	}
+	var machine string // uname machine，Wait 后与 chipNames 一起推导画像
+
 	// 并行查询各指标类别
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -239,7 +247,7 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 		}
 	}
 
-	wg.Add(10)
+	wg.Add(11)
 
 	// CPU
 	go func() {
@@ -268,7 +276,13 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	// Temperature
 	go func() {
 		defer wg.Done()
-		r.fillTemperature(ctx, ip, nm)
+		r.fillTemperature(ctx, ip, nm, chipNameByPath)
+	}()
+
+	// Hardware（风扇 / 散热 / 欠压）
+	go func() {
+		defer wg.Done()
+		r.fillHardware(ctx, ip, nm)
 	}()
 
 	// PSI
@@ -295,15 +309,17 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 		r.fillVMStat(ctx, ip, nm)
 	}()
 
-	// Uptime + Kernel
+	// Uptime + Kernel + machine
 	go func() {
 		defer wg.Done()
-		if err := r.fillSystemInfo(ctx, ip, nm); err != nil {
-			recordErr(err)
-		}
+		m, err := r.fillSystemInfo(ctx, ip, nm)
+		machine = m
+		recordErr(err)
 	}()
 
 	wg.Wait()
+
+	nm.HardwareProfile = metrics.DetectHardwareProfile(machine, chipNames)
 
 	return nm, firstErr
 }
@@ -390,6 +406,34 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 			nm.CPU.Load5 = roundTo(val, 2)
 		case "node_load15":
 			nm.CPU.Load15 = roundTo(val, 2)
+		}
+	}
+
+	// 各核当前频率 + 标称最高频率（cpufreq collector；热降频判定在 Master）
+	freqRows, err := r.client.Query(ctx, `
+		SELECT toUInt32OrZero(Attributes['cpu']) AS cpu,
+		       argMaxIf(Value, TimeUnix, MetricName='node_cpu_scaling_frequency_hertz') AS cur,
+		       argMaxIf(Value, TimeUnix, MetricName='node_cpu_scaling_frequency_max_hertz') AS maxv
+		FROM otel_metrics_gauge
+		WHERE MetricName IN ('node_cpu_scaling_frequency_hertz', 'node_cpu_scaling_frequency_max_hertz')
+		  AND ResourceAttributes['net.host.name'] = ?
+		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
+		GROUP BY cpu
+		ORDER BY cpu
+	`, ip)
+	if err != nil {
+		return
+	}
+	defer freqRows.Close()
+	for freqRows.Next() {
+		var cpu uint32
+		var cur, maxv float64
+		if err := freqRows.Scan(&cpu, &cur, &maxv); err != nil {
+			continue
+		}
+		nm.CPU.FreqHz = append(nm.CPU.FreqHz, cur)
+		if maxv > nm.CPU.FreqMaxHz {
+			nm.CPU.FreqMaxHz = maxv
 		}
 	}
 }
@@ -494,7 +538,9 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 		WHERE MetricName IN (
 			'node_disk_read_bytes_total', 'node_disk_written_bytes_total',
 			'node_disk_reads_completed_total', 'node_disk_writes_completed_total',
-			'node_disk_io_time_seconds_total'
+			'node_disk_io_time_seconds_total',
+			'node_disk_read_time_seconds_total', 'node_disk_write_time_seconds_total',
+			'node_disk_io_time_weighted_seconds_total'
 		)
 		AND ResourceAttributes['net.host.name'] = ?
 		AND TimeUnix >= now() - INTERVAL 5 MINUTE
@@ -507,6 +553,10 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	}
 	defer ioRows.Close()
 
+	// await 需要 time 与 ops 两条速率相除，先攒起来，循环结束再算
+	type ioTime struct{ read, write float64 }
+	ioTimes := make(map[string]*ioTime)
+
 	for ioRows.Next() {
 		var device, metricName string
 		var rate float64
@@ -517,6 +567,9 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 		if !ok {
 			d = &metrics.NodeDisk{Device: device}
 			diskMap[device] = d
+		}
+		if _, ok := ioTimes[device]; !ok {
+			ioTimes[device] = &ioTime{}
 		}
 		switch metricName {
 		case "node_disk_read_bytes_total":
@@ -529,7 +582,19 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 			d.WriteIOPS = roundTo(rate, 2)
 		case "node_disk_io_time_seconds_total":
 			d.IOUtilPct = roundTo(clamp(rate*100, 0, 100), 2)
+		case "node_disk_read_time_seconds_total":
+			ioTimes[device].read = rate
+		case "node_disk_write_time_seconds_total":
+			ioTimes[device].write = rate
+		case "node_disk_io_time_weighted_seconds_total":
+			d.QueueDepth = roundTo(rate, 2)
 		}
+	}
+
+	for device, t := range ioTimes {
+		d := diskMap[device]
+		d.AwaitReadMs = awaitMs(t.read, d.ReadIOPS)
+		d.AwaitWriteMs = awaitMs(t.write, d.WriteIOPS)
 	}
 
 	for _, d := range diskMap {
@@ -627,8 +692,10 @@ func (r *metricsRepository) fillNetworks(ctx context.Context, ip string, nm *met
 	}
 }
 
-// fillTemperature 填充温度指标
-func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+// fillTemperature 填充温度指标：所有 hwmon 传感器 + 可读 chip 名。
+// CPU 温度 / 阈值取 CPU 类传感器（coretemp / SoC thermal zone）里最热的一个，
+// 不再取 Sensors[0]（那取决于 ClickHouse 的返回顺序，NVMe 排前面就会把盘温当 CPU 温）。
+func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *metrics.NodeMetrics, chipNameByPath map[string]string) {
 	query := `
 		SELECT Attributes['chip'] AS chip, Attributes['sensor'] AS sensor,
 		       argMaxIf(Value, TimeUnix, MetricName='node_hwmon_temp_celsius') AS current,
@@ -639,6 +706,7 @@ func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *
 		  AND ResourceAttributes['net.host.name'] = ?
 		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
 		GROUP BY chip, sensor
+		ORDER BY chip, sensor
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
@@ -646,22 +714,134 @@ func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *
 	}
 	defer rows.Close()
 
-	var maxCPUTemp float64
+	var hottestCPU *metrics.TempSensor
 	for rows.Next() {
 		var s metrics.TempSensor
 		if err := rows.Scan(&s.Chip, &s.Sensor, &s.CurrentC, &s.MaxC, &s.CritC); err != nil {
 			continue
 		}
+		s.ChipName = chipNameByPath[s.Chip]
+		s.CurrentC = roundTo(s.CurrentC, 2)
+		s.MaxC = sanitizeTempLimit(s.MaxC)
+		s.CritC = sanitizeTempLimit(s.CritC)
 		nm.Temperature.Sensors = append(nm.Temperature.Sensors, s)
-		if s.CurrentC > maxCPUTemp {
-			maxCPUTemp = s.CurrentC
+		if s.Class() == metrics.TempClassCPU && (hottestCPU == nil || s.CurrentC > hottestCPU.CurrentC) {
+			last := nm.Temperature.Sensors[len(nm.Temperature.Sensors)-1]
+			hottestCPU = &last
 		}
 	}
-	nm.Temperature.CPUTempC = roundTo(maxCPUTemp, 1)
-	if len(nm.Temperature.Sensors) > 0 {
-		nm.Temperature.CPUMaxC = nm.Temperature.Sensors[0].MaxC
-		nm.Temperature.CPUCritC = nm.Temperature.Sensors[0].CritC
+	if hottestCPU != nil {
+		nm.Temperature.CPUTempC = roundTo(hottestCPU.CurrentC, 1)
+		nm.Temperature.CPUMaxC = hottestCPU.MaxC
+		nm.Temperature.CPUCritC = hottestCPU.CritC
 	}
+}
+
+// queryChipNames 取 hwmon chip 路径 → 可读名（node_hwmon_chip_names 的 chip / chip_name 标签）。
+// 查不到返回空 map，调用方按「无可读名」降级，不报错。
+func (r *metricsRepository) queryChipNames(ctx context.Context, ip string) map[string]string {
+	names := make(map[string]string)
+	rows, err := r.client.Query(ctx, `
+		SELECT DISTINCT Attributes['chip'], Attributes['chip_name']
+		FROM otel_metrics_gauge
+		WHERE MetricName = 'node_hwmon_chip_names'
+		  AND ResourceAttributes['net.host.name'] = ?
+		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
+	`, ip)
+	if err != nil {
+		return names
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var chip, name string
+		if err := rows.Scan(&chip, &name); err == nil && chip != "" {
+			names[chip] = name
+		}
+	}
+	return names
+}
+
+// fillHardware 填充风扇 / 散热设备 / 欠压告警。
+// 任一传感器不存在时对应切片为空 / 指针为 nil，Master 据此显示「无数据」。
+func (r *metricsRepository) fillHardware(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+	hw := &metrics.NodeHardware{Fans: []metrics.FanSensor{}, Cooling: []metrics.CoolingDevice{}}
+
+	fanRows, err := r.client.Query(ctx, `
+		SELECT Attributes['chip'], Attributes['sensor'], argMax(Value, TimeUnix)
+		FROM otel_metrics_gauge
+		WHERE MetricName = 'node_hwmon_fan_rpm'
+		  AND ResourceAttributes['net.host.name'] = ?
+		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
+		GROUP BY Attributes['chip'], Attributes['sensor']
+	`, ip)
+	if err == nil {
+		for fanRows.Next() {
+			var f metrics.FanSensor
+			if err := fanRows.Scan(&f.Chip, &f.Sensor, &f.RPM); err == nil {
+				hw.Fans = append(hw.Fans, f)
+			}
+		}
+		fanRows.Close()
+	}
+
+	coolRows, err := r.client.Query(ctx, `
+		SELECT Attributes['name'] AS name, Attributes['type'] AS type,
+		       argMaxIf(Value, TimeUnix, MetricName='node_cooling_device_cur_state') AS cur,
+		       argMaxIf(Value, TimeUnix, MetricName='node_cooling_device_max_state') AS maxv
+		FROM otel_metrics_gauge
+		WHERE MetricName IN ('node_cooling_device_cur_state', 'node_cooling_device_max_state')
+		  AND ResourceAttributes['net.host.name'] = ?
+		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
+		GROUP BY name, type
+		ORDER BY type, name
+	`, ip)
+	if err == nil {
+		for coolRows.Next() {
+			var c metrics.CoolingDevice
+			var cur, maxv float64
+			if err := coolRows.Scan(&c.Name, &c.Type, &cur, &maxv); err == nil {
+				c.CurState, c.MaxState = int(cur), int(maxv)
+				hw.Cooling = append(hw.Cooling, c)
+			}
+		}
+		coolRows.Close()
+	}
+
+	// 欠压位：只有树莓派 rpi_volt 有；用 count 区分「无传感器」与「值为 0」
+	var alarmCount uint64
+	var alarm float64
+	err = r.client.QueryRow(ctx, `
+		SELECT count(), argMax(Value, TimeUnix)
+		FROM otel_metrics_gauge
+		WHERE MetricName = 'node_hwmon_in_lcrit_alarm_volts'
+		  AND ResourceAttributes['net.host.name'] = ?
+		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
+	`, ip).Scan(&alarmCount, &alarm)
+	if err == nil && alarmCount > 0 {
+		v := alarm > 0
+		hw.UndervoltAlarm = &v
+	}
+
+	nm.Hardware = hw
+}
+
+// tempLimitCeilingC 超过它的温度阈值视为传感器垃圾值（实测 NVMe temp2 上报 max=65261.85）
+const tempLimitCeilingC = 200
+
+// sanitizeTempLimit 把物理上不可能的阈值归零，交给 Master 按画像兜底
+func sanitizeTempLimit(v float64) float64 {
+	if v <= 0 || v > tempLimitCeilingC {
+		return 0
+	}
+	return v
+}
+
+// awaitMs 平均 IO 延迟（毫秒）= 累计耗时速率 ÷ 完成次数速率
+func awaitMs(timeRate, opsRate float64) float64 {
+	if opsRate <= 0 {
+		return 0
+	}
+	return roundTo(timeRate/opsRate*1000, 2)
 }
 
 // fillPSI 填充 Pressure Stall Info
@@ -843,8 +1023,8 @@ func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metri
 	}
 }
 
-// fillSystemInfo 填充 Uptime + Kernel
-func (r *metricsRepository) fillSystemInfo(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
+// fillSystemInfo 填充 Uptime + Kernel，并返回 uname machine（x86_64 / aarch64，画像识别用）
+func (r *metricsRepository) fillSystemInfo(ctx context.Context, ip string, nm *metrics.NodeMetrics) (string, error) {
 	// Boot time
 	var bootTime float64
 	err := r.client.QueryRow(ctx, `
@@ -858,20 +1038,20 @@ func (r *metricsRepository) fillSystemInfo(ctx context.Context, ip string, nm *m
 		nm.Uptime = time.Now().Unix() - int64(bootTime)
 	}
 
-	// Kernel from uname info labels
-	var kernel string
+	// Kernel + machine from uname info labels
+	var kernel, machine string
 	err = r.client.QueryRow(ctx, `
-		SELECT Attributes['release']
+		SELECT Attributes['release'], Attributes['machine']
 		FROM otel_metrics_gauge
 		WHERE MetricName = 'node_uname_info'
 		  AND ResourceAttributes['net.host.name'] = ?
 		ORDER BY TimeUnix DESC LIMIT 1
-	`, ip).Scan(&kernel)
+	`, ip).Scan(&kernel, &machine)
 	if err == nil {
 		nm.Kernel = kernel
 	}
 
-	return nil
+	return machine, nil
 }
 
 // =============================================================================

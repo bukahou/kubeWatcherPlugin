@@ -1,0 +1,99 @@
+// metrics_hardware.go 硬件健康 API 响应模型（GET /api/v2/observe/metrics/hardware）
+//
+// 与 model_v3/metrics 的上报模型分开：这里是「判定完的结果」，每格自带 status，
+// 前端只渲染 chip 颜色，不再做任何阈值比较（大后端小前端）。
+// 指针字段为 nil → JSON null → 前端显示「无数据」；绝不用零值冒充正常。
+package model
+
+// HardwareStatus 单格 / 节点的健康状态
+type HardwareStatus string
+
+const (
+	HardwareGood HardwareStatus = "good"
+	HardwareWarn HardwareStatus = "warn"
+	HardwareCrit HardwareStatus = "crit"
+)
+
+// HardwareTempCell 温度格（CPU / 磁盘 / 其他）
+type HardwareTempCell struct {
+	Value  float64        `json:"value"`
+	Max    float64        `json:"max"`  // warn 阈值（传感器自带或画像表）
+	Crit   float64        `json:"crit"` // crit 阈值
+	Label  string         `json:"label,omitempty"`
+	Status HardwareStatus `json:"status"`
+}
+
+// HardwareUndervoltCell 欠压格（树莓派）
+type HardwareUndervoltCell struct {
+	Alarm  bool           `json:"alarm"`
+	Status HardwareStatus `json:"status"`
+}
+
+// HardwareFanCell 风扇格。RPM 为 nil = 没有转速传感器（只有 cooling state）。
+type HardwareFanCell struct {
+	RPM      *float64       `json:"rpm"`
+	State    int            `json:"state"`
+	MaxState int            `json:"maxState"`
+	Status   HardwareStatus `json:"status"`
+}
+
+// HardwareFreqCell CPU 频率格（热降频判定）
+type HardwareFreqCell struct {
+	CurrentGHz float64        `json:"currentGHz"`
+	MaxGHz     float64        `json:"maxGHz"`
+	RatioPct   float64        `json:"ratioPct"`
+	Status     HardwareStatus `json:"status"`
+}
+
+// HardwareAwaitCell 磁盘延迟格（该节点最差的块设备）
+type HardwareAwaitCell struct {
+	ValueMs float64        `json:"valueMs"`
+	Device  string         `json:"device"`
+	Status  HardwareStatus `json:"status"`
+}
+
+// HardwareRow 矩阵一行 = 一个节点
+type HardwareRow struct {
+	NodeName     string                 `json:"nodeName"`
+	Profile      string                 `json:"profile"`
+	ProfileLabel string                 `json:"profileLabel"`
+	CPUTemp      *HardwareTempCell      `json:"cpuTemp"`
+	DiskTemp     *HardwareTempCell      `json:"diskTemp"`
+	OtherTemp    *HardwareTempCell      `json:"otherTemp"`
+	Undervolt    *HardwareUndervoltCell `json:"undervolt"`
+	Fan          *HardwareFanCell       `json:"fan"`
+	CPUFreq      *HardwareFreqCell      `json:"cpuFreq"`
+	DiskAwait    *HardwareAwaitCell     `json:"diskAwait"`
+	Overall      HardwareStatus         `json:"overall"`
+}
+
+// HardwareMaxTemp 速览：集群最高温（含来源）
+type HardwareMaxTemp struct {
+	Value    float64        `json:"value"`
+	NodeName string         `json:"nodeName"`
+	Sensor   string         `json:"sensor"`
+	Status   HardwareStatus `json:"status"`
+}
+
+// HardwareMaxAwait 速览：集群最差磁盘延迟
+type HardwareMaxAwait struct {
+	ValueMs  float64        `json:"valueMs"`
+	NodeName string         `json:"nodeName"`
+	Device   string         `json:"device"`
+	Status   HardwareStatus `json:"status"`
+}
+
+// HardwareSummary 速览 tile 数据
+type HardwareSummary struct {
+	MaxTemp        *HardwareMaxTemp  `json:"maxTemp"`
+	MaxDiskTemp    *HardwareMaxTemp  `json:"maxDiskTemp"`
+	UndervoltNodes int               `json:"undervoltNodes"`
+	ThrottledNodes int               `json:"throttledNodes"`
+	MaxDiskAwait   *HardwareMaxAwait `json:"maxDiskAwait"`
+}
+
+// HardwareHealthResponse 完整响应 data
+type HardwareHealthResponse struct {
+	Rows    []HardwareRow   `json:"rows"`
+	Summary HardwareSummary `json:"summary"`
+}

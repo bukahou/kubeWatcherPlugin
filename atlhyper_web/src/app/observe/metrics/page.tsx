@@ -9,7 +9,6 @@ import {
   Server,
   Cpu,
   HardDrive,
-  Thermometer,
   AlertTriangle,
   Loader2,
   WifiOff,
@@ -20,6 +19,8 @@ import {
   ClusterOverviewChart,
   SummaryCard,
   NodeCard,
+  HardwareSummaryTiles,
+  HardwareMatrix,
 } from "./components";
 
 // OTel 可用性守卫
@@ -29,10 +30,12 @@ import { OTelGuard } from "@/components/observe/OTelGuard";
 import {
   getClusterNodeMetrics,
   getNodeMetricsHistory,
+  getHardwareHealth,
 } from "@/datasource/metrics";
 import type { Summary } from "@/datasource/metrics";
 
 import type { NodeMetrics, Point } from "@/types/node-metrics";
+import type { HardwareHealth } from "@/types/hardware";
 
 // ==================== 主页面 ====================
 export default function MetricsPage() {
@@ -58,6 +61,7 @@ function MetricsPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [nodes, setNodes] = useState<NodeMetrics[]>([]);
+  const [hardware, setHardware] = useState<HardwareHealth | null>(null);
 
   // 历史数据缓存（每个节点，按 metric 分组）
   const [historyCache, setHistoryCache] = useState<Record<string, Record<string, Point[]>>>({});
@@ -69,9 +73,14 @@ function MetricsPageContent() {
     if (showLoading) setIsRefreshing(true);
 
     try {
-      const result = await getClusterNodeMetrics(currentClusterId);
+      // 硬件健康与节点指标来自同一份快照，并行取；硬件接口失败不应拖垮整页
+      const [result, hw] = await Promise.all([
+        getClusterNodeMetrics(currentClusterId),
+        getHardwareHealth(currentClusterId).catch(() => null),
+      ]);
       setSummary(result.summary);
       setNodes(result.nodes);
+      setHardware(hw);
       setError(null);
       setLastUpdate(new Date());
     } finally {
@@ -197,7 +206,7 @@ function MetricsPageContent() {
 
         {/* 集群概览卡片 */}
         {summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <SummaryCard
               icon={Server}
               label={nm.summary.nodes}
@@ -220,12 +229,6 @@ function MetricsPageContent() {
               color={summary.avgMemPct >= 80 ? "bg-red-500/10 text-red-500" : summary.avgMemPct >= 60 ? "bg-yellow-500/10 text-yellow-500" : "bg-green-500/10 text-green-500"}
             />
             <SummaryCard
-              icon={Thermometer}
-              label={nm.summary.maxTemp}
-              value={summary.maxCpuTemp > 0 ? `${summary.maxCpuTemp.toFixed(1)}°C` : nm.temperature.na}
-              color={summary.maxCpuTemp >= 80 ? "bg-red-500/10 text-red-500" : summary.maxCpuTemp >= 65 ? "bg-yellow-500/10 text-yellow-500" : "bg-cyan-500/10 text-cyan-500"}
-            />
-            <SummaryCard
               icon={AlertTriangle}
               label={nm.summary.warnings}
               value={warningNodes.toString()}
@@ -234,6 +237,10 @@ function MetricsPageContent() {
             />
           </div>
         )}
+
+        {/* 硬件健康（速览 + 矩阵）*/}
+        <HardwareSummaryTiles data={hardware} />
+        <HardwareMatrix data={hardware} />
 
         {/* 集群概览趋势图 */}
         {nodes.length > 1 && currentClusterId && (

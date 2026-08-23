@@ -5,6 +5,7 @@
 import { get } from "./request";
 import type { ObserveResponse } from "./observe-common";
 import type { NodeMetrics, Summary, Point } from "@/types/node-metrics";
+import type { HardwareHealth } from "@/types/hardware";
 
 /** 获取指标汇总 */
 export function getMetricsSummary(clusterId: string) {
@@ -34,4 +35,11 @@ export function getMetricsNodeSeries(clusterId: string, nodeName: string, metric
     `/api/v2/observe/metrics/nodes/${encodeURIComponent(nodeName)}/series`,
     { cluster_id: clusterId, metric, ...(minutes ? { minutes } : {}) }
   );
+}
+
+/** 获取硬件健康矩阵（阈值判定已在后端完成） */
+export function getMetricsHardware(clusterId: string) {
+  return get<ObserveResponse<HardwareHealth>>("/api/v2/observe/metrics/hardware", {
+    cluster_id: clusterId,
+  });
 }

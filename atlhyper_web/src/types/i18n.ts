@@ -1821,6 +1821,39 @@ interface NodeMetricsTranslations {
     highWarning: string;
     na: string;
   };
+  // Hardware（硬件健康矩阵）
+  hardware: {
+    title: string;
+    subtitle: string;
+    node: string;
+    cpuTemp: string;
+    diskTemp: string;
+    otherTemp: string;
+    undervolt: string;
+    fan: string;
+    cpuFreq: string;
+    diskAwait: string;
+    overall: string;
+    noData: string;
+    normal: string;
+    alarm: string;
+    stopped: string;
+    threshold: string;
+    tiles: {
+      maxTemp: string;
+      maxDiskTemp: string;
+      undervoltNodes: string;
+      throttledNodes: string;
+      maxDiskAwait: string;
+      nodes: string;
+      none: string;
+    };
+    status: {
+      good: string;
+      warn: string;
+      crit: string;
+    };
+  };
   // Chart
   chart: {
     title: string;

@@ -56,6 +56,31 @@ func (h *ObserveHandler) MetricsNodes(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MetricsHardware GET /api/v2/observe/metrics/hardware
+//
+// 硬件健康矩阵：每格自带 status，缺传感器的格子为 null（前端显示「无数据」）
+func (h *ObserveHandler) MetricsHardware(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		handler.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	clusterID, ok := requireClusterID(r)
+	if !ok {
+		handler.WriteError(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+
+	health, err := h.querySvc.GetHardwareHealth(r.Context(), clusterID)
+	if err != nil || health == nil {
+		handler.WriteError(w, http.StatusNotFound, "数据尚未就绪")
+		return
+	}
+	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "获取成功",
+		"data":    health,
+	})
+}
+
 // MetricsNodeRoute GET /api/v2/observe/metrics/nodes/{name}[/series]
 //
 // 单节点详情: 从快照 MetricsNodes 中过滤

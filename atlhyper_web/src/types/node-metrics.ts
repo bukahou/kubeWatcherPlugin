@@ -14,6 +14,7 @@ export interface NodeCPU {
   load15: number;
   cores: number;
   freqHz?: number[];
+  freqMaxHz?: number;   // 标称最高频率（热降频判定用）
 }
 
 // ============================================================================
@@ -46,6 +47,9 @@ export interface NodeDisk {
   readIOPS: number;
   writeIOPS: number;
   ioUtilPct: number;
+  awaitReadMs: number;  // 平均读延迟
+  awaitWriteMs: number; // 平均写延迟
+  queueDepth: number;   // 平均在途请求数
 }
 
 // ============================================================================
@@ -78,6 +82,7 @@ export interface NodeTemperature {
 
 export interface TempSensor {
   chip: string;
+  chipName?: string;    // hwmon 可读名：coretemp / nvme / rp1_adc ...
   sensor: string;
   currentC: number;
   maxC: number;
@@ -157,6 +162,31 @@ export interface NodeMetrics {
 
   kernel?: string;
   uptime?: number;
+
+  hardwareProfile?: string;   // desk / raspi5 / raspi4 / unknown
+  hardware?: NodeHardware;    // 缺失 = 上报方不采集，按「无数据」处理
+}
+
+// ============================================================================
+// 硬件传感器（风扇 / 散热 / 电压）
+// ============================================================================
+export interface NodeHardware {
+  undervoltAlarm?: boolean;   // 缺失 = 无此传感器
+  fans: FanSensor[];
+  cooling: CoolingDevice[];
+}
+
+export interface FanSensor {
+  chip: string;
+  sensor: string;
+  rpm: number;
+}
+
+export interface CoolingDevice {
+  name: string;
+  type: string;
+  curState: number;
+  maxState: number;
 }
 
 // ============================================================================

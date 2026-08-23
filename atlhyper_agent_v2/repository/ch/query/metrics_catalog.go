@@ -6,7 +6,7 @@
 //
 // 为什么需要它：
 //
-//	2026-08 实测 Agent 查询引用 52 个 node_* 指标，而 Collector 只 keep 了 16 个 ——
+//	2026-08 实测 Agent 查询引用 55 个 node_* 指标，而 Collector 只 keep 了 16 个 ——
 //	39 个"查而不采"，PSI / TCP / VMStat / 系统资源 四张卡片长期空白且无任何报错。
 //	与此前 kube_* 的"采而不查"（65 个指标 9600 万行无人读）是同一种病的镜像。
 //	根因都是两端各自演进、没有单一对齐点。
@@ -48,6 +48,9 @@ var NodeExporterMetrics = []string{
 	"node_disk_reads_completed_total",
 	"node_disk_writes_completed_total",
 	"node_disk_io_time_seconds_total",
+	"node_disk_read_time_seconds_total",        // ÷ reads_completed = 平均读延迟
+	"node_disk_write_time_seconds_total",       // ÷ writes_completed = 平均写延迟
+	"node_disk_io_time_weighted_seconds_total", // 速率 = 平均队列深度
 	"node_filesystem_size_bytes",
 	"node_filesystem_avail_bytes",
 
@@ -64,10 +67,19 @@ var NodeExporterMetrics = []string{
 	"node_network_receive_drop_total",
 	"node_network_transmit_drop_total",
 
-	// ── hwmon（温度；Phase 1 会补风扇 / 电压）──
+	// ── hwmon（温度 / 风扇 / 电压）+ thermal cooling device ──
+	"node_hwmon_chip_names", // chip 路径 → 可读名（coretemp / nvme / rp1_adc / rpi_volt / pwmfan）
 	"node_hwmon_temp_celsius",
 	"node_hwmon_temp_max_celsius",
 	"node_hwmon_temp_crit_celsius",
+	"node_hwmon_fan_rpm",
+	"node_hwmon_in_lcrit_alarm_volts", // 树莓派欠压告警位
+	"node_cooling_device_cur_state",
+	"node_cooling_device_max_state",
+
+	// ── cpufreq（热降频判定）──
+	"node_cpu_scaling_frequency_hertz",
+	"node_cpu_scaling_frequency_max_hertz",
 
 	// ── pressure (PSI) ──
 	"node_pressure_cpu_waiting_seconds_total",
