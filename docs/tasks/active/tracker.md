@@ -7,7 +7,7 @@
 
 ---
 
-## 节点指标：硬件健康 + USE 改版 — 🔄 进行中
+## 节点指标：硬件健康 + USE 改版 — 🔄 进行中（Phase 0–3 代码完成，待 agent v0.5.6 / controller v0.4.5 / web v0.5.6 部署验证）
 
 > 原设计文档: [node-metrics-hardware-use-design.md](../../design/active/node-metrics-hardware-use-design.md)
 >
@@ -34,8 +34,9 @@
   - OOMKillTotal（累计值）、ProcsRunning/Blocked、ArpEntries、校时；CPU 每核负载
   - swap 段改为常驻显示（「关着」与「查不到」是两回事）
   - 清单 65 → 74，config f0a6ee2 已部署
-  - 待办：agent v0.5.6 / controller v0.4.5 / web v0.5.6 部署后集群验证
-- Phase 3: 节点对比表 — 待办
+- Phase 3: 节点对比表 — ✅ 完成（1dcc186）
+  - GET /observe/metrics/compare（硬件 5 列 + 资源 6 列），硬件列复用矩阵判定不重算
+  - NodeCompareTable：节点列 sticky、硬件/资源分隔线、异常格加粗
 - Phase 4: drivetemp / systemd / SMART — 待决策
 
 ---
