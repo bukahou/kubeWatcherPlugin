@@ -51,8 +51,6 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 		snapshot.AvgP99Ms = s.otelCache.AvgP99Ms
 		snapshot.IngressServices = s.otelCache.IngressServices
 		snapshot.IngressAvgRPS = s.otelCache.IngressAvgRPS
-		snapshot.MeshServices = s.otelCache.MeshServices
-		snapshot.MeshAvgMTLS = s.otelCache.MeshAvgMTLS
 		snapshot.MonitoredNodes = s.otelCache.MonitoredNodes
 		snapshot.AvgCPUPct = s.otelCache.AvgCPUPct
 		snapshot.AvgMemPct = s.otelCache.AvgMemPct
@@ -80,7 +78,7 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 
 		go func() {
 			defer wg.Done()
-			ingressSvc, ingressRPS, meshSvc, meshMTLS, err := s.otelSummaryRepo.GetSLOSummary(ctx)
+			ingressSvc, ingressRPS, err := s.otelSummaryRepo.GetSLOSummary(ctx)
 			if err != nil {
 				log.Warn("OTel SLO 概览查询失败", "err", err)
 				setError()
@@ -89,8 +87,6 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 			mu.Lock()
 			snapshot.IngressServices = ingressSvc
 			snapshot.IngressAvgRPS = ingressRPS
-			snapshot.MeshServices = meshSvc
-			snapshot.MeshAvgMTLS = meshMTLS
 			mu.Unlock()
 		}()
 
@@ -124,8 +120,6 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 		snapshot.APMTopology = cached.APMTopology
 		snapshot.SLOSummary = cached.SLOSummary
 		snapshot.SLOIngress = cached.SLOIngress
-		snapshot.SLOServices = cached.SLOServices
-		snapshot.SLOEdges = cached.SLOEdges
 		snapshot.APMOperations = cached.APMOperations
 		snapshot.RecentTraces = cached.RecentTraces
 		// RecentLogs 不再缓存到快照（日志走 Command → ClickHouse 按需查询）
@@ -268,7 +262,7 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 
 	// Concentrator: 摄入当前数据 + 输出预聚合时序
 	if s.conc != nil {
-		s.conc.Ingest(snapshot.MetricsNodes, snapshot.SLOIngress, snapshot.SLOServices, snapshot.APMServices, now)
+		s.conc.Ingest(snapshot.MetricsNodes, snapshot.SLOIngress, snapshot.APMServices, now)
 		snapshot.NodeMetricsSeries = s.conc.FlushNodeSeries()
 		snapshot.SLOTimeSeries = s.conc.FlushSLOSeries()
 		snapshot.APMTimeSeries = s.conc.FlushAPMSeries()

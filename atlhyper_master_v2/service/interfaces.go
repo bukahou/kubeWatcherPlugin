@@ -52,8 +52,6 @@ type QueryOTel interface {
 
 // QuerySLO SLO 服务网格查询 + SLO 目标/路由映射查询
 type QuerySLO interface {
-	GetMeshTopology(ctx context.Context, clusterID, timeRange string) (*model.ServiceMeshTopologyResponse, error)
-	GetServiceDetail(ctx context.Context, clusterID, namespace, name, timeRange string) (*model.ServiceDetailResponse, error)
 	// SLO 目标查询（返回 model 类型，非 database 类型）
 	GetSLOTargets(ctx context.Context, clusterID string) ([]model.SLOTargetResponse, error)
 	// SLO 路由映射查询（返回 model 类型，非 database 类型）

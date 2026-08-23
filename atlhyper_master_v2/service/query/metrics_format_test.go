@@ -45,9 +45,9 @@ func TestFormatMemory(t *testing.T) {
 		{"mi_to_gi", "2048Mi", "2.00Gi"},
 		{"gi_passthrough", "1Gi", "1Gi"},
 		{"gi_large", "4Gi", "4Gi"},
-		{"bytes_to_mi", "134217728", "128Mi"},       // 128 * 1024 * 1024
-		{"bytes_to_gi", "2147483648", "2.00Gi"},      // 2 * 1024^3
-		{"bytes_to_ki", "65536", "64Ki"},              // 64 * 1024, < 1Mi
+		{"bytes_to_mi", "134217728", "128Mi"},   // 128 * 1024 * 1024
+		{"bytes_to_gi", "2147483648", "2.00Gi"}, // 2 * 1024^3
+		{"bytes_to_ki", "65536", "64Ki"},        // 64 * 1024, < 1Mi
 		{"invalid_input", "abc", "abc"},
 		{"ki_invalid_number", "xyzKi", "xyzKi"},
 		{"mi_invalid_number", "abcMi", "abcMi"},

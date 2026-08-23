@@ -51,5 +51,5 @@ type HistogramBucket struct {
 // HistogramResult 直方图查询结果
 type HistogramResult struct {
 	Buckets    []HistogramBucket `json:"buckets"`
-	IntervalMs int64            `json:"intervalMs"`
+	IntervalMs int64             `json:"intervalMs"`
 }

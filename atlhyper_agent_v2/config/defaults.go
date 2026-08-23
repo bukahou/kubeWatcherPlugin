@@ -8,10 +8,10 @@ package config
 // ============================================================
 var defaultDurations = map[string]string{
 	// -------------------- 调度器配置 --------------------
-	"AGENT_SNAPSHOT_INTERVAL":     "10s", // 快照采集间隔
+	"AGENT_SNAPSHOT_INTERVAL":     "10s",   // 快照采集间隔
 	"AGENT_COMMAND_POLL_INTERVAL": "100ms", // 指令轮询间隔（Dashboard 端点走快照直读后，Command 仅用于 Detail 查询，缩短以降低延迟）
-	"AGENT_HEARTBEAT_INTERVAL":    "15s", // 心跳发送间隔
-	"AGENT_OTEL_CACHE_TTL":        "10s", // OTel 概览缓存 TTL（与快照间隔一致）
+	"AGENT_HEARTBEAT_INTERVAL":    "15s",   // 心跳发送间隔
+	"AGENT_OTEL_CACHE_TTL":        "10s",   // OTel 概览缓存 TTL（与快照间隔一致）
 
 	// -------------------- 超时配置 --------------------
 	"AGENT_TIMEOUT_HTTP_CLIENT":      "90s", // HTTP 客户端超时 (需 > Master 长轮询超时 60s + 网络开销)
@@ -41,6 +41,6 @@ var defaultStrings = map[string]string{
 	"AGENT_KUBECONFIG": "", // kubeconfig 文件路径，空则使用 InCluster 模式
 
 	// -------------------- ClickHouse 配置（可选，不配置则纯 K8s 模式） --------------------
-	"AGENT_CLICKHOUSE_ENDPOINT": "", // ClickHouse 地址，为空则不连接（纯 K8s 模式，无 OTel 数据）
+	"AGENT_CLICKHOUSE_ENDPOINT": "",         // ClickHouse 地址，为空则不连接（纯 K8s 模式，无 OTel 数据）
 	"AGENT_CLICKHOUSE_DATABASE": "atlhyper", // ClickHouse 数据库名
 }

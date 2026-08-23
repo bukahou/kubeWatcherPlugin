@@ -14,10 +14,10 @@ import (
 type Scorer struct {
 	config       *RiskConfig
 	mu           sync.RWMutex
-	results      map[string]*aiops.ClusterRisk                // clusterID -> ClusterRisk
-	entityMap    map[string]map[string]*aiops.EntityRisk      // clusterID -> entityKey -> EntityRisk
-	propagations map[string][]*aiops.PropagationPath          // clusterID -> propagation paths
-	firstAnomaly map[string]int64                             // entityKey -> 首次异常时间
+	results      map[string]*aiops.ClusterRisk           // clusterID -> ClusterRisk
+	entityMap    map[string]map[string]*aiops.EntityRisk // clusterID -> entityKey -> EntityRisk
+	propagations map[string][]*aiops.PropagationPath     // clusterID -> propagation paths
+	firstAnomaly map[string]int64                        // entityKey -> 首次异常时间
 }
 
 // NewScorer 创建风险评分引擎

@@ -58,29 +58,29 @@ type SLODomainsResponse struct {
 // DomainSLOResponseV2 域名级别的 SLO 响应 (V2)
 // 以真实域名为单位，包含该域名下的所有后端服务
 type DomainSLOResponseV2 struct {
-	Domain               string                    `json:"domain"`                 // 真实域名（如 example.com）
-	TLS                  bool                      `json:"tls"`                    // 是否启用 TLS
-	Services             []ServiceSLO              `json:"services"`               // 该域名下的所有后端服务
-	Summary              *SLOMetrics               `json:"summary"`                // 域名级别汇总指标
-	Previous             *SLOMetrics               `json:"previous,omitempty"`     // 上一周期汇总指标
-	Targets              map[string]*SLOTargetSpec  `json:"targets,omitempty"`      // 目标配置 ("1d"/"7d"/"30d")
-	Status               string                    `json:"status"`                 // healthy / warning / critical
+	Domain               string                    `json:"domain"`               // 真实域名（如 example.com）
+	TLS                  bool                      `json:"tls"`                  // 是否启用 TLS
+	Services             []ServiceSLO              `json:"services"`             // 该域名下的所有后端服务
+	Summary              *SLOMetrics               `json:"summary"`              // 域名级别汇总指标
+	Previous             *SLOMetrics               `json:"previous,omitempty"`   // 上一周期汇总指标
+	Targets              map[string]*SLOTargetSpec `json:"targets,omitempty"`    // 目标配置 ("1d"/"7d"/"30d")
+	Status               string                    `json:"status"`               // healthy / warning / critical
 	ErrorBudgetRemaining float64                   `json:"errorBudgetRemaining"` // 剩余错误预算
 }
 
 // ServiceSLO 后端服务级别的 SLO 数据（Metrics 的实际数据来源）
 type ServiceSLO struct {
-	ServiceKey   string                    `json:"serviceKey"`            // Traefik service key (namespace-name-port@kubernetes)
-	ServiceName  string                    `json:"serviceName"`           // 服务名称
-	ServicePort  int                       `json:"servicePort"`           // 服务端口
-	Namespace    string                    `json:"namespace"`              // 命名空间
-	Paths        []string                  `json:"paths"`                  // 使用该服务的路径列表
-	IngressName  string                    `json:"ingressName"`           // IngressRoute/Ingress 名称
-	Current      *SLOMetrics               `json:"current"`                // 当前周期指标
-	Previous     *SLOMetrics               `json:"previous,omitempty"`     // 上一周期指标（用于对比）
-	Targets      map[string]*SLOTargetSpec `json:"targets,omitempty"`      // 目标配置
-	Status       string                    `json:"status"`                 // healthy / warning / critical
-	ErrorBudget  float64                   `json:"errorBudgetRemaining"` // 剩余错误预算
+	ServiceKey  string                    `json:"serviceKey"`           // Traefik service key (namespace-name-port@kubernetes)
+	ServiceName string                    `json:"serviceName"`          // 服务名称
+	ServicePort int                       `json:"servicePort"`          // 服务端口
+	Namespace   string                    `json:"namespace"`            // 命名空间
+	Paths       []string                  `json:"paths"`                // 使用该服务的路径列表
+	IngressName string                    `json:"ingressName"`          // IngressRoute/Ingress 名称
+	Current     *SLOMetrics               `json:"current"`              // 当前周期指标
+	Previous    *SLOMetrics               `json:"previous,omitempty"`   // 上一周期指标（用于对比）
+	Targets     map[string]*SLOTargetSpec `json:"targets,omitempty"`    // 目标配置
+	Status      string                    `json:"status"`               // healthy / warning / critical
+	ErrorBudget float64                   `json:"errorBudgetRemaining"` // 剩余错误预算
 }
 
 // SLODomainsResponseV2 域名列表响应 (V2)
@@ -134,7 +134,7 @@ type MethodBreakdown struct {
 
 // StatusCodeBreakdown 状态码分布
 type StatusCodeBreakdown struct {
-	Code  string `json:"code"`  // "2xx", "3xx", "4xx", "5xx"
+	Code  string `json:"code"` // "2xx", "3xx", "4xx", "5xx"
 	Count int64  `json:"count"`
 }
 
@@ -155,14 +155,14 @@ type LatencyDistributionResponse struct {
 
 // SLOTargetResponse SLO 目标（API 响应，camelCase）
 type SLOTargetResponse struct {
-	ID                 int64  `json:"id"`
-	ClusterID          string `json:"clusterId"`
-	Host               string `json:"host"`
-	TimeRange          string `json:"timeRange"`
+	ID                 int64   `json:"id"`
+	ClusterID          string  `json:"clusterId"`
+	Host               string  `json:"host"`
+	TimeRange          string  `json:"timeRange"`
 	AvailabilityTarget float64 `json:"availabilityTarget"`
-	P95LatencyTarget   int    `json:"p95LatencyTarget"`
-	CreatedAt          string `json:"createdAt"`
-	UpdatedAt          string `json:"updatedAt"`
+	P95LatencyTarget   int     `json:"p95LatencyTarget"`
+	CreatedAt          string  `json:"createdAt"`
+	UpdatedAt          string  `json:"updatedAt"`
 }
 
 // ==================== API 请求类型 ====================
@@ -209,7 +209,7 @@ type ServiceMeshTopologyResponse struct {
 
 // ServiceNodeResponse 服务节点响应
 type ServiceNodeResponse struct {
-	ID            string  `json:"id"`             // "namespace/name"
+	ID            string  `json:"id"` // "namespace/name"
 	Name          string  `json:"name"`
 	Namespace     string  `json:"namespace"`
 	RPS           float64 `json:"rps"`
@@ -219,14 +219,14 @@ type ServiceNodeResponse struct {
 	P99LatencyMs  float64 `json:"p99Latency"`
 	ErrorRate     float64 `json:"errorRate"`
 	Availability  float64 `json:"availability"`
-	Status        string  `json:"status"`         // healthy/warning/critical
+	Status        string  `json:"status"` // healthy/warning/critical
 	MtlsEnabled   bool    `json:"mtlsEnabled"`
 	TotalRequests int64   `json:"totalRequests"`
 }
 
 // ServiceEdgeResponse 服务拓扑边响应
 type ServiceEdgeResponse struct {
-	Source       string  `json:"source"`      // "namespace/name"
+	Source       string  `json:"source"` // "namespace/name"
 	Target       string  `json:"target"`
 	RPS          float64 `json:"rps"`
 	AvgLatencyMs float64 `json:"avgLatency"`

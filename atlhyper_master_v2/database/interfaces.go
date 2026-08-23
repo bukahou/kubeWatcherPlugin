@@ -26,11 +26,11 @@ type DB struct {
 	AIProvider     AIProviderRepository
 	AISettings     AISettingsRepository
 	AIModel        AIProviderModelRepository
-	SLO SLORepository
+	SLO            SLORepository
 
 	AIOpsBaseline AIOpsBaselineRepository
-	AIOpsGraph     AIOpsGraphRepository
-	AIOpsIncident  AIOpsIncidentRepository
+	AIOpsGraph    AIOpsGraphRepository
+	AIOpsIncident AIOpsIncidentRepository
 
 	AIRoleBudget AIRoleBudgetRepository
 	AIReport     AIReportRepository
@@ -588,4 +588,3 @@ type DeployHistoryDialect interface {
 	SelectLatestByPath(clusterID, path string) (query string, args []any)
 	ScanRow(rows *sql.Rows) (*DeployHistory, error)
 }
-

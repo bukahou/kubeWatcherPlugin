@@ -209,8 +209,6 @@ func lightweightOTelCopy(src *cluster.OTelSnapshot) *cluster.OTelSnapshot {
 		AvgP99Ms:        src.AvgP99Ms,
 		IngressServices: src.IngressServices,
 		IngressAvgRPS:   src.IngressAvgRPS,
-		MeshServices:    src.MeshServices,
-		MeshAvgMTLS:     src.MeshAvgMTLS,
 		MonitoredNodes:  src.MonitoredNodes,
 		AvgCPUPct:       src.AvgCPUPct,
 		AvgMemPct:       src.AvgMemPct,
@@ -221,8 +219,6 @@ func lightweightOTelCopy(src *cluster.OTelSnapshot) *cluster.OTelSnapshot {
 		MetricsNodes: src.MetricsNodes,
 		APMServices:  src.APMServices,
 		SLOIngress:   src.SLOIngress,
-		SLOServices:  src.SLOServices,
-		SLOEdges:     src.SLOEdges,
 
 		// 以下字段不复制（仅从最新快照读取）:
 		// MetricsSummary, APMTopology, SLOSummary,

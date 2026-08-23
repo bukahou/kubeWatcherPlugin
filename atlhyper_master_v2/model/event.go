@@ -30,7 +30,7 @@ type EventCards struct {
 
 // EventOverview 事件概览
 type EventOverview struct {
-	Cards EventCards  `json:"cards"`
+	Cards EventCards `json:"cards"`
 	Rows  []EventLog `json:"rows"`
 }
 

@@ -570,4 +570,3 @@ func (s *service) getPreviousSourceSHA(ctx context.Context, clusterID, path stri
 	}
 	return latest.SourceCommitSHA
 }
-

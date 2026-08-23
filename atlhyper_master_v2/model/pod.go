@@ -4,17 +4,17 @@ package model
 
 // PodItem Pod 列表项（扁平）
 type PodItem struct {
-	Name           string `json:"name"`
-	Namespace      string `json:"namespace"`
-	Deployment     string `json:"deployment"`
-	Ready          string `json:"ready"`
-	Phase          string `json:"phase"`
-	Restarts       int32  `json:"restarts"`
-	CPUText        string `json:"cpuText"`
-	MemoryText     string `json:"memoryText"`
-	StartTime      string `json:"startTime"`
-	Node           string `json:"node"`
-	Age            string `json:"age,omitempty"`
+	Name       string `json:"name"`
+	Namespace  string `json:"namespace"`
+	Deployment string `json:"deployment"`
+	Ready      string `json:"ready"`
+	Phase      string `json:"phase"`
+	Restarts   int32  `json:"restarts"`
+	CPUText    string `json:"cpuText"`
+	MemoryText string `json:"memoryText"`
+	StartTime  string `json:"startTime"`
+	Node       string `json:"node"`
+	Age        string `json:"age,omitempty"`
 }
 
 // PodOverviewCards Pod 概览统计
@@ -77,20 +77,20 @@ type PodDetail struct {
 
 // PodContainerResponse 容器响应
 type PodContainerResponse struct {
-	Name              string            `json:"name"`
-	Image             string            `json:"image"`
-	ImagePullPolicy   string            `json:"imagePullPolicy,omitempty"`
-	Ports             interface{}       `json:"ports,omitempty"`
-	Envs              interface{}       `json:"envs,omitempty"`
-	VolumeMounts      interface{}       `json:"volumeMounts,omitempty"`
-	Requests          map[string]string `json:"requests,omitempty"`
-	Limits            map[string]string `json:"limits,omitempty"`
-	ReadinessProbe    interface{}       `json:"readinessProbe,omitempty"`
-	LivenessProbe     interface{}       `json:"livenessProbe,omitempty"`
-	StartupProbe      interface{}       `json:"startupProbe,omitempty"`
-	State             string            `json:"state,omitempty"`
-	RestartCount      int32             `json:"restartCount"`
-	LastTerminatedReason string         `json:"lastTerminatedReason,omitempty"`
+	Name                 string            `json:"name"`
+	Image                string            `json:"image"`
+	ImagePullPolicy      string            `json:"imagePullPolicy,omitempty"`
+	Ports                interface{}       `json:"ports,omitempty"`
+	Envs                 interface{}       `json:"envs,omitempty"`
+	VolumeMounts         interface{}       `json:"volumeMounts,omitempty"`
+	Requests             map[string]string `json:"requests,omitempty"`
+	Limits               map[string]string `json:"limits,omitempty"`
+	ReadinessProbe       interface{}       `json:"readinessProbe,omitempty"`
+	LivenessProbe        interface{}       `json:"livenessProbe,omitempty"`
+	StartupProbe         interface{}       `json:"startupProbe,omitempty"`
+	State                string            `json:"state,omitempty"`
+	RestartCount         int32             `json:"restartCount"`
+	LastTerminatedReason string            `json:"lastTerminatedReason,omitempty"`
 }
 
 // PodVolumeResponse 存储卷响应

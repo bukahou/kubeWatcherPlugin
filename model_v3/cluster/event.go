@@ -9,14 +9,14 @@ import (
 // Event K8s Event 资源模型
 type Event struct {
 	model_v3.CommonMeta
-	Type           string             `json:"type"`
-	Reason         string             `json:"reason"`
-	Message        string             `json:"message"`
-	Source         string             `json:"source,omitempty"`
+	Type           string               `json:"type"`
+	Reason         string               `json:"reason"`
+	Message        string               `json:"message"`
+	Source         string               `json:"source,omitempty"`
 	InvolvedObject model_v3.ResourceRef `json:"involvedObject"`
-	Count          int32              `json:"count"`
-	FirstTimestamp time.Time          `json:"firstTimestamp"`
-	LastTimestamp   time.Time          `json:"lastTimestamp"`
+	Count          int32                `json:"count"`
+	FirstTimestamp time.Time            `json:"firstTimestamp"`
+	LastTimestamp  time.Time            `json:"lastTimestamp"`
 }
 
 func (e *Event) IsWarning() bool { return e.Type == "Warning" }

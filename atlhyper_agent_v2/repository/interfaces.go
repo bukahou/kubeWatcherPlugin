@@ -159,7 +159,7 @@ type OTelSummaryRepository interface {
 	// APM 概览
 	GetAPMSummary(ctx context.Context) (totalServices, healthyServices int, totalRPS, avgSuccessRate, avgP99Ms float64, err error)
 	// SLO 概览
-	GetSLOSummary(ctx context.Context) (ingressServices int, ingressAvgRPS float64, meshServices int, meshAvgMTLS float64, err error)
+	GetSLOSummary(ctx context.Context) (ingressServices int, ingressAvgRPS float64, err error)
 	// 基础设施指标概览
 	GetMetricsSummary(ctx context.Context) (monitoredNodes int, avgCPUPct, avgMemPct, maxCPUPct, maxMemPct float64, err error)
 }

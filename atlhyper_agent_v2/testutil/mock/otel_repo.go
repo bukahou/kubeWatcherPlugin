@@ -14,7 +14,7 @@ import (
 // OTelSummaryRepository mock
 type OTelSummaryRepository struct {
 	GetAPMSummaryFn     func(ctx context.Context) (totalServices, healthyServices int, totalRPS, avgSuccessRate, avgP99Ms float64, err error)
-	GetSLOSummaryFn     func(ctx context.Context) (ingressServices int, ingressAvgRPS float64, meshServices int, meshAvgMTLS float64, err error)
+	GetSLOSummaryFn     func(ctx context.Context) (int, float64, error)
 	GetMetricsSummaryFn func(ctx context.Context) (monitoredNodes int, avgCPUPct, avgMemPct, maxCPUPct, maxMemPct float64, err error)
 }
 
@@ -25,11 +25,11 @@ func (m *OTelSummaryRepository) GetAPMSummary(ctx context.Context) (totalService
 	return 0, 0, 0, 0, 0, nil
 }
 
-func (m *OTelSummaryRepository) GetSLOSummary(ctx context.Context) (ingressServices int, ingressAvgRPS float64, meshServices int, meshAvgMTLS float64, err error) {
+func (m *OTelSummaryRepository) GetSLOSummary(ctx context.Context) (ingressServices int, ingressAvgRPS float64, err error) {
 	if m.GetSLOSummaryFn != nil {
 		return m.GetSLOSummaryFn(ctx)
 	}
-	return 0, 0, 0, 0, nil
+	return 0, 0, nil
 }
 
 func (m *OTelSummaryRepository) GetMetricsSummary(ctx context.Context) (monitoredNodes int, avgCPUPct, avgMemPct, maxCPUPct, maxMemPct float64, err error) {
@@ -41,14 +41,14 @@ func (m *OTelSummaryRepository) GetMetricsSummary(ctx context.Context) (monitore
 
 // TraceQueryRepository mock
 type TraceQueryRepository struct {
-	ListTracesFn      func(ctx context.Context, service, operation string, minDurationMs float64, limit int, since time.Duration, sort string, startTime, endTime string, statusCode, method string) ([]apm.TraceSummary, error)
-	GetTraceDetailFn  func(ctx context.Context, traceID string) (*apm.TraceDetail, error)
-	ListServicesFn    func(ctx context.Context, since time.Duration, startTime, endTime string) ([]apm.APMService, error)
-	GetTopologyFn     func(ctx context.Context, since time.Duration, startTime, endTime string) (*apm.Topology, error)
-	ListOperationsFn  func(ctx context.Context, since time.Duration, startTime, endTime string) ([]apm.OperationStats, error)
-	GetHTTPStatsFn    func(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.HTTPStats, error)
-	GetDBStatsFn              func(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.DBOperationStats, error)
-	GetServiceTimeSeriesFn    func(ctx context.Context, service string, since time.Duration) ([]apm.TimePoint, error)
+	ListTracesFn           func(ctx context.Context, service, operation string, minDurationMs float64, limit int, since time.Duration, sort string, startTime, endTime string, statusCode, method string) ([]apm.TraceSummary, error)
+	GetTraceDetailFn       func(ctx context.Context, traceID string) (*apm.TraceDetail, error)
+	ListServicesFn         func(ctx context.Context, since time.Duration, startTime, endTime string) ([]apm.APMService, error)
+	GetTopologyFn          func(ctx context.Context, since time.Duration, startTime, endTime string) (*apm.Topology, error)
+	ListOperationsFn       func(ctx context.Context, since time.Duration, startTime, endTime string) ([]apm.OperationStats, error)
+	GetHTTPStatsFn         func(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.HTTPStats, error)
+	GetDBStatsFn           func(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.DBOperationStats, error)
+	GetServiceTimeSeriesFn func(ctx context.Context, service string, since time.Duration) ([]apm.TimePoint, error)
 }
 
 func (m *TraceQueryRepository) ListTraces(ctx context.Context, service, operation string, minDurationMs float64, limit int, since time.Duration, sort string, startTime, endTime string, statusCode, method string) ([]apm.TraceSummary, error) {
@@ -109,10 +109,10 @@ func (m *TraceQueryRepository) GetServiceTimeSeries(ctx context.Context, service
 
 // LogQueryRepository mock
 type LogQueryRepository struct {
-	QueryLogsFn          func(ctx context.Context, opts repository.LogQueryOptions) (*log.QueryResult, error)
-	QueryHistogramFn     func(ctx context.Context, opts repository.LogQueryOptions) (*log.HistogramResult, error)
-	GetSummaryFn         func(ctx context.Context) (*log.Summary, error)
-	ListRecentEntriesFn  func(ctx context.Context, limit int) ([]log.Entry, error)
+	QueryLogsFn         func(ctx context.Context, opts repository.LogQueryOptions) (*log.QueryResult, error)
+	QueryHistogramFn    func(ctx context.Context, opts repository.LogQueryOptions) (*log.HistogramResult, error)
+	GetSummaryFn        func(ctx context.Context) (*log.Summary, error)
+	ListRecentEntriesFn func(ctx context.Context, limit int) ([]log.Entry, error)
 }
 
 func (m *LogQueryRepository) QueryLogs(ctx context.Context, opts repository.LogQueryOptions) (*log.QueryResult, error) {
@@ -145,11 +145,11 @@ func (m *LogQueryRepository) ListRecentEntries(ctx context.Context, limit int) (
 
 // MetricsQueryRepository mock
 type MetricsQueryRepository struct {
-	ListAllNodeMetricsFn      func(ctx context.Context) ([]metrics.NodeMetrics, error)
-	GetNodeMetricsFn          func(ctx context.Context, nodeName string) (*metrics.NodeMetrics, error)
-	GetNodeMetricsSeriesFn    func(ctx context.Context, nodeName string, metric string, since time.Duration) ([]metrics.Point, error)
-	GetMetricsSummaryFn       func(ctx context.Context) (*metrics.Summary, error)
-	GetNodeMetricsHistoryFn   func(ctx context.Context, nodeName string, since time.Duration) (map[string][]metrics.Point, error)
+	ListAllNodeMetricsFn    func(ctx context.Context) ([]metrics.NodeMetrics, error)
+	GetNodeMetricsFn        func(ctx context.Context, nodeName string) (*metrics.NodeMetrics, error)
+	GetNodeMetricsSeriesFn  func(ctx context.Context, nodeName string, metric string, since time.Duration) ([]metrics.Point, error)
+	GetMetricsSummaryFn     func(ctx context.Context) (*metrics.Summary, error)
+	GetNodeMetricsHistoryFn func(ctx context.Context, nodeName string, since time.Duration) (map[string][]metrics.Point, error)
 }
 
 func (m *MetricsQueryRepository) ListAllNodeMetrics(ctx context.Context) ([]metrics.NodeMetrics, error) {
@@ -192,8 +192,6 @@ type SLOQueryRepository struct {
 	ListIngressSLOFn         func(ctx context.Context, since time.Duration) ([]slo.IngressSLO, error)
 	ListIngressSLOPreviousFn func(ctx context.Context, since time.Duration) ([]slo.IngressSLO, error)
 	GetIngressSLOHistoryFn   func(ctx context.Context, since, bucket time.Duration) ([]slo.SLOHistoryPoint, error)
-	ListServiceSLOFn         func(ctx context.Context, since time.Duration) ([]slo.ServiceSLO, error)
-	ListServiceEdgesFn       func(ctx context.Context, since time.Duration) ([]slo.ServiceEdge, error)
 	GetSLOTimeSeriesFn       func(ctx context.Context, name string, since time.Duration) (*slo.TimeSeries, error)
 	GetSLOSummaryFn          func(ctx context.Context) (*slo.SLOSummary, error)
 }
@@ -217,20 +215,6 @@ func (m *SLOQueryRepository) GetIngressSLOHistory(ctx context.Context, since, bu
 		return m.GetIngressSLOHistoryFn(ctx, since, bucket)
 	}
 	return []slo.SLOHistoryPoint{}, nil
-}
-
-func (m *SLOQueryRepository) ListServiceSLO(ctx context.Context, since time.Duration) ([]slo.ServiceSLO, error) {
-	if m.ListServiceSLOFn != nil {
-		return m.ListServiceSLOFn(ctx, since)
-	}
-	return []slo.ServiceSLO{}, nil
-}
-
-func (m *SLOQueryRepository) ListServiceEdges(ctx context.Context, since time.Duration) ([]slo.ServiceEdge, error) {
-	if m.ListServiceEdgesFn != nil {
-		return m.ListServiceEdgesFn(ctx, since)
-	}
-	return []slo.ServiceEdge{}, nil
 }
 
 func (m *SLOQueryRepository) GetSLOTimeSeries(ctx context.Context, name string, since time.Duration) (*slo.TimeSeries, error) {

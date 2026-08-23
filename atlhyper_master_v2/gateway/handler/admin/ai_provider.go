@@ -71,16 +71,16 @@ type AISettingsResponse struct {
 
 // ProviderListResponse プロバイダー一覧レスポンス
 type ProviderListResponse struct {
-	Providers  []ProviderResponse  `json:"providers"`
-	Settings   AISettingsResponse  `json:"settings"`
-	Models     []ProviderModelInfo `json:"models"`
+	Providers []ProviderResponse  `json:"providers"`
+	Settings  AISettingsResponse  `json:"settings"`
+	Models    []ProviderModelInfo `json:"models"`
 }
 
 // ProviderModelInfo モデル情報
 type ProviderModelInfo struct {
-	Provider    string   `json:"provider"`
-	Name        string   `json:"name"`
-	Models      []string `json:"models"`
+	Provider string   `json:"provider"`
+	Name     string   `json:"name"`
+	Models   []string `json:"models"`
 }
 
 // ProviderCreateRequest プロバイダー作成リクエスト
@@ -662,8 +662,8 @@ func (h *AIProviderHandler) BudgetsHandler(w http.ResponseWriter, r *http.Reques
 			MonthlyCallsUsed:        b.MonthlyCallsUsed,
 			AutoTriggerMinSeverity:  b.AutoTriggerMinSeverity,
 			AutoTriggerMode:         b.AutoTriggerMode,
-			ScheduleStartTime:      b.ScheduleStartTime,
-			ScheduleEndTime:        b.ScheduleEndTime,
+			ScheduleStartTime:       b.ScheduleStartTime,
+			ScheduleEndTime:         b.ScheduleEndTime,
 			FallbackProviderID:      b.FallbackProviderID,
 		}
 		if b.DailyResetAt != nil {

@@ -325,7 +325,7 @@ func makeTestEvents() []cluster.Event {
 			Reason:         "OOMKilled",
 			Message:        "Container killed due to OOM",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Namespace: "default", Name: "nginx"},
-			LastTimestamp:   now,
+			LastTimestamp:  now,
 		},
 		{
 			CommonMeta:     model_v3.CommonMeta{Name: "evt-2"},
@@ -333,7 +333,7 @@ func makeTestEvents() []cluster.Event {
 			Reason:         "Pulled",
 			Message:        "Successfully pulled image",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Namespace: "default", Name: "redis"},
-			LastTimestamp:   now.Add(-1 * time.Hour),
+			LastTimestamp:  now.Add(-1 * time.Hour),
 		},
 		{
 			CommonMeta:     model_v3.CommonMeta{Name: "evt-3"},
@@ -341,7 +341,7 @@ func makeTestEvents() []cluster.Event {
 			Reason:         "BackOff",
 			Message:        "Back-off restarting failed container",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Namespace: "kube-system", Name: "coredns"},
-			LastTimestamp:   now.Add(-2 * time.Hour),
+			LastTimestamp:  now.Add(-2 * time.Hour),
 		},
 		{
 			CommonMeta:     model_v3.CommonMeta{Name: "evt-4"},
@@ -349,7 +349,7 @@ func makeTestEvents() []cluster.Event {
 			Reason:         "Scheduled",
 			Message:        "Successfully assigned pod",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Namespace: "default", Name: "nginx"},
-			LastTimestamp:   now.Add(-3 * time.Hour),
+			LastTimestamp:  now.Add(-3 * time.Hour),
 		},
 	}
 }
@@ -869,9 +869,9 @@ func TestGetOverview_WorkloadStats(t *testing.T) {
 					{Summary: cluster.DaemonSetSummary{Name: "ds-2", Namespace: "kube-system", DesiredNumberScheduled: 2, NumberReady: 1}}, // not healthy
 				},
 				Jobs: []cluster.Job{
-					{CommonMeta: model_v3.CommonMeta{Name: "job-1"}, Active: 1, Succeeded: 0, Failed: 0, Complete: false},                 // running
-					{CommonMeta: model_v3.CommonMeta{Name: "job-2"}, Active: 0, Succeeded: 1, Failed: 0, Complete: true},                  // succeeded
-					{CommonMeta: model_v3.CommonMeta{Name: "job-3"}, Active: 0, Succeeded: 0, Failed: 2, Complete: false},                 // failed
+					{CommonMeta: model_v3.CommonMeta{Name: "job-1"}, Active: 1, Succeeded: 0, Failed: 0, Complete: false}, // running
+					{CommonMeta: model_v3.CommonMeta{Name: "job-2"}, Active: 0, Succeeded: 1, Failed: 0, Complete: true},  // succeeded
+					{CommonMeta: model_v3.CommonMeta{Name: "job-3"}, Active: 0, Succeeded: 0, Failed: 2, Complete: false}, // failed
 				},
 				Pods: []cluster.Pod{
 					{Summary: cluster.PodSummary{Name: "p1"}, Status: cluster.PodStatus{Phase: "Running"}},
@@ -964,7 +964,7 @@ func TestGetOverview_NodeUsageAndPeak(t *testing.T) {
 						Summary:     cluster.NodeSummary{Name: "node-1"},
 						Allocatable: cluster.NodeResources{CPU: "4", Memory: "8Gi"},
 						Metrics: &cluster.NodeResourceUsage{
-							CPU:    cluster.NodeResourceMetric{Usage: "2"},    // 2000m / 4000m = 50%
+							CPU:    cluster.NodeResourceMetric{Usage: "2"},   // 2000m / 4000m = 50%
 							Memory: cluster.NodeResourceMetric{Usage: "2Gi"}, // 2Gi / 8Gi = 25%
 						},
 					},
@@ -1098,7 +1098,7 @@ func TestGetOverview_AlertsFromDB(t *testing.T) {
 				InvolvedName:      "nginx-abc",
 				Message:           "Back-off restarting",
 				Reason:            "BackOff",
-				LastTimestamp:      now.Add(-10 * time.Minute),
+				LastTimestamp:     now.Add(-10 * time.Minute),
 			},
 		},
 	}

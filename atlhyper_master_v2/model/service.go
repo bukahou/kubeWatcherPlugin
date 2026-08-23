@@ -8,9 +8,9 @@ type ServiceItem struct {
 	Namespace string `json:"namespace"`
 	Type      string `json:"type"`
 	ClusterIP string `json:"clusterIP"`
-	Ports     string `json:"ports"`     // 格式化字符串，如 "80:30080/TCP→8080"
+	Ports     string `json:"ports"` // 格式化字符串，如 "80:30080/TCP→8080"
 	Protocol  string `json:"protocol"`
-	Selector  string `json:"selector"`  // 格式化字符串，如 "app=nginx,tier=frontend"
+	Selector  string `json:"selector"` // 格式化字符串，如 "app=nginx,tier=frontend"
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -54,8 +54,8 @@ type ServiceDetail struct {
 	InternalTrafficPolicy string `json:"internalTrafficPolicy,omitempty"`
 
 	// IP 族
-	IPFamilies   []string `json:"ipFamilies,omitempty"`
-	IPFamilyPolicy string `json:"ipFamilyPolicy,omitempty"`
+	IPFamilies     []string `json:"ipFamilies,omitempty"`
+	IPFamilyPolicy string   `json:"ipFamilyPolicy,omitempty"`
 
 	// 后端端点
 	Backends interface{} `json:"backends,omitempty"`

@@ -2,10 +2,11 @@
 // SLO API Handler — 共用结构体和辅助函数
 //
 // 各职责分布在:
-//   slo_domains.go   — Domains / DomainsV2 / DomainDetail / DomainHistory
-//   slo_targets.go   — Targets / StatusHistory
-//   slo_latency.go   — LatencyDistribution
-//   slo_mesh.go      — MeshTopology / ServiceDetail (独立 Handler)
+//
+//	slo_domains.go   — Domains / DomainsV2 / DomainDetail / DomainHistory
+//	slo_targets.go   — Targets / StatusHistory
+//	slo_latency.go   — LatencyDistribution
+//	slo_mesh.go      — MeshTopology / ServiceDetail (独立 Handler)
 package slo
 
 import (

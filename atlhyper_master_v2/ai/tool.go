@@ -29,8 +29,8 @@ type ToolHandler func(ctx context.Context, clusterID string, params map[string]i
 type toolExecutor struct {
 	ops         *operations.CommandService
 	bus         mq.Producer
-	timeout     time.Duration              // 指令执行超时（默认 30s）
-	customTools map[string]ToolHandler      // 自定义 Tool 注册表
+	timeout     time.Duration          // 指令执行超时（默认 30s）
+	customTools map[string]ToolHandler // 自定义 Tool 注册表
 }
 
 // newToolExecutor 创建工具执行器

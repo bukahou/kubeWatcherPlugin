@@ -7,7 +7,6 @@ import (
 	"AtlHyper/model_v3/apm"
 	"AtlHyper/model_v3/cluster"
 	"AtlHyper/model_v3/log"
-	"AtlHyper/model_v3/slo"
 )
 
 func TestBuildFromSnapshot_Empty(t *testing.T) {
@@ -159,40 +158,6 @@ func TestBuildFromSnapshot_IngressRoutesToService(t *testing.T) {
 	}
 }
 
-func TestBuildFromSnapshot_SLOCalls(t *testing.T) {
-	snap := &cluster.ClusterSnapshot{
-		OTel: &cluster.OTelSnapshot{
-			SLOEdges: []slo.ServiceEdge{
-				{
-					SrcNamespace: "default",
-					SrcName:      "frontend",
-					DstNamespace: "default",
-					DstName:      "backend",
-				},
-			},
-		},
-	}
-
-	graph := BuildFromSnapshot("test", snap, snap.OTel)
-
-	// 检查 calls 边
-	found := false
-	for _, edge := range graph.Edges {
-		if edge.Type == "calls" {
-			found = true
-			if edge.From != "default/service/frontend" {
-				t.Fatalf("calls edge from should be src service, got %s", edge.From)
-			}
-			if edge.To != "default/service/backend" {
-				t.Fatalf("calls edge to should be dst service, got %s", edge.To)
-			}
-		}
-	}
-	if !found {
-		t.Fatal("should have calls edge from SLO data")
-	}
-}
-
 // ==================== Enhanced: APM 拓扑边 ====================
 
 func TestBuildFromSnapshot_APMTopologyEdges(t *testing.T) {
@@ -225,41 +190,6 @@ func TestBuildFromSnapshot_APMTopologyEdges(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("should have calls edge from APM topology")
-	}
-}
-
-func TestBuildFromSnapshot_EdgeDedup(t *testing.T) {
-	otel := &cluster.OTelSnapshot{
-		// SLO 边：api-gateway→user-svc + api-gateway→order-svc
-		SLOEdges: []slo.ServiceEdge{
-			{SrcNamespace: "default", SrcName: "api-gateway", DstNamespace: "default", DstName: "user-svc"},
-			{SrcNamespace: "default", SrcName: "api-gateway", DstNamespace: "default", DstName: "order-svc"},
-		},
-		// APM 边：api-gateway→user-svc（与 SLO 重复）
-		APMTopology: &apm.Topology{
-			Nodes: []apm.TopologyNode{
-				{Id: "api-gateway", Name: "api-gateway", Namespace: "default"},
-				{Id: "user-svc", Name: "user-svc", Namespace: "default"},
-			},
-			Edges: []apm.TopologyEdge{
-				{Source: "api-gateway", Target: "user-svc", CallCount: 500},
-			},
-		},
-	}
-	snap := &cluster.ClusterSnapshot{}
-	graph := BuildFromSnapshot("test", snap, otel)
-
-	// 统计 calls 边数
-	callsCount := 0
-	for _, edge := range graph.Edges {
-		if edge.Type == "calls" {
-			callsCount++
-		}
-	}
-
-	// SLO 有 2 条 + APM 有 1 条（与 SLO 重复） → 去重后 = 2
-	if callsCount != 2 {
-		t.Fatalf("expected 2 calls edges after dedup, got %d", callsCount)
 	}
 }
 

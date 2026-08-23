@@ -136,7 +136,7 @@ type OperationStats struct {
 	OperationName string  `json:"operationName"` // SpanName
 	SpanCount     int64   `json:"spanCount"`
 	ErrorCount    int64   `json:"errorCount"`
-	SuccessRate   float64 `json:"successRate"`   // 0-1
+	SuccessRate   float64 `json:"successRate"` // 0-1
 	AvgDurationMs float64 `json:"avgDurationMs"`
 	P50Ms         float64 `json:"p50Ms"`
 	P99Ms         float64 `json:"p99Ms"`
@@ -148,13 +148,13 @@ type OperationStats struct {
 // ============================================================
 
 type TopologyNode struct {
-	Id          string               `json:"id"`
-	Name        string               `json:"name"`
-	Namespace   string               `json:"namespace"`
-	Type        string               `json:"type"` // "service", "database", "external"
-	RPS         float64              `json:"rps"`
-	SuccessRate float64              `json:"successRate"`
-	P99Ms       float64              `json:"p99Ms"`
+	Id          string                `json:"id"`
+	Name        string                `json:"name"`
+	Namespace   string                `json:"namespace"`
+	Type        string                `json:"type"` // "service", "database", "external"
+	RPS         float64               `json:"rps"`
+	SuccessRate float64               `json:"successRate"`
+	P99Ms       float64               `json:"p99Ms"`
 	Status      model_v3.HealthStatus `json:"status"`
 }
 

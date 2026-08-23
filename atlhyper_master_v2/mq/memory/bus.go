@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"AtlHyper/model_v3/command"
 	"AtlHyper/common/logger"
+	"AtlHyper/model_v3/command"
 )
 
 var log = logger.Module("MemoryBus")

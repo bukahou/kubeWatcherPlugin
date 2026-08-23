@@ -30,9 +30,9 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, map[string]any{
-		"status":   "ok",
-		"testers":  h.registry.List(),
-		"time":     time.Now().Format(time.RFC3339),
+		"status":  "ok",
+		"testers": h.registry.List(),
+		"time":    time.Now().Format(time.RFC3339),
 	})
 }
 

@@ -17,7 +17,6 @@ type TimeSeriesAggregator interface {
 	Ingest(
 		nodes []metrics.NodeMetrics,
 		sloIngress []slo.IngressSLO,
-		sloServices []slo.ServiceSLO,
 		apmServices []apm.APMService,
 		ts time.Time,
 	)

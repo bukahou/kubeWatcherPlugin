@@ -511,7 +511,7 @@ func makeEvent(typ, reason, involvedKind, involvedNS, involvedName string, lastT
 		},
 		Type:           typ,
 		Reason:         reason,
-		LastTimestamp:   lastTimestamp,
+		LastTimestamp:  lastTimestamp,
 		InvolvedObject: model_v3.ResourceRef{Kind: involvedKind, Namespace: involvedNS, Name: involvedName},
 	}
 }
@@ -822,35 +822,6 @@ func TestExtractDeploymentImpact_IntegrationWithContainerAnomaly(t *testing.T) {
 	if findResult(results, "default/pod/app-4", "container_anomaly") != nil {
 		t.Error("健康 Pod app-4 不应有 container_anomaly")
 	}
-}
-
-// ==================== Phase 5: SLO/Ingress 指标提取（范围修复验证） ====================
-
-func TestExtractServiceMetrics_SuccessRateRange(t *testing.T) {
-	// SLO ServiceSLO.SuccessRate 是 0-100 范围
-	otel := &cluster.OTelSnapshot{
-		SLOServices: []slo.ServiceSLO{
-			{Namespace: "default", Name: "api-svc", SuccessRate: 99.5, P90Ms: 120, RPS: 50},
-			{Namespace: "default", Name: "db-svc", SuccessRate: 85.0, P90Ms: 500, RPS: 30},
-			{Namespace: "default", Name: "perfect-svc", SuccessRate: 100.0, P90Ms: 10, RPS: 100},
-		},
-	}
-
-	points := extractServiceMetrics(otel)
-
-	// api-svc: error_rate = 100 - 99.5 = 0.5
-	apiMetrics := indexPoints(points, "default/service/api-svc")
-	assertMetricApprox(t, apiMetrics, "error_rate", 0.5)
-	assertMetric(t, apiMetrics, "avg_latency", 120)
-	assertMetric(t, apiMetrics, "request_rate", 50)
-
-	// db-svc: error_rate = 100 - 85 = 15
-	dbMetrics := indexPoints(points, "default/service/db-svc")
-	assertMetricApprox(t, dbMetrics, "error_rate", 15.0)
-
-	// perfect-svc: error_rate = 100 - 100 = 0
-	perfectMetrics := indexPoints(points, "default/service/perfect-svc")
-	assertMetricApprox(t, perfectMetrics, "error_rate", 0.0)
 }
 
 func TestExtractIngressMetrics_ErrorRateRange(t *testing.T) {

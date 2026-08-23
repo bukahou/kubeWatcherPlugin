@@ -1,7 +1,8 @@
 // Package slo 定义 SLO 数据模型
 //
 // 数据源: Traefik (otel_metrics_sum + otel_metrics_histogram)
-//         Linkerd (otel_metrics_gauge)
+//
+//	Linkerd (otel_metrics_gauge)
 package slo
 
 import "time"
@@ -53,32 +54,9 @@ type StatusCodeCount struct {
 // ServiceSLO — Linkerd 服务网格指标
 // ============================================================
 
-type ServiceSLO struct {
-	Namespace      string            `json:"namespace"`
-	Name           string            `json:"name"`
-	RPS            float64           `json:"rps"`
-	SuccessRate    float64           `json:"successRate"`
-	P50Ms          float64           `json:"p50Ms"`
-	P90Ms          float64           `json:"p90Ms"`
-	P99Ms          float64           `json:"p99Ms"`
-	MTLSEnabled    bool              `json:"mtlsEnabled"`
-	StatusCodes    []StatusCodeCount `json:"statusCodes"`
-	LatencyBuckets []LatencyBucket   `json:"latencyBuckets,omitempty"`
-}
-
 // ============================================================
 // ServiceEdge — 服务间调用关系（Linkerd outbound）
 // ============================================================
-
-type ServiceEdge struct {
-	SrcNamespace string  `json:"srcNamespace"`
-	SrcName      string  `json:"srcName"`
-	DstNamespace string  `json:"dstNamespace"`
-	DstName      string  `json:"dstName"`
-	RPS          float64 `json:"rps"`
-	SuccessRate  float64 `json:"successRate"`
-	AvgMs        float64 `json:"avgMs"`
-}
 
 // ============================================================
 // SLO 时序数据
@@ -109,8 +87,6 @@ type SLOWindowData struct {
 	History  []SLOHistoryPoint `json:"history,omitempty"`  // 时序数据
 
 	// Mesh 数据（Linkerd 服务网格，按窗口时间范围聚合）
-	MeshServices []ServiceSLO  `json:"meshServices,omitempty"`
-	MeshEdges    []ServiceEdge `json:"meshEdges,omitempty"`
 }
 
 // SLOHistoryPoint 时序数据点（按桶聚合）

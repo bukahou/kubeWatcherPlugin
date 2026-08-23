@@ -8,9 +8,9 @@ package config
 // ============================================================
 var defaultDurations = map[string]string{
 	// -------------------- DataHub 配置 --------------------
-	"MASTER_DATAHUB_EVENT_RETENTION":  "30m", // Event 保留时间
-	"MASTER_DATAHUB_HEARTBEAT_EXPIRE":    "45s",  // 心跳过期时间
-	"MASTER_DATAHUB_SNAPSHOT_RETENTION": "15m",  // OTel 快照时间线保留时间
+	"MASTER_DATAHUB_EVENT_RETENTION":    "30m", // Event 保留时间
+	"MASTER_DATAHUB_HEARTBEAT_EXPIRE":   "45s", // 心跳过期时间
+	"MASTER_DATAHUB_SNAPSHOT_RETENTION": "15m", // OTel 快照时间线保留时间
 
 	// -------------------- 超时配置 --------------------
 	"MASTER_TIMEOUT_COMMAND_POLL": "60s", // 长轮询超时
@@ -29,11 +29,11 @@ var defaultDurations = map[string]string{
 	"MASTER_AI_TOOL_TIMEOUT": "30s", // Tool 执行超时
 
 	// -------------------- SLO 配置 --------------------
-	"MASTER_SLO_AGGREGATE_INTERVAL": "1h",     // 聚合间隔
-	"MASTER_SLO_CLEANUP_INTERVAL":   "1h",     // 清理间隔
-	"MASTER_SLO_RAW_RETENTION":      "48h",    // raw 数据保留时间
-	"MASTER_SLO_HOURLY_RETENTION":   "2160h",  // hourly 数据保留时间 (90 天)
-	"MASTER_SLO_STATUS_RETENTION":   "4320h",  // 状态历史保留时间 (180 天)
+	"MASTER_SLO_AGGREGATE_INTERVAL": "1h",    // 聚合间隔
+	"MASTER_SLO_CLEANUP_INTERVAL":   "1h",    // 清理间隔
+	"MASTER_SLO_RAW_RETENTION":      "48h",   // raw 数据保留时间
+	"MASTER_SLO_HOURLY_RETENTION":   "2160h", // hourly 数据保留时间 (90 天)
+	"MASTER_SLO_STATUS_RETENTION":   "4320h", // 状态历史保留时间 (180 天)
 
 	// -------------------- 节点指标持久化配置 --------------------
 	"MASTER_METRICS_SAMPLE_INTERVAL":  "30s", // 历史数据采样间隔
@@ -85,9 +85,9 @@ var defaultStrings = map[string]string{
 	"MASTER_REDIS_PASSWORD": "",               // Redis 密码
 
 	// -------------------- 数据库配置 --------------------
-	"MASTER_DB_TYPE": "sqlite",         // 数据库类型
+	"MASTER_DB_TYPE": "sqlite",                                            // 数据库类型
 	"MASTER_DB_PATH": "atlhyper_master_v2/database/sqlite/data/master.db", // SQLite 路径
-	"MASTER_DB_DSN":  "",               // MySQL/PG 连接串
+	"MASTER_DB_DSN":  "",                                                  // MySQL/PG 连接串
 
 	// -------------------- JWT 配置 --------------------
 	"MASTER_JWT_SECRET": "", // JWT 密钥（必须通过环境变量配置）
@@ -105,8 +105,8 @@ var defaultStrings = map[string]string{
 	"MASTER_AI_SEED_BASE_URL": "", // 种子自定义 API 地址
 
 	// -------------------- GitHub 配置 --------------------
-	"GITHUB_APP_SLUG":         "",                                          // GitHub App URL slug
-	"GITHUB_PRIVATE_KEY_PATH": "",                                          // GitHub Private Key PEM 文件路径
+	"GITHUB_APP_SLUG":         "",                                           // GitHub App URL slug
+	"GITHUB_PRIVATE_KEY_PATH": "",                                           // GitHub Private Key PEM 文件路径
 	"GITHUB_CALLBACK_URL":     "http://localhost:3000/auth/github/callback", // GitHub App 安装回调 URL
 }
 

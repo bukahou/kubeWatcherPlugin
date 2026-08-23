@@ -15,7 +15,7 @@ type PodQueryOpts struct {
 
 // EventQueryOpts Event 查询选项
 type EventQueryOpts struct {
-	Type   string    // Normal / Warning
+	Type   string // Normal / Warning
 	Reason string
 	Since  time.Time
 	Limit  int

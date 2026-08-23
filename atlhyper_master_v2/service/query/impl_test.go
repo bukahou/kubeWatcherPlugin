@@ -23,11 +23,11 @@ func (m *mockStore) SetSnapshot(clusterID string, snapshot *cluster.ClusterSnaps
 	return nil
 }
 func (m *mockStore) GetSnapshot(clusterID string) (*cluster.ClusterSnapshot, error) { return nil, nil }
-func (m *mockStore) UpdateHeartbeat(clusterID string) error                          { return nil }
+func (m *mockStore) UpdateHeartbeat(clusterID string) error                         { return nil }
 func (m *mockStore) GetAgentStatus(clusterID string) (*agentmodel.AgentStatus, error) {
 	return nil, nil
 }
-func (m *mockStore) ListAgents() ([]agentmodel.AgentInfo, error) { return nil, nil }
+func (m *mockStore) ListAgents() ([]agentmodel.AgentInfo, error)         { return nil, nil }
 func (m *mockStore) GetEvents(clusterID string) ([]cluster.Event, error) { return nil, nil }
 func (m *mockStore) GetOTelTimeline(clusterID string, since time.Time) ([]cluster.OTelEntry, error) {
 	return nil, nil
@@ -64,7 +64,7 @@ func (m *mockEventRepo) ListByInvolvedResource(ctx context.Context, clusterID, k
 func (m *mockEventRepo) ListByType(ctx context.Context, clusterID, eventType string, since time.Time) ([]*database.ClusterEvent, error) {
 	return nil, nil
 }
-func (m *mockEventRepo) GetLatestEventID(ctx context.Context) (int64, error)         { return 0, nil }
+func (m *mockEventRepo) GetLatestEventID(ctx context.Context) (int64, error) { return 0, nil }
 func (m *mockEventRepo) GetEventsSince(ctx context.Context, sinceID int64) ([]*database.ClusterEvent, error) {
 	return nil, nil
 }
@@ -89,13 +89,13 @@ var _ database.ClusterEventRepository = (*mockEventRepo)(nil)
 // --- aiops.Engine ---
 type mockAIOpsEngine struct{}
 
-func (m *mockAIOpsEngine) OnSnapshot(clusterID string)                                    {}
-func (m *mockAIOpsEngine) GetGraph(clusterID string) *aiops.DependencyGraph               { return nil }
+func (m *mockAIOpsEngine) OnSnapshot(clusterID string)                      {}
+func (m *mockAIOpsEngine) GetGraph(clusterID string) *aiops.DependencyGraph { return nil }
 func (m *mockAIOpsEngine) GetGraphTrace(clusterID, fromKey, direction string, maxDepth int) *aiops.TraceResult {
 	return nil
 }
-func (m *mockAIOpsEngine) GetBaseline(entityKey string) *aiops.EntityBaseline              { return nil }
-func (m *mockAIOpsEngine) GetClusterRisk(clusterID string) *aiops.ClusterRisk              { return nil }
+func (m *mockAIOpsEngine) GetBaseline(entityKey string) *aiops.EntityBaseline { return nil }
+func (m *mockAIOpsEngine) GetClusterRisk(clusterID string) *aiops.ClusterRisk { return nil }
 func (m *mockAIOpsEngine) GetEntityRisks(clusterID, sortBy string, limit int) []*aiops.EntityRisk {
 	return nil
 }
@@ -115,8 +115,8 @@ func (m *mockAIOpsEngine) GetIncidentPatterns(ctx context.Context, entityKey str
 	return nil
 }
 func (m *mockAIOpsEngine) SetIncidentNotify(fn func(incidentID, severity, trigger string)) {}
-func (m *mockAIOpsEngine) Start(ctx context.Context) error                                  { return nil }
-func (m *mockAIOpsEngine) Stop() error                                                      { return nil }
+func (m *mockAIOpsEngine) Start(ctx context.Context) error                                 { return nil }
+func (m *mockAIOpsEngine) Stop() error                                                     { return nil }
 
 var _ aiops.Engine = (*mockAIOpsEngine)(nil)
 
@@ -153,17 +153,21 @@ func (m *mockCommandRepo) Count(ctx context.Context, opts database.CommandQueryO
 
 type mockNotifyRepo struct{}
 
-func (m *mockNotifyRepo) Create(ctx context.Context, ch *database.NotifyChannel) error   { return nil }
-func (m *mockNotifyRepo) Update(ctx context.Context, ch *database.NotifyChannel) error   { return nil }
-func (m *mockNotifyRepo) Delete(ctx context.Context, id int64) error                     { return nil }
+func (m *mockNotifyRepo) Create(ctx context.Context, ch *database.NotifyChannel) error { return nil }
+func (m *mockNotifyRepo) Update(ctx context.Context, ch *database.NotifyChannel) error { return nil }
+func (m *mockNotifyRepo) Delete(ctx context.Context, id int64) error                   { return nil }
 func (m *mockNotifyRepo) GetByID(ctx context.Context, id int64) (*database.NotifyChannel, error) {
 	return nil, nil
 }
 func (m *mockNotifyRepo) GetByType(ctx context.Context, channelType string) (*database.NotifyChannel, error) {
 	return nil, nil
 }
-func (m *mockNotifyRepo) List(ctx context.Context) ([]*database.NotifyChannel, error)        { return nil, nil }
-func (m *mockNotifyRepo) ListEnabled(ctx context.Context) ([]*database.NotifyChannel, error) { return nil, nil }
+func (m *mockNotifyRepo) List(ctx context.Context) ([]*database.NotifyChannel, error) {
+	return nil, nil
+}
+func (m *mockNotifyRepo) ListEnabled(ctx context.Context) ([]*database.NotifyChannel, error) {
+	return nil, nil
+}
 
 type mockSettingsRepo struct{}
 
@@ -179,9 +183,9 @@ func (m *mockSettingsRepo) List(ctx context.Context) ([]*database.Setting, error
 
 type mockAIProviderRepo struct{}
 
-func (m *mockAIProviderRepo) Create(ctx context.Context, p *database.AIProvider) error   { return nil }
-func (m *mockAIProviderRepo) Update(ctx context.Context, p *database.AIProvider) error   { return nil }
-func (m *mockAIProviderRepo) Delete(ctx context.Context, id int64) error                 { return nil }
+func (m *mockAIProviderRepo) Create(ctx context.Context, p *database.AIProvider) error { return nil }
+func (m *mockAIProviderRepo) Update(ctx context.Context, p *database.AIProvider) error { return nil }
+func (m *mockAIProviderRepo) Delete(ctx context.Context, id int64) error               { return nil }
 func (m *mockAIProviderRepo) GetByID(ctx context.Context, id int64) (*database.AIProvider, error) {
 	return nil, nil
 }

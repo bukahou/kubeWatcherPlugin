@@ -12,12 +12,12 @@ import (
 
 // mockCallback 模拟 TransitionCallback
 type mockCallback struct {
-	warningCreated int
-	stateEscalated int
+	warningCreated  int
+	stateEscalated  int
 	recoveryStarted int
-	recurrence     int
-	stable         int
-	lastIncidentID string
+	recurrence      int
+	stable          int
+	lastIncidentID  string
 }
 
 func (m *mockCallback) OnWarningCreated(ctx context.Context, clusterID, entityKey string, risk *aiops.EntityRisk, now time.Time) string {

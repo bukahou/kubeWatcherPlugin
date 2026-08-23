@@ -26,8 +26,7 @@ func buildSLOTimeSeries(entries []cluster.OTelEntry, serviceName string) map[str
 		if e.Snapshot == nil {
 			continue
 		}
-		// 在 SLO Ingress 或 SLO Services 中查找
-		found := false
+		// 在 SLO Ingress 中查找（服务网格已移除，SLO 只做入口视角）
 		if e.Snapshot.SLOIngress != nil {
 			for _, svc := range e.Snapshot.SLOIngress {
 				if svc.ServiceKey == serviceName || svc.DisplayName == serviceName {
@@ -38,21 +37,6 @@ func buildSLOTimeSeries(entries []cluster.OTelEntry, serviceName string) map[str
 						P50Ms:     svc.P50Ms,
 						P99Ms:     svc.P99Ms,
 						ErrorRate: svc.ErrorRate,
-					})
-					found = true
-					break
-				}
-			}
-		}
-		if !found && e.Snapshot.SLOServices != nil {
-			for _, svc := range e.Snapshot.SLOServices {
-				if svc.Name == serviceName {
-					points = append(points, sloPoint{
-						Timestamp: e.Timestamp,
-						RPS:       svc.RPS,
-						SuccRate:  svc.SuccessRate,
-						P50Ms:     svc.P50Ms,
-						P99Ms:     svc.P99Ms,
 					})
 					break
 				}

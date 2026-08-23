@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"AtlHyper/atlhyper_master_v2/gateway/handler"
 	"AtlHyper/atlhyper_master_v2/database"
+	"AtlHyper/atlhyper_master_v2/gateway/handler"
 	"AtlHyper/atlhyper_master_v2/service"
 )
 
@@ -31,9 +31,9 @@ type ChannelResponse struct {
 	ID               int64           `json:"id"`
 	Type             string          `json:"type"`
 	Name             string          `json:"name"`
-	Enabled          bool            `json:"enabled"`            // 用户设置的启用状态
-	EffectiveEnabled bool            `json:"effectiveEnabled"`   // 实际可用状态（启用+配置完整）
-	ValidationErrors []string        `json:"validationErrors"`   // 配置校验错误
+	Enabled          bool            `json:"enabled"`          // 用户设置的启用状态
+	EffectiveEnabled bool            `json:"effectiveEnabled"` // 实际可用状态（启用+配置完整）
+	ValidationErrors []string        `json:"validationErrors"` // 配置校验错误
 	Config           json.RawMessage `json:"config"`
 	CreatedAt        time.Time       `json:"createdAt"`
 	UpdatedAt        time.Time       `json:"updatedAt"`

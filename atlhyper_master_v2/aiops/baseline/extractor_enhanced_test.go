@@ -267,12 +267,12 @@ func TestExtractOTelDeterministicAnomalies_BoundaryValues(t *testing.T) {
 		errorCount  int64
 		wantCount   int
 	}{
-		{"error_rate=14%", 0.86, 100, 0, 0},             // 14% 不触发（需 > 15%）
-		{"error_rate=16%", 0.84, 100, 0, 1},             // 16% > 15% 触发
-		{"p99=5000ms exact", 0.99, 5000, 0, 0},         // 5000ms 不触发（需 > 5000）
-		{"p99=5001ms", 0.99, 5001, 0, 1},               // > 5000ms 触发
-		{"log_error=500 exact", 0.99, 100, 500, 0},     // 500 不触发（需 > 500）
-		{"log_error=501", 0.99, 100, 501, 1},           // > 500 触发
+		{"error_rate=14%", 0.86, 100, 0, 0},        // 14% 不触发（需 > 15%）
+		{"error_rate=16%", 0.84, 100, 0, 1},        // 16% > 15% 触发
+		{"p99=5000ms exact", 0.99, 5000, 0, 0},     // 5000ms 不触发（需 > 5000）
+		{"p99=5001ms", 0.99, 5001, 0, 1},           // > 5000ms 触发
+		{"log_error=500 exact", 0.99, 100, 500, 0}, // 500 不触发（需 > 500）
+		{"log_error=501", 0.99, 100, 501, 1},       // > 500 触发
 	}
 
 	for _, tt := range tests {

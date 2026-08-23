@@ -98,7 +98,6 @@ func (s *aiServiceImpl) loadAIConfigForRole(ctx context.Context, role string) (*
 	return nil, fmt.Errorf("角色 %s 未分配 Provider，请在 AI 设置中为该角色指定提供商", role)
 }
 
-
 // providerToRoleConfig 将 Provider 转换为 RoleConfig
 func (s *aiServiceImpl) providerToRoleConfig(ctx context.Context, p *database.AIProvider) *RoleConfig {
 	cfg := &RoleConfig{

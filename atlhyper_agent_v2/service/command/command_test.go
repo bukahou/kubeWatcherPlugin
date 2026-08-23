@@ -318,9 +318,9 @@ func TestExecute_GetLogs_AutoSelectContainer(t *testing.T) {
 
 func TestExecute_GetLogs_TailLinesClamp(t *testing.T) {
 	tests := []struct {
-		name          string
-		inputTail     float64
-		expectedTail  int64
+		name         string
+		inputTail    float64
+		expectedTail int64
 	}{
 		{"ZeroDefaults100", 0, 100},
 		{"NegativeDefaults100", -1, 100},

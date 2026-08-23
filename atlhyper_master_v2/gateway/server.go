@@ -25,14 +25,14 @@ var serverLog = logger.Module("Gateway")
 
 // Server Gateway HTTP Server
 type Server struct {
-	port            int
-	service         service.Service
-	database        *database.DB
-	aiService       ai.AIService
-	analyzeTrigger  aiopsHandler.AnalyzeTrigger
-	ghClient        github.Client
-	deployer        deployer.Deployer
-	httpServer      *http.Server
+	port           int
+	service        service.Service
+	database       *database.DB
+	aiService      ai.AIService
+	analyzeTrigger aiopsHandler.AnalyzeTrigger
+	ghClient       github.Client
+	deployer       deployer.Deployer
+	httpServer     *http.Server
 }
 
 // Config Server 配置
@@ -41,7 +41,7 @@ type Config struct {
 	Service        service.Service
 	Database       *database.DB
 	AIService      ai.AIService                // 可选，nil 表示 AI 功能未启用
-	AnalyzeTrigger aiopsHandler.AnalyzeTrigger  // 可选，nil 表示深度分析未启用
+	AnalyzeTrigger aiopsHandler.AnalyzeTrigger // 可选，nil 表示深度分析未启用
 	GitHubClient   github.Client               // 可选，nil 表示 GitHub 集成未配置
 	Deployer       deployer.Deployer           // 可选，nil 表示 Deployer 未启用
 }

@@ -187,5 +187,3 @@ func (g *masterGateway) Heartbeat(ctx context.Context) error {
 
 	return nil
 }
-
-

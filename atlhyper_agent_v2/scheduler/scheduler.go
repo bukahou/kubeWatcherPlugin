@@ -317,4 +317,3 @@ func (s *Scheduler) runHeartbeatLoop() {
 		}
 	}
 }
-

@@ -475,8 +475,8 @@ func TestGetOTelSnapshot_CacheBehavior(t *testing.T) {
 			atomic.AddInt64(&callCount, 1)
 			return 10, 8, 100.0, 99.5, 15.0, nil
 		},
-		GetSLOSummaryFn: func(_ context.Context) (int, float64, int, float64, error) {
-			return 5, 50.0, 3, 95.0, nil
+		GetSLOSummaryFn: func(_ context.Context) (int, float64, error) {
+			return 5, 50.0, nil
 		},
 		GetMetricsSummaryFn: func(_ context.Context) (int, float64, float64, float64, float64, error) {
 			return 4, 45.0, 60.0, 80.0, 85.0, nil
@@ -536,8 +536,8 @@ func TestGetOTelSnapshot_CacheExpiry(t *testing.T) {
 			atomic.AddInt64(&callCount, 1)
 			return 10, 8, 100.0, 99.5, 15.0, nil
 		},
-		GetSLOSummaryFn: func(_ context.Context) (int, float64, int, float64, error) {
-			return 5, 50.0, 3, 95.0, nil
+		GetSLOSummaryFn: func(_ context.Context) (int, float64, error) {
+			return 5, 50.0, nil
 		},
 		GetMetricsSummaryFn: func(_ context.Context) (int, float64, float64, float64, float64, error) {
 			return 4, 45.0, 60.0, 80.0, 85.0, nil

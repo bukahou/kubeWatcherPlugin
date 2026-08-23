@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"AtlHyper/atlhyper_master_v2/gateway/handler"
 	"AtlHyper/atlhyper_master_v2/database"
+	"AtlHyper/atlhyper_master_v2/gateway/handler"
 	"AtlHyper/atlhyper_master_v2/service"
 )
 
@@ -36,16 +36,16 @@ type ProviderInfo struct {
 
 // AIConfigResponse AI 配置响应
 type AIConfigResponse struct {
-	Enabled            bool           `json:"enabled"`              // 用户设置的启用状态
-	EffectiveEnabled   bool           `json:"effectiveEnabled"`     // 实际可用状态
-	ValidationErrors   []string       `json:"validationErrors"`     // 配置校验错误
-	Provider           string         `json:"provider"`             // 当前提供商
-	APIKeyMasked       string         `json:"apiKeyMasked"`         // 脱敏后的 API Key
-	APIKeySet          bool           `json:"apiKeySet"`            // 是否已设置 API Key
-	Model              string         `json:"model"`                // 当前模型
-	ToolTimeout        int            `json:"toolTimeout"`          // Tool 超时(秒)
-	AvailableProviders []ProviderInfo `json:"availableProviders"`   // 可用提供商列表
-	RequiresRestart    bool           `json:"requiresRestart"`      // 修改后是否需要重启
+	Enabled            bool           `json:"enabled"`            // 用户设置的启用状态
+	EffectiveEnabled   bool           `json:"effectiveEnabled"`   // 实际可用状态
+	ValidationErrors   []string       `json:"validationErrors"`   // 配置校验错误
+	Provider           string         `json:"provider"`           // 当前提供商
+	APIKeyMasked       string         `json:"apiKeyMasked"`       // 脱敏后的 API Key
+	APIKeySet          bool           `json:"apiKeySet"`          // 是否已设置 API Key
+	Model              string         `json:"model"`              // 当前模型
+	ToolTimeout        int            `json:"toolTimeout"`        // Tool 超时(秒)
+	AvailableProviders []ProviderInfo `json:"availableProviders"` // 可用提供商列表
+	RequiresRestart    bool           `json:"requiresRestart"`    // 修改后是否需要重启
 }
 
 // AIConfigUpdateRequest AI 配置更新请求

@@ -79,8 +79,8 @@ type toolCallFunction struct {
 }
 
 type toolParam struct {
-	Type     string       `json:"type"`
-	Function functionDef  `json:"function"`
+	Type     string      `json:"type"`
+	Function functionDef `json:"function"`
 }
 
 type functionDef struct {

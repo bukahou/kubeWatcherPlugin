@@ -67,4 +67,3 @@ type DeleteOptions struct {
 	// Foreground: 前台删除依赖资源
 	PropagationPolicy string
 }
-

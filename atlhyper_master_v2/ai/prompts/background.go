@@ -7,10 +7,10 @@ import "fmt"
 // IncidentPromptContext LLM 输入上下文（纯文本，不含领域类型）
 // 由 aiops 包构建后传入，prompts 包不依赖 aiops
 type IncidentPromptContext struct {
-	IncidentSummary  string // 事件基本信息
-	TimelineText     string // 时间线叙述
-	AffectedEntities string // 受影响实体及其风险评分
-	RootCauseEntity  string // 根因实体详情
+	IncidentSummary   string // 事件基本信息
+	TimelineText      string // 时间线叙述
+	AffectedEntities  string // 受影响实体及其风险评分
+	RootCauseEntity   string // 根因实体详情
 	HistoricalContext string // 历史相似事件
 
 	// OTel 上下文（Phase 3 新增）

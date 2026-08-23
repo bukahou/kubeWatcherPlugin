@@ -14,9 +14,9 @@ import (
 // ==================== 确定性异常阈值 ====================
 
 const (
-	apmErrorRateThreshold  = 0.15  // APM error rate > 15%
-	apmP99LatencyThreshold = 5000  // APM P99 > 5000ms
-	logErrorCountThreshold = 500   // 全局 ERROR 日志 > 500 条/5min
+	apmErrorRateThreshold  = 0.15 // APM error rate > 15%
+	apmP99LatencyThreshold = 5000 // APM P99 > 5000ms
+	logErrorCountThreshold = 500  // 全局 ERROR 日志 > 500 条/5min
 )
 
 // ==================== 指标提取 ====================

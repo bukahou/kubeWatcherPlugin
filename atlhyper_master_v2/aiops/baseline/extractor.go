@@ -100,17 +100,6 @@ func extractPodMetrics(snap *cluster.ClusterSnapshot) []aiops.MetricDataPoint {
 
 func extractServiceMetrics(otel *cluster.OTelSnapshot) []aiops.MetricDataPoint {
 	var points []aiops.MetricDataPoint
-	for _, svc := range otel.SLOServices {
-		key := aiops.EntityKey(svc.Namespace, "service", svc.Name)
-
-		// SuccessRate 0-100 范围（如 99.5） → ErrorRate 0-100（如 0.5）
-		errorRate := 100 - svc.SuccessRate
-		points = append(points,
-			aiops.MetricDataPoint{EntityKey: key, MetricName: "error_rate", Value: errorRate},
-			aiops.MetricDataPoint{EntityKey: key, MetricName: "avg_latency", Value: svc.P90Ms},
-			aiops.MetricDataPoint{EntityKey: key, MetricName: "request_rate", Value: svc.RPS},
-		)
-	}
 	return points
 }
 

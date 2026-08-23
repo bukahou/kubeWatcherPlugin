@@ -469,10 +469,6 @@ func (r *sloRepository) GetSLOSummary(ctx context.Context) (*slo.SLOSummary, err
 		data []slo.IngressSLO
 		err  error
 	}
-	type serviceResult struct {
-		data []slo.ServiceSLO
-		err  error
-	}
 
 	// SLO 只覆盖 ingress（外部视角）。服务间调用质量由 APM 承担，
 	// 详见 docs/design/active/slo-ingress-contract-design.md 的范围决策。

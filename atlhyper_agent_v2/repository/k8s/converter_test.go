@@ -1848,27 +1848,27 @@ func TestConvertDaemonSet_Rollout(t *testing.T) {
 		wantBadgeContain []string
 	}{
 		{
-			name:        "Complete",
-			desired:     3,
-			updated:     3,
-			ready:       3,
-			wantPhase:   "Complete",
+			name:             "Complete",
+			desired:          3,
+			updated:          3,
+			ready:            3,
+			wantPhase:        "Complete",
 			wantBadgeContain: []string{},
 		},
 		{
-			name:        "Progressing - updating",
-			desired:     3,
-			updated:     1,
-			ready:       3,
-			wantPhase:   "Progressing",
+			name:             "Progressing - updating",
+			desired:          3,
+			updated:          1,
+			ready:            3,
+			wantPhase:        "Progressing",
 			wantBadgeContain: []string{"Updating"},
 		},
 		{
-			name:        "Progressing - not ready",
-			desired:     3,
-			updated:     3,
-			ready:       1,
-			wantPhase:   "Progressing",
+			name:             "Progressing - not ready",
+			desired:          3,
+			updated:          3,
+			ready:            1,
+			wantPhase:        "Progressing",
 			wantBadgeContain: []string{"Scaling"},
 		},
 		{
@@ -2137,7 +2137,7 @@ func TestConvertCronJob_BasicFields(t *testing.T) {
 		Spec: batchv1.CronJobSpec{
 			Schedule:                   "0 * * * *",
 			Suspend:                    boolPtr(false),
-			ConcurrencyPolicy:         batchv1.ForbidConcurrent,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 			SuccessfulJobsHistoryLimit: &successLimit,
 			FailedJobsHistoryLimit:     &failedLimit,
 			JobTemplate: batchv1.JobTemplateSpec{

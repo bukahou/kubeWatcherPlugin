@@ -103,7 +103,6 @@ func (r *Router) registerRoutes() {
 
 	// 创建 Handlers — SLO (package slo)
 	sloH := sloHandler.NewSLOHandler(r.service, r.service)
-	sloMeshH := sloHandler.NewSLOMeshHandler(r.service)
 
 	// 创建 Handlers — AIOps (package aiops)
 	aiopsGraphH := aiopsHandler.NewAIOpsGraphHandler(r.service)
@@ -223,17 +222,13 @@ func (r *Router) registerRoutes() {
 		register("/api/v2/commands/", commandH.GetStatus)
 
 		// ---------- SLO 监控查询（只读） ----------
-		register("/api/v2/slo/domains", sloH.Domains)       // V1: 按 service key
-		register("/api/v2/slo/domains/v2", sloH.DomainsV2)  // V2: 按真实域名
+		register("/api/v2/slo/domains", sloH.Domains)      // V1: 按 service key
+		register("/api/v2/slo/domains/v2", sloH.DomainsV2) // V2: 按真实域名
 		register("/api/v2/slo/domains/detail", sloH.DomainDetail)
 		register("/api/v2/slo/domains/history", sloH.DomainHistory)
 		register("/api/v2/slo/domains/latency", sloH.LatencyDistribution)
 		register("/api/v2/slo/targets", sloH.Targets)
 		register("/api/v2/slo/status-history", sloH.StatusHistory)
-
-		// ---------- SLO 服务网格查询（只读） ----------
-		register("/api/v2/slo/mesh/topology", sloMeshH.MeshTopology)
-		register("/api/v2/slo/mesh/service/detail", sloMeshH.ServiceDetail)
 
 		// ---------- 节点指标查询（只读） ----------
 		register("/api/v2/node-metrics", nodeMetricsH.Route)
@@ -255,8 +250,6 @@ func (r *Router) registerRoutes() {
 		register("/api/v2/observe/traces/", observeH.TracesDetail)
 		register("/api/v2/observe/slo/summary", observeH.SLOSummary)
 		register("/api/v2/observe/slo/ingress", observeH.SLOIngress)
-		register("/api/v2/observe/slo/services", observeH.SLOServices)
-		register("/api/v2/observe/slo/edges", observeH.SLOEdges)
 		register("/api/v2/observe/slo/timeseries", observeH.SLOTimeSeries)
 
 		// ---------- AIOps 查询（只读） ----------

@@ -608,9 +608,6 @@ func extractActiveEntityKeys(snap *cluster.ClusterSnapshot, otel *cluster.OTelSn
 		keys[aiops.EntityKey(ing.Summary.Namespace, "ingress", ing.Summary.Name)] = true
 	}
 	if otel != nil {
-		for _, svc := range otel.SLOServices {
-			keys[aiops.EntityKey(svc.Namespace, "service", svc.Name)] = true
-		}
 		for _, ing := range otel.SLOIngress {
 			keys[aiops.EntityKey("_cluster", "ingress", ing.ServiceKey)] = true
 		}

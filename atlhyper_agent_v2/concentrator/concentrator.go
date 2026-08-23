@@ -38,7 +38,6 @@ func NewConcentrator() TimeSeriesAggregator {
 func (c *Concentrator) Ingest(
 	nodes []metrics.NodeMetrics,
 	sloIngress []slo.IngressSLO,
-	sloServices []slo.ServiceSLO,
 	apmServices []apm.APMService,
 	ts time.Time,
 ) {
@@ -117,26 +116,6 @@ func (c *Concentrator) Ingest(
 			P50Ms:       svc.P50Ms,
 			P99Ms:       svc.P99Ms,
 			ErrorRate:   svc.ErrorRate,
-		})
-	}
-
-	// SLO Mesh Services（Linkerd）— 复用 sloRings，key 为 "namespace/name"
-	for i := range sloServices {
-		svc := &sloServices[i]
-		key := svc.Namespace + "/" + svc.Name
-		ring, ok := c.sloRings[key]
-		if !ok {
-			ring = &sloMetricsRing{}
-			c.sloRings[key] = ring
-		}
-		errRate := 100 - svc.SuccessRate
-		ring.put(minute, cluster.SLOTimePoint{
-			Timestamp:   truncated,
-			RPS:         svc.RPS,
-			SuccessRate: svc.SuccessRate, // 0-100
-			P50Ms:       svc.P50Ms,
-			P99Ms:       svc.P99Ms,
-			ErrorRate:   errRate, // 0-100
 		})
 	}
 

@@ -700,9 +700,9 @@ func TestNamespaceFilter_SmokeFiltered(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name     string
-		call     func() (int, error)
-		wantAll  int // namespace="default" 的数量
+		name    string
+		call    func() (int, error)
+		wantAll int // namespace="default" 的数量
 	}{
 		{"Services", func() (int, error) {
 			r, e := svc.GetServices(ctx, "cluster-1", "default")

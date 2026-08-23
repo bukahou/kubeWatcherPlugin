@@ -54,8 +54,8 @@ func (r *summaryRepository) GetAPMSummary(ctx context.Context) (totalServices, h
 }
 
 // GetSLOSummary SLO 概览（从 Traefik sum + Linkerd gauge 聚合）
-func (r *summaryRepository) GetSLOSummary(ctx context.Context) (ingressServices int, ingressAvgRPS float64, meshServices int, meshAvgMTLS float64, err error) {
-	// Ingress (Traefik)
+func (r *summaryRepository) GetSLOSummary(ctx context.Context) (ingressServices int, ingressAvgRPS float64, err error) {
+	// Ingress（契约 ingress_request_total，与具体 ingress 实现解耦）
 	ingressQuery := `
 		SELECT count(DISTINCT svc) AS ingress_services, avg(rate_val) AS avg_rps
 		FROM (
@@ -69,19 +69,9 @@ func (r *summaryRepository) GetSLOSummary(ctx context.Context) (ingressServices 
 	_ = r.client.QueryRow(ctx, ingressQuery).Scan(&ingressServices, &ingressAvgRPS)
 	ingressAvgRPS = roundF(ingressAvgRPS, 2)
 
-	// Mesh 概览（通用契约：Linkerd/Istio 均通过 OTel transform 映射到 mesh_request_total）
-	// 从 inbound 视角统计：服务被调用的数量和 mTLS 占比
-	meshQuery := `
-		SELECT count(DISTINCT Attributes['workload']) AS mesh_services,
-		       sumIf(Value, Attributes['mtls'] = 'true') / if(sum(Value) = 0, 1, sum(Value)) AS avg_mtls
-		FROM atlhyper.otel_metrics_sum
-		WHERE MetricName = 'mesh_request_total' AND Attributes['direction'] = 'inbound'
-		  AND TimeUnix >= now() - INTERVAL 5 MINUTE
-	`
-	_ = r.client.QueryRow(ctx, meshQuery).Scan(&meshServices, &meshAvgMTLS)
-	meshAvgMTLS = roundF(meshAvgMTLS*100, 2) // ratio → percent
-
-	return ingressServices, ingressAvgRPS, meshServices, meshAvgMTLS, nil
+	// 服务网格概览已移除：SLO 只做 ingress 外部视角，
+	// 服务间调用质量由 APM 承担（见 slo-ingress-contract-design.md）。
+	return ingressServices, ingressAvgRPS, nil
 }
 
 // GetMetricsSummary 基础设施指标概览（从 node_cpu + node_memory 聚合）

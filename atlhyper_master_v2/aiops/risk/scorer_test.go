@@ -208,8 +208,8 @@ func TestComputeLocalRisks_PodThreeDeterministic(t *testing.T) {
 
 func TestComputeLocalRisks_PodMixed_Channel2Wins(t *testing.T) {
 	anomalies := []*aiops.AnomalyResult{
-		{EntityKey: "default/pod/api-1", MetricName: "restart_count", IsAnomaly: true, Score: 0.80},       // both
-		{EntityKey: "default/pod/api-1", MetricName: "container_anomaly", IsAnomaly: true, Score: 0.90},   // deterministic
+		{EntityKey: "default/pod/api-1", MetricName: "restart_count", IsAnomaly: true, Score: 0.80},     // both
+		{EntityKey: "default/pod/api-1", MetricName: "container_anomaly", IsAnomaly: true, Score: 0.90}, // deterministic
 	}
 	config := DefaultRiskConfig()
 
@@ -355,8 +355,8 @@ func TestPropagate_PropagationPaths(t *testing.T) {
 	graph.RebuildIndex()
 
 	weightedRisks := map[string]float64{
-		"_cluster/node/node1":  0.8,
-		"default/pod/api-1": 0.3,
+		"_cluster/node/node1": 0.8,
+		"default/pod/api-1":   0.3,
 	}
 
 	_, paths := Propagate(graph, weightedRisks, 0.6)
@@ -625,8 +625,8 @@ func TestServiceWeights_Enhanced(t *testing.T) {
 	// Enhanced 后 service 应包含 APM 和 Log 指标
 	requiredMetrics := []string{
 		"error_rate", "avg_latency", "request_rate", // Basic SLO
-		"apm_error_rate", "apm_p99_latency",         // Enhanced APM
-		"log_error_count",                            // Enhanced Log
+		"apm_error_rate", "apm_p99_latency", // Enhanced APM
+		"log_error_count", // Enhanced Log
 	}
 	for _, name := range requiredMetrics {
 		if _, ok := serviceConfigs[name]; !ok {
@@ -650,8 +650,8 @@ func TestNodeWeights_Enhanced(t *testing.T) {
 
 	// Enhanced 后 node 应包含磁盘和 PSI 指标
 	requiredMetrics := []string{
-		"cpu_usage", "memory_usage",     // Basic
-		"disk_usage",                    // Enhanced
+		"cpu_usage", "memory_usage", // Basic
+		"disk_usage",                      // Enhanced
 		"psi_cpu", "psi_memory", "psi_io", // Enhanced
 	}
 	for _, name := range requiredMetrics {

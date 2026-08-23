@@ -55,52 +55,6 @@ func (h *ObserveHandler) SLOIngress(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// SLOServices GET /api/v2/observe/slo/services (Dashboard: 快照直读)
-func (h *ObserveHandler) SLOServices(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		handler.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-	clusterID, ok := requireClusterID(r)
-	if !ok {
-		handler.WriteError(w, http.StatusBadRequest, "cluster_id is required")
-		return
-	}
-
-	otel, err := h.querySvc.GetOTelSnapshot(r.Context(), clusterID)
-	if err != nil || otel == nil || otel.SLOServices == nil {
-		handler.WriteError(w, http.StatusNotFound, "数据尚未就绪")
-		return
-	}
-	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "获取成功",
-		"data":    otel.SLOServices,
-	})
-}
-
-// SLOEdges GET /api/v2/observe/slo/edges (Dashboard: 快照直读)
-func (h *ObserveHandler) SLOEdges(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		handler.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-	clusterID, ok := requireClusterID(r)
-	if !ok {
-		handler.WriteError(w, http.StatusBadRequest, "cluster_id is required")
-		return
-	}
-
-	otel, err := h.querySvc.GetOTelSnapshot(r.Context(), clusterID)
-	if err != nil || otel == nil || otel.SLOEdges == nil {
-		handler.WriteError(w, http.StatusNotFound, "数据尚未就绪")
-		return
-	}
-	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "获取成功",
-		"data":    otel.SLOEdges,
-	})
-}
-
 // SLOTimeSeries GET /api/v2/observe/slo/timeseries
 // 优先从预聚合时序读取（1h），降级到 OTel Ring Buffer（≤15min）
 func (h *ObserveHandler) SLOTimeSeries(w http.ResponseWriter, r *http.Request) {

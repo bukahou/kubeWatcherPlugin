@@ -2,11 +2,12 @@
 // QueryService 结构体与构造函数
 //
 // 各功能域实现分布在:
-//   k8s.go        — K8s 资源快照查询 (19 个方法)
-//   otel.go       — OTel 快照/时间线查询
-//   overview.go   — 集群概览、Agent 状态、事件、单资源查询
-//   slo.go        — SLO 服务网格查询
-//   aiops.go      — AIOps 查询与 AI 增强
+//
+//	k8s.go        — K8s 资源快照查询 (19 个方法)
+//	otel.go       — OTel 快照/时间线查询
+//	overview.go   — 集群概览、Agent 状态、事件、单资源查询
+//	slo.go        — SLO 服务网格查询
+//	aiops.go      — AIOps 查询与 AI 增强
 package query
 
 import (

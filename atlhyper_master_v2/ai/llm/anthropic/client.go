@@ -19,9 +19,9 @@ import (
 var log = logger.Module("Anthropic")
 
 const (
-	apiEndpoint   = "https://api.anthropic.com/v1/messages"
-	apiVersion    = "2023-06-01"
-	maxTokens     = 4096
+	apiEndpoint = "https://api.anthropic.com/v1/messages"
+	apiVersion  = "2023-06-01"
+	maxTokens   = 4096
 )
 
 func init() {
@@ -56,12 +56,12 @@ func NewAnthropicClient(apiKey, model string) (*Client, error) {
 
 // messagesRequest Anthropic Messages API リクエスト
 type messagesRequest struct {
-	Model       string          `json:"model"`
-	MaxTokens   int             `json:"max_tokens"`
-	System      string          `json:"system,omitempty"`
-	Messages    []messageParam  `json:"messages"`
-	Tools       []toolParam     `json:"tools,omitempty"`
-	Stream      bool            `json:"stream"`
+	Model     string         `json:"model"`
+	MaxTokens int            `json:"max_tokens"`
+	System    string         `json:"system,omitempty"`
+	Messages  []messageParam `json:"messages"`
+	Tools     []toolParam    `json:"tools,omitempty"`
+	Stream    bool           `json:"stream"`
 }
 
 // messageParam メッセージパラメータ

@@ -58,12 +58,12 @@ const (
 
 // 默认配置
 const (
-	defaultCooldown       = 60 * time.Second  // Rate Limit 冷却时间
-	defaultMaxCache       = 200               // 最大缓存条目数
-	defaultCacheTTL       = 24 * time.Hour    // 缓存 TTL
-	rateLimitExpiry       = 1 * time.Hour     // Rate Limit 条目过期清理阈值
-	maxConcurrentAnalysis = 3                 // 最多同时进行的后台分析数
-	analysisTimeout       = 5 * time.Minute   // 深度分析超时
+	defaultCooldown       = 60 * time.Second // Rate Limit 冷却时间
+	defaultMaxCache       = 200              // 最大缓存条目数
+	defaultCacheTTL       = 24 * time.Hour   // 缓存 TTL
+	rateLimitExpiry       = 1 * time.Hour    // Rate Limit 条目过期清理阈值
+	maxConcurrentAnalysis = 3                // 最多同时进行的后台分析数
+	analysisTimeout       = 5 * time.Minute  // 深度分析超时
 )
 
 // 可缓存的事件状态（已结束，数据不再变化）
@@ -343,7 +343,7 @@ func (e *Enricher) saveAnalysisReport(ctx context.Context, incidentID string, in
 		RootCauseAnalysis:  parsed.RootCauseAnalysis,
 		Recommendations:    string(recsJSON),
 		InvestigationSteps: string(stepsJSON),
-		ProviderName:        result.ProviderName,
+		ProviderName:       result.ProviderName,
 		Model:              result.Model,
 		InputTokens:        result.InputTokens,
 		OutputTokens:       result.OutputTokens,

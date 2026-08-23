@@ -109,6 +109,8 @@ type ReplicaSet struct {
 
 func (d *Deployment) GetName() string      { return d.Summary.Name }
 func (d *Deployment) GetNamespace() string { return d.Summary.Namespace }
-func (d *Deployment) IsHealthy() bool      { return d.Summary.Ready == d.Summary.Replicas && d.Summary.Replicas > 0 }
-func (d *Deployment) IsUpdating() bool     { return d.Summary.Updated < d.Summary.Replicas }
-func (d *Deployment) IsPaused() bool       { return d.Summary.Paused }
+func (d *Deployment) IsHealthy() bool {
+	return d.Summary.Ready == d.Summary.Replicas && d.Summary.Replicas > 0
+}
+func (d *Deployment) IsUpdating() bool { return d.Summary.Updated < d.Summary.Replicas }
+func (d *Deployment) IsPaused() bool   { return d.Summary.Paused }

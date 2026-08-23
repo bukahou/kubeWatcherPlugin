@@ -130,10 +130,10 @@ func TestPodDetail_FieldMapping(t *testing.T) {
 		},
 		Containers: []cluster.PodContainerDetail{
 			{
-				Name:                 "app",
-				Image:                "nginx:1.25",
-				State:                "running",
-				RestartCount:         0,
+				Name:                  "app",
+				Image:                 "nginx:1.25",
+				State:                 "running",
+				RestartCount:          0,
 				LastTerminationReason: "OOMKilled",
 			},
 		},

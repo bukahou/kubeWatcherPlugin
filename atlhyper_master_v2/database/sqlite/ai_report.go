@@ -68,11 +68,11 @@ func (d *aiReportDialect) UpdateResult(id int64, r *database.AIReport) (string, 
 		investigation_steps = ?,
 		input_tokens = ?, output_tokens = ?, duration_ms = ?
 	WHERE id = ?`, []any{
-		r.Summary, r.RootCauseAnalysis, r.Recommendations,
-		r.InvestigationSteps,
-		r.InputTokens, r.OutputTokens, r.DurationMs,
-		id,
-	}
+			r.Summary, r.RootCauseAnalysis, r.Recommendations,
+			r.InvestigationSteps,
+			r.InputTokens, r.OutputTokens, r.DurationMs,
+			id,
+		}
 }
 
 func (d *aiReportDialect) CountByClusterAndRole(clusterID, role string, since time.Time) (string, []any) {

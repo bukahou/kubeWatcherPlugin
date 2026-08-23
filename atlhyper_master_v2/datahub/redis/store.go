@@ -11,8 +11,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	agentmodel "AtlHyper/model_v3/agent"
 	"AtlHyper/common/logger"
+	agentmodel "AtlHyper/model_v3/agent"
 	"AtlHyper/model_v3/cluster"
 )
 

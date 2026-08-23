@@ -27,10 +27,10 @@ func BuildIncidentContext(
 	historical []*database.AIOpsIncident,
 ) *prompts.IncidentPromptContext {
 	return &prompts.IncidentPromptContext{
-		IncidentSummary:  buildSummary(incident),
-		RootCauseEntity:  buildRootCause(entities),
-		AffectedEntities: buildEntities(entities),
-		TimelineText:     buildTimeline(timeline),
+		IncidentSummary:   buildSummary(incident),
+		RootCauseEntity:   buildRootCause(entities),
+		AffectedEntities:  buildEntities(entities),
+		TimelineText:      buildTimeline(timeline),
 		HistoricalContext: buildHistorical(historical),
 	}
 }
@@ -225,14 +225,6 @@ func buildOTelContext(otel *cluster.OTelSnapshot, entities []*database.AIOpsInci
 			sloLines = append(sloLines, fmt.Sprintf(
 				"- %s: SuccessRate=%.2f%% ErrorRate=%.4f%% P99=%.1fms RPS=%.1f",
 				s.ServiceKey, s.SuccessRate*100, s.ErrorRate*100, s.P99Ms, s.RPS,
-			))
-		}
-	}
-	for _, s := range otel.SLOServices {
-		if serviceSet[s.Name] {
-			sloLines = append(sloLines, fmt.Sprintf(
-				"- %s/%s: SuccessRate=%.2f%% P99=%.1fms RPS=%.1f",
-				s.Namespace, s.Name, s.SuccessRate*100, s.P99Ms, s.RPS,
 			))
 		}
 	}

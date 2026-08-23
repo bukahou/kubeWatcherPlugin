@@ -29,18 +29,17 @@ import (
 	"AtlHyper/atlhyper_master_v2/agentsdk"
 	"AtlHyper/atlhyper_master_v2/ai"
 	"AtlHyper/atlhyper_master_v2/aiops"
-	"AtlHyper/atlhyper_master_v2/aiops/enricher"
 	aiopscore "AtlHyper/atlhyper_master_v2/aiops/core"
+	"AtlHyper/atlhyper_master_v2/aiops/enricher"
 	"AtlHyper/atlhyper_master_v2/config"
 	"AtlHyper/atlhyper_master_v2/database"
-	"AtlHyper/atlhyper_master_v2/model"
-	"AtlHyper/model_v3/command"
 	"AtlHyper/atlhyper_master_v2/database/repo"
 	"AtlHyper/atlhyper_master_v2/database/sqlite"
 	"AtlHyper/atlhyper_master_v2/datahub"
 	"AtlHyper/atlhyper_master_v2/deployer"
 	"AtlHyper/atlhyper_master_v2/gateway"
 	"AtlHyper/atlhyper_master_v2/github"
+	"AtlHyper/atlhyper_master_v2/model"
 	"AtlHyper/atlhyper_master_v2/mq"
 	"AtlHyper/atlhyper_master_v2/notifier"
 	"AtlHyper/atlhyper_master_v2/notifier/trigger"
@@ -52,6 +51,7 @@ import (
 	"AtlHyper/atlhyper_master_v2/slo"
 	"AtlHyper/atlhyper_master_v2/tester"
 	"AtlHyper/common/logger"
+	"AtlHyper/model_v3/command"
 )
 
 var log = logger.Module("Master")
@@ -255,9 +255,9 @@ func NewMaster() (*Master, error) {
 		risk := aiopsEngine.GetClusterRisk(clusterID)
 		entities := aiopsEngine.GetEntityRisks(clusterID, "r_final", topN)
 		data, _ := json.Marshal(map[string]interface{}{
-			"clusterRisk":   scaleClusterRiskForAI(risk),
-			"topEntities":   scaleEntityRisksForAI(entities),
-			"entityCount":   len(entities),
+			"clusterRisk": scaleClusterRiskForAI(risk),
+			"topEntities": scaleEntityRisksForAI(entities),
+			"entityCount": len(entities),
 		})
 		return string(data), nil
 	})
@@ -412,23 +412,6 @@ func NewMaster() (*Master, error) {
 					})
 				}
 			}
-			if domain == "" { // 未指定 domain 时才包含 mesh
-				for _, s := range windowData.MeshServices {
-					if serviceName != "" && s.Name != serviceName {
-						continue
-					}
-					services = append(services, map[string]interface{}{
-						"name":        s.Name,
-						"namespace":   s.Namespace,
-						"type":        "mesh",
-						"rps":         s.RPS,
-						"successRate": s.SuccessRate,
-						"p50Ms":       s.P50Ms,
-						"p90Ms":       s.P90Ms,
-						"p99Ms":       s.P99Ms,
-					})
-				}
-			}
 		} else {
 			// 降级：从实时 SLO 列表获取
 			if serviceName == "" {
@@ -442,23 +425,6 @@ func NewMaster() (*Master, error) {
 						"rps":         s.RPS,
 						"successRate": s.SuccessRate,
 						"errorRate":   s.ErrorRate,
-						"p50Ms":       s.P50Ms,
-						"p90Ms":       s.P90Ms,
-						"p99Ms":       s.P99Ms,
-					})
-				}
-			}
-			if domain == "" {
-				for _, s := range otel.SLOServices {
-					if serviceName != "" && s.Name != serviceName {
-						continue
-					}
-					services = append(services, map[string]interface{}{
-						"name":        s.Name,
-						"namespace":   s.Namespace,
-						"type":        "mesh",
-						"rps":         s.RPS,
-						"successRate": s.SuccessRate,
 						"p50Ms":       s.P50Ms,
 						"p90Ms":       s.P90Ms,
 						"p99Ms":       s.P99Ms,
@@ -592,20 +558,20 @@ func NewMaster() (*Master, error) {
 	log.Info("Tester 初始化完成", "port", cfg.Server.TesterPort)
 
 	return &Master{
-		store:          store,
-		bus:            bus,
-		database:       db,
-		processor:      proc,
-		service:        svc,
-		agentSDK:       agentServer,
-		gateway:        gw,
-		testerServer:   testerServer,
+		store:        store,
+		bus:          bus,
+		database:     db,
+		processor:    proc,
+		service:      svc,
+		agentSDK:     agentServer,
+		gateway:      gw,
+		testerServer: testerServer,
 		eventPersist: eventPersist,
 		alertManager: alertMgr,
-		heartbeat:      heartbeat,
-		eventTrigger:   eventTrigger,
-		aiopsEngine:    aiopsEngine,
-		deployer:       deployerService,
+		heartbeat:    heartbeat,
+		eventTrigger: eventTrigger,
+		aiopsEngine:  aiopsEngine,
+		deployer:     deployerService,
 	}, nil
 }
 

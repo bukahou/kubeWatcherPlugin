@@ -422,7 +422,6 @@ func migrate(db *sql.DB) error {
 			error_message     TEXT
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_deploy_history_lookup ON deploy_history(cluster_id, path, deployed_at DESC)`,
-
 	}
 
 	for _, m := range migrations {

@@ -2,11 +2,12 @@
 // 可观测性查询 Handler — 共用结构体、缓存、执行方法
 //
 // 各信号域 Handler 方法分布在:
-//   observe_metrics.go     — MetricsSummary / MetricsNodes / MetricsNodeRoute
-//   observe_logs.go        — LogsQuery / LogsSummary
-//   observe_apm.go         — TracesList / TracesServices / TracesTopology / TracesOperations / TracesDetail / TracesStats / APMServiceSeries
-//   observe_slo_query.go   — SLOSummary / SLOIngress / SLOServices / SLOEdges / SLOTimeSeries
-//   observe_timeline.go    — 时序辅助函数
+//
+//	observe_metrics.go     — MetricsSummary / MetricsNodes / MetricsNodeRoute
+//	observe_logs.go        — LogsQuery / LogsSummary
+//	observe_apm.go         — TracesList / TracesServices / TracesTopology / TracesOperations / TracesDetail / TracesStats / APMServiceSeries
+//	observe_slo_query.go   — SLOSummary / SLOIngress / SLOServices / SLOEdges / SLOTimeSeries
+//	observe_timeline.go    — 时序辅助函数
 package observe
 
 import (

@@ -8,11 +8,11 @@ import "time"
 
 // ClusterOverview 集群概览响应
 type ClusterOverview struct {
-	ClusterID string             `json:"clusterId"`
-	Cards     OverviewCards      `json:"cards"`
-	Workloads OverviewWorkloads  `json:"workloads"`
-	Alerts    OverviewAlerts     `json:"alerts"`
-	Nodes     OverviewNodes      `json:"nodes"`
+	ClusterID string            `json:"clusterId"`
+	Cards     OverviewCards     `json:"cards"`
+	Workloads OverviewWorkloads `json:"workloads"`
+	Alerts    OverviewAlerts    `json:"alerts"`
+	Nodes     OverviewNodes     `json:"nodes"`
 }
 
 // ==================== 卡片数据 ====================
@@ -104,8 +104,8 @@ type OverviewPeakStats struct {
 
 // OverviewAlerts 告警数据
 type OverviewAlerts struct {
-	Trend  []OverviewAlertTrend `json:"trend"`
-	Totals OverviewAlertTotals  `json:"totals"`
+	Trend  []OverviewAlertTrend  `json:"trend"`
+	Totals OverviewAlertTotals   `json:"totals"`
 	Recent []OverviewRecentAlert `json:"recent"`
 }
 

@@ -66,20 +66,6 @@ func BuildFromSnapshot(clusterID string, snap *cluster.ClusterSnapshot, otel *cl
 	if otel != nil {
 		edgeSet := make(map[string]bool) // "srcKey->dstKey" 去重
 
-		// 4a. SLO 边
-		for _, edge := range otel.SLOEdges {
-			srcKey := aiops.EntityKey(edge.SrcNamespace, "service", edge.SrcName)
-			dstKey := aiops.EntityKey(edge.DstNamespace, "service", edge.DstName)
-			dedupKey := srcKey + "->" + dstKey
-			if edgeSet[dedupKey] {
-				continue
-			}
-			edgeSet[dedupKey] = true
-			g.AddNode(srcKey, "service", edge.SrcNamespace, edge.SrcName, nil)
-			g.AddNode(dstKey, "service", edge.DstNamespace, edge.DstName, nil)
-			g.AddEdge(srcKey, dstKey, "calls", 1.0)
-		}
-
 		// 4b. APM 拓扑边
 		if otel.APMTopology != nil {
 			// 构建 nodeId → namespace 索引

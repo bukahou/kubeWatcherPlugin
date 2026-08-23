@@ -32,15 +32,15 @@ type StatefulSetSummary struct {
 }
 
 type StatefulSetSpec struct {
-	Replicas                                 *int32                `json:"replicas,omitempty"`
-	ServiceName                              string                `json:"serviceName,omitempty"`
-	PodManagementPolicy                      string                `json:"podManagementPolicy,omitempty"`
-	UpdateStrategy                           *UpdateStrategy       `json:"updateStrategy,omitempty"`
-	RevisionHistoryLimit                     *int32                `json:"revisionHistoryLimit,omitempty"`
-	MinReadySeconds                          int32                 `json:"minReadySeconds,omitempty"`
-	PersistentVolumeClaimRetentionPolicy     *PVCRetentionPolicy   `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
-	Selector                                 *LabelSelector        `json:"selector,omitempty"`
-	VolumeClaimTemplates                     []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	Replicas                             *int32                `json:"replicas,omitempty"`
+	ServiceName                          string                `json:"serviceName,omitempty"`
+	PodManagementPolicy                  string                `json:"podManagementPolicy,omitempty"`
+	UpdateStrategy                       *UpdateStrategy       `json:"updateStrategy,omitempty"`
+	RevisionHistoryLimit                 *int32                `json:"revisionHistoryLimit,omitempty"`
+	MinReadySeconds                      int32                 `json:"minReadySeconds,omitempty"`
+	PersistentVolumeClaimRetentionPolicy *PVCRetentionPolicy   `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
+	Selector                             *LabelSelector        `json:"selector,omitempty"`
+	VolumeClaimTemplates                 []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 type UpdateStrategy struct {
@@ -78,8 +78,10 @@ type StatefulSetStatus struct {
 
 func (s *StatefulSet) GetName() string      { return s.Summary.Name }
 func (s *StatefulSet) GetNamespace() string { return s.Summary.Namespace }
-func (s *StatefulSet) IsHealthy() bool      { return s.Summary.Ready == s.Summary.Replicas && s.Summary.Replicas > 0 }
-func (s *StatefulSet) IsUpdating() bool     { return s.Summary.Updated < s.Summary.Replicas }
+func (s *StatefulSet) IsHealthy() bool {
+	return s.Summary.Ready == s.Summary.Replicas && s.Summary.Replicas > 0
+}
+func (s *StatefulSet) IsUpdating() bool { return s.Summary.Updated < s.Summary.Replicas }
 
 // ============================================================
 // DaemonSet 模型
@@ -133,6 +135,10 @@ type DaemonSetStatus struct {
 
 func (d *DaemonSet) GetName() string      { return d.Summary.Name }
 func (d *DaemonSet) GetNamespace() string { return d.Summary.Namespace }
-func (d *DaemonSet) IsHealthy() bool      { return d.Summary.NumberReady == d.Summary.DesiredNumberScheduled && d.Summary.DesiredNumberScheduled > 0 }
-func (d *DaemonSet) IsUpdating() bool     { return d.Summary.UpdatedNumberScheduled < d.Summary.DesiredNumberScheduled }
+func (d *DaemonSet) IsHealthy() bool {
+	return d.Summary.NumberReady == d.Summary.DesiredNumberScheduled && d.Summary.DesiredNumberScheduled > 0
+}
+func (d *DaemonSet) IsUpdating() bool {
+	return d.Summary.UpdatedNumberScheduled < d.Summary.DesiredNumberScheduled
+}
 func (d *DaemonSet) HasMisscheduled() bool { return d.Summary.NumberMisscheduled > 0 }

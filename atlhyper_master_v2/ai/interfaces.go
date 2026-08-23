@@ -53,32 +53,32 @@ type ChatRequest struct {
 
 // ChatChunk SSE 流式响应块
 type ChatChunk struct {
-	Type    string      `json:"type"`              // text / tool_call / tool_result / done / error
-	Content string      `json:"content,omitempty"` // 文本内容
-	Tool    string      `json:"tool,omitempty"`    // tool 名称
-	Params  string      `json:"params,omitempty"`  // tool 参数 JSON
-	Stats   *ChatStats  `json:"stats,omitempty"`   // 统计信息（done 时返回）
+	Type    string     `json:"type"`              // text / tool_call / tool_result / done / error
+	Content string     `json:"content,omitempty"` // 文本内容
+	Tool    string     `json:"tool,omitempty"`    // tool 名称
+	Params  string     `json:"params,omitempty"`  // tool 参数 JSON
+	Stats   *ChatStats `json:"stats,omitempty"`   // 统计信息（done 时返回）
 }
 
 // ChatStats 对话统计信息
 type ChatStats struct {
-	Rounds         int `json:"rounds"`          // 思考轮次（AI 调用次数）
-	TotalToolCalls int `json:"totalToolCalls"`   // 总指令数（所有轮次的 Tool 调用总数）
-	InputTokens    int `json:"inputTokens"`      // 输入 Token 数
-	OutputTokens   int `json:"outputTokens"`     // 输出 Token 数
+	Rounds         int `json:"rounds"`         // 思考轮次（AI 调用次数）
+	TotalToolCalls int `json:"totalToolCalls"` // 总指令数（所有轮次的 Tool 调用总数）
+	InputTokens    int `json:"inputTokens"`    // 输入 Token 数
+	OutputTokens   int `json:"outputTokens"`   // 输出 Token 数
 }
 
 // Conversation 对话
 type Conversation struct {
-	ID           int64     `json:"id"`
-	UserID       int64     `json:"userId"`
-	ClusterID    string    `json:"clusterId"`
-	Title        string    `json:"title"`
-	MessageCount int       `json:"messageCount"`
+	ID           int64  `json:"id"`
+	UserID       int64  `json:"userId"`
+	ClusterID    string `json:"clusterId"`
+	Title        string `json:"title"`
+	MessageCount int    `json:"messageCount"`
 	// 累计统计
-	TotalInputTokens  int64 `json:"totalInputTokens"`    // 累计输入 Token
-	TotalOutputTokens int64 `json:"totalOutputTokens"`   // 累计输出 Token
-	TotalToolCalls    int   `json:"totalToolCalls"`       // 累计指令数
+	TotalInputTokens  int64     `json:"totalInputTokens"`  // 累计输入 Token
+	TotalOutputTokens int64     `json:"totalOutputTokens"` // 累计输出 Token
+	TotalToolCalls    int       `json:"totalToolCalls"`    // 累计指令数
 	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt         time.Time `json:"updatedAt"`
 }
@@ -87,7 +87,7 @@ type Conversation struct {
 type Message struct {
 	ID             int64     `json:"id"`
 	ConversationID int64     `json:"conversationId"`
-	Role           string    `json:"role"`                // user / assistant / tool
+	Role           string    `json:"role"` // user / assistant / tool
 	Content        string    `json:"content"`
 	ToolCalls      string    `json:"toolCalls,omitempty"` // JSON
 	CreatedAt      time.Time `json:"createdAt"`

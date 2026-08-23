@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	defaultAnalyzeMaxRounds = 8                // 默认最大调查轮次
-	defaultAnalyzeTimeout   = 5 * time.Minute  // 默认分析超时
-	maxToolCallsPerAnalyze  = 5                // 每轮最多 Tool Call 数
+	defaultAnalyzeMaxRounds = 8               // 默认最大调查轮次
+	defaultAnalyzeTimeout   = 5 * time.Minute // 默认分析超时
+	maxToolCallsPerAnalyze  = 5               // 每轮最多 Tool Call 数
 )
 
 // Analyze 执行非交互式多轮 Tool Calling 分析

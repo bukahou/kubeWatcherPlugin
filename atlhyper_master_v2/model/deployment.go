@@ -24,7 +24,7 @@ type DeploymentOverviewCards struct {
 // DeploymentOverview Deployment 概览
 type DeploymentOverview struct {
 	Cards DeploymentOverviewCards `json:"cards"`
-	Rows  []DeploymentItem       `json:"rows"`
+	Rows  []DeploymentItem        `json:"rows"`
 }
 
 // DeploymentDetail Deployment 详情（扁平顶层 + 嵌套子结构）

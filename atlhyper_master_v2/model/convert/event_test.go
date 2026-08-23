@@ -157,27 +157,27 @@ func TestEventLogFromDB_FieldMapping(t *testing.T) {
 func TestEventOverview_Aggregation(t *testing.T) {
 	events := []cluster.Event{
 		{
-			CommonMeta: model_v3.CommonMeta{Name: "e1"},
-			Type:       "Warning",
-			Reason:     "FailedScheduling",
+			CommonMeta:     model_v3.CommonMeta{Name: "e1"},
+			Type:           "Warning",
+			Reason:         "FailedScheduling",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Name: "pod-1"},
 		},
 		{
-			CommonMeta: model_v3.CommonMeta{Name: "e2"},
-			Type:       "Warning",
-			Reason:     "Unhealthy",
+			CommonMeta:     model_v3.CommonMeta{Name: "e2"},
+			Type:           "Warning",
+			Reason:         "Unhealthy",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Name: "pod-2"},
 		},
 		{
-			CommonMeta: model_v3.CommonMeta{Name: "e3"},
-			Type:       "Normal",
-			Reason:     "Scheduled",
+			CommonMeta:     model_v3.CommonMeta{Name: "e3"},
+			Type:           "Normal",
+			Reason:         "Scheduled",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Node", Name: "node-1"},
 		},
 		{
-			CommonMeta: model_v3.CommonMeta{Name: "e4"},
-			Type:       "Normal",
-			Reason:     "Pulled",
+			CommonMeta:     model_v3.CommonMeta{Name: "e4"},
+			Type:           "Normal",
+			Reason:         "Pulled",
 			InvolvedObject: model_v3.ResourceRef{Kind: "Pod", Name: "pod-3"},
 		},
 	}

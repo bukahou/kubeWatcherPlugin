@@ -131,7 +131,7 @@ func TestSummarizeList_NodeList(t *testing.T) {
 				"metadata": map[string]interface{}{
 					"name":              "worker-1",
 					"creationTimestamp": time.Now().Add(-5 * 24 * time.Hour).Format(time.RFC3339),
-					"labels":           map[string]interface{}{},
+					"labels":            map[string]interface{}{},
 				},
 				"status": map[string]interface{}{
 					"conditions": []interface{}{

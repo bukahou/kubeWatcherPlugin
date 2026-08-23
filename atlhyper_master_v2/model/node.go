@@ -16,10 +16,10 @@ type NodeItem struct {
 
 // NodeOverviewCards Node 概览统计
 type NodeOverviewCards struct {
-	TotalNodes   int     `json:"totalNodes"`
-	ReadyNodes   int     `json:"readyNodes"`
-	TotalCPU     float64 `json:"totalCPU"`
-	TotalMemGiB  float64 `json:"totalMemoryGiB"`
+	TotalNodes  int     `json:"totalNodes"`
+	ReadyNodes  int     `json:"readyNodes"`
+	TotalCPU    float64 `json:"totalCPU"`
+	TotalMemGiB float64 `json:"totalMemoryGiB"`
 }
 
 // NodeOverview Node 概览
@@ -51,13 +51,13 @@ type NodeDetail struct {
 	KubeProxy    string `json:"kubeProxy,omitempty"`
 
 	// 资源容量（单位已转换）
-	CPUCapacityCores     float64 `json:"cpuCapacityCores,omitempty"`
-	CPUAllocatableCores  float64 `json:"cpuAllocatableCores,omitempty"`
-	MemCapacityGiB       float64 `json:"memCapacityGiB,omitempty"`
-	MemAllocatableGiB    float64 `json:"memAllocatableGiB,omitempty"`
-	PodsCapacity         int     `json:"podsCapacity,omitempty"`
-	PodsAllocatable      int     `json:"podsAllocatable,omitempty"`
-	EphemeralStorageGiB  float64 `json:"ephemeralStorageGiB,omitempty"`
+	CPUCapacityCores    float64 `json:"cpuCapacityCores,omitempty"`
+	CPUAllocatableCores float64 `json:"cpuAllocatableCores,omitempty"`
+	MemCapacityGiB      float64 `json:"memCapacityGiB,omitempty"`
+	MemAllocatableGiB   float64 `json:"memAllocatableGiB,omitempty"`
+	PodsCapacity        int     `json:"podsCapacity,omitempty"`
+	PodsAllocatable     int     `json:"podsAllocatable,omitempty"`
+	EphemeralStorageGiB float64 `json:"ephemeralStorageGiB,omitempty"`
 
 	// 当前指标
 	CPUUsageCores float64 `json:"cpuUsageCores,omitempty"`

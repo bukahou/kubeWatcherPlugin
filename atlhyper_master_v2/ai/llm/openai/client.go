@@ -61,11 +61,11 @@ func NewOpenAIClient(apiKey, model, baseURL string) (*Client, error) {
 
 // chatRequest OpenAI Chat Completions API リクエスト
 type chatRequest struct {
-	Model         string           `json:"model"`
-	Messages      []messageParam   `json:"messages"`
-	Tools         []toolParam      `json:"tools,omitempty"`
-	Stream        bool             `json:"stream"`
-	StreamOptions *streamOptions   `json:"stream_options,omitempty"`
+	Model         string         `json:"model"`
+	Messages      []messageParam `json:"messages"`
+	Tools         []toolParam    `json:"tools,omitempty"`
+	Stream        bool           `json:"stream"`
+	StreamOptions *streamOptions `json:"stream_options,omitempty"`
 }
 
 // streamOptions ストリームオプション
@@ -96,8 +96,8 @@ type functionCall struct {
 
 // toolParam ツール定義
 type toolParam struct {
-	Type     string       `json:"type"`
-	Function functionDef  `json:"function"`
+	Type     string      `json:"type"`
+	Function functionDef `json:"function"`
 }
 
 // functionDef 関数定義
@@ -137,9 +137,9 @@ type deltaContent struct {
 
 // toolCallDelta ツール呼び出しデルタ
 type toolCallDelta struct {
-	Index    int          `json:"index"`
-	ID       string       `json:"id,omitempty"`
-	Type     string       `json:"type,omitempty"`
+	Index    int           `json:"index"`
+	ID       string        `json:"id,omitempty"`
+	Type     string        `json:"type,omitempty"`
 	Function functionDelta `json:"function,omitempty"`
 }
 

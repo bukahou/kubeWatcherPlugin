@@ -8,8 +8,8 @@ import "time"
 
 // GraphNode 图节点
 type GraphNode struct {
-	Key       string            `json:"key"`                 // "default/service/api-server"
-	Type      string            `json:"type"`                // "ingress" | "service" | "pod" | "node"
+	Key       string            `json:"key"`  // "default/service/api-server"
+	Type      string            `json:"type"` // "ingress" | "service" | "pod" | "node"
 	Namespace string            `json:"namespace"`
 	Name      string            `json:"name"`
 	Metadata  map[string]string `json:"metadata,omitempty"`
@@ -150,7 +150,7 @@ type MetricDataPoint struct {
 // EntityRisk 实体风险评分
 type EntityRisk struct {
 	EntityKey    string  `json:"entityKey"`
-	EntityType   string  `json:"entityType"`   // "service" | "pod" | "node" | "ingress"
+	EntityType   string  `json:"entityType"` // "service" | "pod" | "node" | "ingress"
 	Namespace    string  `json:"namespace"`
 	Name         string  `json:"name"`
 	RLocal       float64 `json:"rLocal"`       // Stage 1: 局部风险 [0, 1]
@@ -175,10 +175,10 @@ type ClusterRisk struct {
 // EntityRiskDetail 实体风险详情
 type EntityRiskDetail struct {
 	EntityRisk
-	Metrics     []*AnomalyResult  `json:"metrics"`               // 各指标异常详情
-	Propagation []*PropagationPath `json:"propagation"`           // 传播路径
-	CausalChain []*CausalEntry     `json:"causalChain"`           // 因果链（按时间排序，向后兼容）
-	CausalTree  []*CausalTreeNode  `json:"causalTree,omitempty"`  // 因果树（依赖图驱动）
+	Metrics     []*AnomalyResult   `json:"metrics"`              // 各指标异常详情
+	Propagation []*PropagationPath `json:"propagation"`          // 传播路径
+	CausalChain []*CausalEntry     `json:"causalChain"`          // 因果链（按时间排序，向后兼容）
+	CausalTree  []*CausalTreeNode  `json:"causalTree,omitempty"` // 因果树（依赖图驱动）
 }
 
 // CausalTreeNode 因果树节点（以查询实体为中心，按依赖图展开）
@@ -335,18 +335,18 @@ type IncidentTimeline struct {
 
 // 时间线事件类型常量
 const (
-	TimelineAnomalyDetected    = "anomaly_detected"
-	TimelineStateChange        = "state_change"
-	TimelineMetricSpike        = "metric_spike"
+	TimelineAnomalyDetected     = "anomaly_detected"
+	TimelineStateChange         = "state_change"
+	TimelineMetricSpike         = "metric_spike"
 	TimelineRootCauseIdentified = "root_cause_identified"
-	TimelineRecoveryStarted    = "recovery_started"
-	TimelineRecurrence         = "recurrence"
+	TimelineRecoveryStarted     = "recovery_started"
+	TimelineRecurrence          = "recurrence"
 )
 
 // IncidentDetail 事件详情（API 响应）
 type IncidentDetail struct {
 	Incident
-	Entities []*IncidentEntity  `json:"entities"`
+	Entities []*IncidentEntity   `json:"entities"`
 	Timeline []*IncidentTimeline `json:"timeline"`
 }
 

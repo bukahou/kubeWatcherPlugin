@@ -94,10 +94,10 @@ type EndpointPort struct {
 }
 
 type BackendEndpoint struct {
-	Address   string         `json:"address"`
-	Ready     bool           `json:"ready"`
-	NodeName  string         `json:"nodeName,omitempty"`
-	Zone      string         `json:"zone,omitempty"`
+	Address   string           `json:"address"`
+	Ready     bool             `json:"ready"`
+	NodeName  string           `json:"nodeName,omitempty"`
+	Zone      string           `json:"zone,omitempty"`
 	TargetRef *model_v3.K8sRef `json:"targetRef,omitempty"`
 }
 

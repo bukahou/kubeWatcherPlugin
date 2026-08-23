@@ -211,7 +211,7 @@ func TestCronJobDetail_SpecFields(t *testing.T) {
 			CreatedAt: time.Now(),
 		},
 		Schedule:                   "*/5 * * * *",
-		ConcurrencyPolicy:         "Forbid",
+		ConcurrencyPolicy:          "Forbid",
 		SuccessfulJobsHistoryLimit: &successLimit,
 		FailedJobsHistoryLimit:     &failedLimit,
 		Template: cluster.PodTemplate{

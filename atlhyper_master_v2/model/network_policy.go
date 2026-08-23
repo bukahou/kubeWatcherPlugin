@@ -16,16 +16,16 @@ type NetworkPolicyItem struct {
 
 // NetworkPolicyDetail NetworkPolicy 详情
 type NetworkPolicyDetail struct {
-	Name             string   `json:"name"`
-	Namespace        string   `json:"namespace"`
-	PodSelector      string   `json:"podSelector"`
-	PolicyTypes      []string `json:"policyTypes"`
-	IngressRuleCount int      `json:"ingressRuleCount"`
-	EgressRuleCount  int      `json:"egressRuleCount"`
+	Name             string      `json:"name"`
+	Namespace        string      `json:"namespace"`
+	PodSelector      string      `json:"podSelector"`
+	PolicyTypes      []string    `json:"policyTypes"`
+	IngressRuleCount int         `json:"ingressRuleCount"`
+	EgressRuleCount  int         `json:"egressRuleCount"`
 	IngressRules     interface{} `json:"ingressRules,omitempty"`
 	EgressRules      interface{} `json:"egressRules,omitempty"`
-	CreatedAt        string   `json:"createdAt"`
-	Age              string   `json:"age"`
+	CreatedAt        string      `json:"createdAt"`
+	Age              string      `json:"age"`
 
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`

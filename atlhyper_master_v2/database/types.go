@@ -217,8 +217,8 @@ type AIProvider struct {
 	Description string // 说明・备注
 
 	// 角色路由
-	Roles                []string // JSON 解码后的角色列表: ["background","chat"]
-	ContextWindowOverride int     // 用户覆盖的上下文窗口 (0=使用模型默认值)
+	Roles                 []string // JSON 解码后的角色列表: ["background","chat"]
+	ContextWindowOverride int      // 用户覆盖的上下文窗口 (0=使用模型默认值)
 
 	// 使用统计
 	TotalRequests int64
@@ -502,4 +502,3 @@ type DeployHistoryQueryOpts struct {
 	Limit     int
 	Offset    int
 }
-

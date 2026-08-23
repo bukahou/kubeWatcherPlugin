@@ -151,8 +151,6 @@ type OTelSnapshot struct {
 	// SLO 概览
 	IngressServices int     `json:"ingressServices"`
 	IngressAvgRPS   float64 `json:"ingressAvgRps"`
-	MeshServices    int     `json:"meshServices"`
-	MeshAvgMTLS     float64 `json:"meshAvgMtls"`
 
 	// 基础设施指标概览
 	MonitoredNodes int     `json:"monitoredNodes"`
@@ -172,10 +170,8 @@ type OTelSnapshot struct {
 	APMTopology *apm.Topology    `json:"apmTopology,omitempty"`
 
 	// SLO Dashboard
-	SLOSummary  *slo.SLOSummary  `json:"sloSummary,omitempty"`
-	SLOIngress  []slo.IngressSLO `json:"sloIngress,omitempty"`
-	SLOServices []slo.ServiceSLO `json:"sloServices,omitempty"`
-	SLOEdges    []slo.ServiceEdge `json:"sloEdges,omitempty"`
+	SLOSummary *slo.SLOSummary  `json:"sloSummary,omitempty"`
+	SLOIngress []slo.IngressSLO `json:"sloIngress,omitempty"`
 
 	// ===== 扩展数据（内存时间线 + Dashboard 首屏） =====
 

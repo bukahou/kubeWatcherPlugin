@@ -262,10 +262,10 @@ func (h *SLOHandler) DomainsV2(w http.ResponseWriter, r *http.Request) {
 		avgBudget = totalBudget / float64(len(domainResponses))
 	}
 
-	// 服务网格服务总数（从 OTelSnapshot 直接获取）
+	// Ingress 后端服务总数（SLO 只做入口视角，服务网格已移除）
 	var totalServices int
 	if otel != nil {
-		totalServices = len(otel.SLOServices)
+		totalServices = len(otel.SLOIngress)
 	}
 
 	if domainResponses == nil {
