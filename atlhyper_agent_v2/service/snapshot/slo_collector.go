@@ -6,8 +6,8 @@
 //   - 每个窗口独立 3 分钟超时
 //
 // 窗口集对齐两件事：
-//   1. Google SRE 的多窗口燃烧率需要 1h / 6h / 24h / 3d 四档
-//   2. ClickHouse TTL 是 7 天，30d 窗口永远查不到数据 —— 留着只会让页面显示假的空值
+//  1. Google SRE 的多窗口燃烧率需要 1h / 6h / 24h / 3d 四档
+//  2. ClickHouse TTL 是 7 天，30d 窗口永远查不到数据 —— 留着只会让页面显示假的空值
 package snapshot
 
 import (
