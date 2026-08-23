@@ -61,6 +61,8 @@ type snapshotService struct {
 	limitRangeRepo     repository.LimitRangeRepository
 	networkPolicyRepo  repository.NetworkPolicyRepository
 	serviceAccountRepo repository.ServiceAccountRepository
+	// 路由映射: serviceKey → 对外域名（供 SLO displayName 使用）
+	routeRepo repository.RouteRepository
 
 	// OTel 仓库 (可选，从 ClickHouse 聚合)
 	otelSummaryRepo repository.OTelSummaryRepository
@@ -113,6 +115,7 @@ func NewSnapshotService(
 	limitRangeRepo repository.LimitRangeRepository,
 	networkPolicyRepo repository.NetworkPolicyRepository,
 	serviceAccountRepo repository.ServiceAccountRepository,
+	routeRepo repository.RouteRepository,
 	otelSummaryRepo repository.OTelSummaryRepository,
 	dashboardRepo repository.OTelDashboardRepository,
 	conc concentrator.TimeSeriesAggregator,
@@ -139,6 +142,7 @@ func NewSnapshotService(
 		limitRangeRepo:     limitRangeRepo,
 		networkPolicyRepo:  networkPolicyRepo,
 		serviceAccountRepo: serviceAccountRepo,
+		routeRepo:          routeRepo,
 		otelSummaryRepo:    otelSummaryRepo,
 		dashboardRepo:      dashboardRepo,
 		conc:               conc,

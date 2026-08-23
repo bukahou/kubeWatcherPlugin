@@ -71,6 +71,8 @@ func (s *snapshotService) fetchSLOWindow(wc sloWindowConfig) *slo.SLOWindowData 
 		return nil
 	}
 
+	s.applyRouteHostnames(windowCtx, current)
+
 	previous, _ := s.dashboardRepo.ListIngressSLOPrevious(windowCtx, wc.since)
 	history, _ := s.dashboardRepo.GetIngressSLOHistory(windowCtx, wc.since, wc.bucket)
 
@@ -80,5 +82,31 @@ func (s *snapshotService) fetchSLOWindow(wc sloWindowConfig) *slo.SLOWindowData 
 		Current:  current,
 		Previous: previous,
 		History:  history,
+	}
+}
+
+// applyRouteHostnames 用路由映射把 IngressSLO 的 DisplayName 从 serviceKey
+// 替换为对外域名（如 "geass-v3/geass-gateway" → "geass-api.bukahou.com"）。
+//
+// 为什么在 service 层做而不是 SQL 层：
+//
+//	域名来自 K8s 路由资源，指标来自 ClickHouse —— 两个不同数据源的组合是
+//	service 层的职责。repository 只应关心自己那一个数据源，让 SLO 的 SQL
+//	去查 K8s 会破坏分层。
+//
+// 查不到映射的服务保留 serviceKey 作为 DisplayName —— 有值总比空白好，
+// 且能一眼看出"这个服务没有对外路由"（可能是内部服务或路由配置遗漏）。
+func (s *snapshotService) applyRouteHostnames(ctx context.Context, items []slo.IngressSLO) {
+	if len(items) == 0 || s.routeRepo == nil {
+		return
+	}
+	hostMap, err := s.routeRepo.GetServiceHostMap(ctx)
+	if err != nil || len(hostMap) == 0 {
+		return // 映射不可用时静默保留 serviceKey，不影响 SLO 主数据
+	}
+	for i := range items {
+		if host, ok := hostMap[items[i].ServiceKey]; ok && host != "" {
+			items[i].DisplayName = host
+		}
 	}
 }

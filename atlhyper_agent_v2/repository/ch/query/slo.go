@@ -137,7 +137,11 @@ func buildIngressLatencyQuery(timeFilter string) string {
 		       Attributes['%s'] AS svc,
 		       argMax(ExplicitBounds, TimeUnix) AS bounds,
 		       argMax(BucketCounts, TimeUnix) AS latest,
-		       argMin(BucketCounts, TimeUnix) AS earliest
+		       argMin(BucketCounts, TimeUnix) AS earliest,
+		       argMax(Sum, TimeUnix) AS sumLatest,
+		       argMin(Sum, TimeUnix) AS sumEarliest,
+		       argMax(Count, TimeUnix) AS cntLatest,
+		       argMin(Count, TimeUnix) AS cntEarliest
 		FROM otel_metrics_histogram
 		WHERE MetricName = '%s'
 		  %s
@@ -192,10 +196,19 @@ func buildIngressSummaryQuery() string {
 type svcHistogram struct {
 	bounds []float64
 	counts []uint64
+	// sum / count 来自 histogram 的 Sum / Count 字段（窗口内 delta 累加）。
+	// 桶只能给出分位数的近似（受固定桶宽限制），而 Sum/Count 相除是精确均值 ——
+	// 两者用途不同，都要保留。
+	sum   float64
+	count uint64
 }
 
-// addHistogramDelta 把一行 {latest, earliest} BucketCounts 的 delta 累加到 hist
-func addHistogramDelta(hist *svcHistogram, bounds []float64, latest, earliest []uint64) {
+// addHistogramDelta 把一行的 delta（桶计数 + Sum/Count）累加到 hist。
+//
+// 同一服务在窗口内可能有多个系列（不同 status_class），各自是独立累积计数器，
+// 必须逐系列取 delta 再相加；直接用最新值会把窗口之前的历史总量算进来。
+func addHistogramDelta(hist *svcHistogram, bounds []float64, latest, earliest []uint64,
+	sumLatest, sumEarliest float64, cntLatest, cntEarliest uint64) {
 	// 首次：初始化 bounds 和 counts
 	if len(hist.bounds) == 0 {
 		hist.bounds = bounds
@@ -208,6 +221,26 @@ func addHistogramDelta(hist *svcHistogram, bounds []float64, latest, earliest []
 			hist.counts[i] += latest[i] // counter reset
 		}
 	}
+
+	// Sum / Count 同样按 counter-reset-safe 方式取 delta
+	if cntLatest >= cntEarliest {
+		hist.count += cntLatest - cntEarliest
+	} else {
+		hist.count += cntLatest
+	}
+	if sumLatest >= sumEarliest {
+		hist.sum += sumLatest - sumEarliest
+	} else {
+		hist.sum += sumLatest
+	}
+}
+
+// histAvgMs 由 Sum/Count 求精确平均延迟（毫秒）。零请求时返回 0，不除零。
+func histAvgMs(hist *svcHistogram) float64 {
+	if hist == nil || hist.count == 0 {
+		return 0
+	}
+	return roundTo(hist.sum/float64(hist.count), 2)
 }
 
 // histToLatency 从聚合后的 histogram 提取分位数和桶列表
@@ -328,7 +361,10 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 			var ns, svc string
 			var bounds []float64
 			var latest, earliest []uint64
-			if err := latencyRows.Scan(&ns, &svc, &bounds, &latest, &earliest); err != nil {
+			var sumLatest, sumEarliest float64
+			var cntLatest, cntEarliest uint64
+			if err := latencyRows.Scan(&ns, &svc, &bounds, &latest, &earliest,
+				&sumLatest, &sumEarliest, &cntLatest, &cntEarliest); err != nil {
 				continue
 			}
 			svcKey := ingressServiceKey(ns, svc)
@@ -340,7 +376,7 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 				hist = &svcHistogram{}
 				histMap[svcKey] = hist
 			}
-			addHistogramDelta(hist, bounds, latest, earliest)
+			addHistogramDelta(hist, bounds, latest, earliest, sumLatest, sumEarliest, cntLatest, cntEarliest)
 		}
 	}
 
@@ -367,6 +403,8 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 		}
 		if hist, ok := histMap[key]; ok {
 			item.P50Ms, item.P90Ms, item.P95Ms, item.P99Ms, item.LatencyBuckets = histToLatency(hist)
+			// 均值取自 Sum/Count（精确），而非从桶估算（受桶宽限制只能近似）
+			item.AvgMs = histAvgMs(hist)
 		}
 		result = append(result, item)
 	}
@@ -573,7 +611,11 @@ func (r *sloRepository) GetIngressSLOHistory(ctx context.Context, since, bucket 
 		       toStartOfInterval(TimeUnix, INTERVAL %d SECOND) AS ts,
 		       argMax(ExplicitBounds, TimeUnix) AS bounds,
 		       argMax(BucketCounts, TimeUnix) AS latest,
-		       argMin(BucketCounts, TimeUnix) AS earliest
+		       argMin(BucketCounts, TimeUnix) AS earliest,
+		       argMax(Sum, TimeUnix) AS sumLatest,
+		       argMin(Sum, TimeUnix) AS sumEarliest,
+		       argMax(Count, TimeUnix) AS cntLatest,
+		       argMin(Count, TimeUnix) AS cntEarliest
 		FROM otel_metrics_histogram
 		WHERE MetricName = '%s'
 		  AND TimeUnix >= now() - INTERVAL %d SECOND
@@ -591,7 +633,10 @@ func (r *sloRepository) GetIngressSLOHistory(ctx context.Context, since, bucket 
 			var ts time.Time
 			var bounds []float64
 			var latest, earliest []uint64
-			if err := latRows.Scan(&ns, &svc, &ts, &bounds, &latest, &earliest); err != nil {
+			var sumLatest, sumEarliest float64
+			var cntLatest, cntEarliest uint64
+			if err := latRows.Scan(&ns, &svc, &ts, &bounds, &latest, &earliest,
+				&sumLatest, &sumEarliest, &cntLatest, &cntEarliest); err != nil {
 				continue
 			}
 			svcKey := ingressServiceKey(ns, svc)
@@ -604,7 +649,7 @@ func (r *sloRepository) GetIngressSLOHistory(ctx context.Context, since, bucket 
 				hist = &svcHistogram{}
 				latencyByBucket[key] = hist
 			}
-			addHistogramDelta(hist, bounds, latest, earliest)
+			addHistogramDelta(hist, bounds, latest, earliest, sumLatest, sumEarliest, cntLatest, cntEarliest)
 		}
 	}
 

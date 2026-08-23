@@ -127,6 +127,7 @@ func New() (*Agent, error) {
 		repos.job, repos.cronJob, repos.pv, repos.pvc,
 		repos.resourceQuota, repos.limitRange,
 		repos.networkPolicy, repos.serviceAccount,
+		k8srepo.NewRouteRepository(k8sClient, repos.ingress),
 		otelSummaryRepo,
 		dashboardRepo,
 		conc,

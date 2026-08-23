@@ -144,3 +144,67 @@ func TestIsErrorStatusClass(t *testing.T) {
 		}
 	}
 }
+
+// ──────────────────────────────────────────────────────────────
+// 平均延迟：由 histogram 的 Sum/Count 求得，而非从桶估算
+// ──────────────────────────────────────────────────────────────
+
+// TestHistAvgMs 验证均值取自 Sum/Count。
+//
+// 桶只能给出分位数的近似（受桶宽限制），但 Envoy 同时导出了 Sum 与 Count，
+// 两者相除是【精确】均值。此前 avgMs 恒为 0 —— 数据一直在，只是没用上。
+func TestHistAvgMs(t *testing.T) {
+	tests := []struct {
+		name  string
+		sum   float64
+		count uint64
+		want  float64
+	}{
+		{"正常均值", 1665997.8, 32900, 50.64},
+		{"零请求", 0, 0, 0}, // 不得除零
+		{"单请求", 42, 1, 42},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &svcHistogram{sum: tt.sum, count: tt.count}
+			if got := histAvgMs(h); got != tt.want {
+				t.Errorf("histAvgMs(sum=%v,count=%v) = %v, want %v", tt.sum, tt.count, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAddHistogramDelta_AccumulatesSumCount 验证多行聚合时 Sum/Count 也做 delta 累加。
+//
+// 同一服务在窗口内可能有多个系列（不同 status_class），各自是独立累积计数器，
+// 必须逐系列取 delta 再相加 —— 直接用最新值会把历史总量算进来。
+func TestAddHistogramDelta_AccumulatesSumCount(t *testing.T) {
+	h := &svcHistogram{}
+	// 系列 A：count 100→150 (delta 50)，sum 1000→1600 (delta 600)
+	addHistogramDelta(h, []float64{1, 5}, []uint64{10, 20}, []uint64{5, 10}, 1600, 1000, 150, 100)
+	// 系列 B：count 20→30 (delta 10)，sum 200→400 (delta 200)
+	addHistogramDelta(h, []float64{1, 5}, []uint64{8, 12}, []uint64{4, 6}, 400, 200, 30, 20)
+
+	if h.count != 60 {
+		t.Errorf("count = %d, want 60 (50+10)", h.count)
+	}
+	if h.sum != 800 {
+		t.Errorf("sum = %v, want 800 (600+200)", h.sum)
+	}
+	if got := histAvgMs(h); got != roundTo(800.0/60.0, 2) {
+		t.Errorf("avgMs = %v, want %v", got, roundTo(800.0/60.0, 2))
+	}
+}
+
+// TestAddHistogramDelta_CounterReset 验证 Sum/Count 的 counter reset 处理。
+func TestAddHistogramDelta_CounterReset(t *testing.T) {
+	h := &svcHistogram{}
+	// latest < earliest 表示窗口内发生了 reset，delta 取 latest 本身
+	addHistogramDelta(h, []float64{1}, []uint64{5}, []uint64{100}, 50, 900, 5, 90)
+	if h.count != 5 {
+		t.Errorf("reset 后 count = %d, want 5 (取 latest)", h.count)
+	}
+	if h.sum != 50 {
+		t.Errorf("reset 后 sum = %v, want 50 (取 latest)", h.sum)
+	}
+}

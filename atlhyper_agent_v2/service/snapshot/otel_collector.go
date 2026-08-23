@@ -209,6 +209,7 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 				return
 			}
 			mu.Lock()
+			s.applyRouteHostnames(ctx, result)
 			snapshot.SLOIngress = result
 			mu.Unlock()
 		}()

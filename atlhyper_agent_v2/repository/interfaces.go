@@ -258,6 +258,19 @@ type OTelDashboardRepository interface {
 	LogsDashboardRepository
 }
 
+// RouteRepository 路由映射仓库 —— 后端服务 → 对外域名
+//
+// 数据源是 K8s 标准路由资源（Gateway API HTTPRoute / 原生 Ingress），
+// 不绑任何 ingress 实现：换 Nginx / Traefik 只要仍用标准资源，此处不变。
+//
+// 存在理由: SLO 的 displayName 要显示真实域名，但各 ingress 实现的【指标】
+// 都不带域名维度（实测 Envoy 无 vhost 统计、Hubble 无 host label）。
+type RouteRepository interface {
+	// GetServiceHostMap 返回 "namespace/service" → 域名（多域名以 ", " 连接）。
+	// 集群未装 Gateway API 时自动退回原生 Ingress。
+	GetServiceHostMap(ctx context.Context) (map[string]string, error)
+}
+
 // SLOQueryRepository SLO 查询仓库（按需查询）
 type SLOQueryRepository interface {
 	ListIngressSLO(ctx context.Context, since time.Duration) ([]slo.IngressSLO, error)
