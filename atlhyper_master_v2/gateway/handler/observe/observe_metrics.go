@@ -81,6 +81,31 @@ func (h *ObserveHandler) MetricsHardware(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// MetricsCompare GET /api/v2/observe/metrics/compare
+//
+// 节点横向对比表：列顺序由后端固定，每格自带 status
+func (h *ObserveHandler) MetricsCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		handler.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	clusterID, ok := requireClusterID(r)
+	if !ok {
+		handler.WriteError(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+
+	cmp, err := h.querySvc.GetNodeComparison(r.Context(), clusterID)
+	if err != nil || cmp == nil {
+		handler.WriteError(w, http.StatusNotFound, "数据尚未就绪")
+		return
+	}
+	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "获取成功",
+		"data":    cmp,
+	})
+}
+
 // MetricsNodeRoute GET /api/v2/observe/metrics/nodes/{name}[/series]
 //
 // 单节点详情: 从快照 MetricsNodes 中过滤

@@ -92,3 +92,27 @@ export interface HardwareHealth {
   rows: HardwareRow[];
   summary: HardwareSummary;
 }
+
+// ──────────────────────────────────────────────────────────────
+// 节点对比表 — 对齐 model/metrics_hardware.go 的 NodeComparisonResponse
+// ──────────────────────────────────────────────────────────────
+
+/** 一格。value 为 null = 该节点取不到这个信号；text 只含数字与单位，文案由前端 i18n 出 */
+export interface CompareCell {
+  value: number | null;
+  text?: string;
+  status: HardwareStatus;
+}
+
+export interface CompareRow {
+  nodeName: string;
+  profile: string;
+  cells: Record<string, CompareCell>;
+  overall: HardwareStatus;
+}
+
+export interface NodeComparison {
+  /** 列顺序由后端固定（硬件优先），前端不重排 */
+  columns: string[];
+  rows: CompareRow[];
+}

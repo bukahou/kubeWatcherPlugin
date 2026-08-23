@@ -17,3 +17,4 @@ export { SummaryCard } from "./SummaryCard";
 export { NodeCard } from "./NodeCard";
 export { HardwareMatrix } from "./HardwareMatrix";
 export { HardwareSummaryTiles } from "./HardwareSummaryTiles";
+export { NodeCompareTable } from "./NodeCompareTable";

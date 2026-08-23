@@ -239,6 +239,7 @@ func (r *Router) registerRoutes() {
 		register("/api/v2/observe/metrics/nodes", observeH.MetricsNodes)
 		register("/api/v2/observe/metrics/nodes/", observeH.MetricsNodeRoute)
 		register("/api/v2/observe/metrics/hardware", observeH.MetricsHardware)
+		register("/api/v2/observe/metrics/compare", observeH.MetricsCompare)
 		register("/api/v2/observe/logs/summary", observeH.LogsSummary)
 		register("/api/v2/observe/logs/query", observeH.LogsQuery)
 		register("/api/v2/observe/logs/histogram", observeH.LogsHistogram)

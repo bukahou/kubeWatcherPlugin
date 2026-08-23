@@ -1842,6 +1842,29 @@ interface NodeMetricsTranslations {
     power: string;
     fanSpeed: string;
   };
+  // Compare（节点对比表）
+  compare: {
+    title: string;
+    subtitle: string;
+    node: string;
+    overall: string;
+    noData: string;
+    normal: string;
+    alarm: string;
+    columns: {
+      cpuTemp: string;
+      diskTemp: string;
+      undervolt: string;
+      freqRatio: string;
+      diskAwait: string;
+      diskUsage: string;
+      cpu: string;
+      psiCpu: string;
+      mem: string;
+      psiMem: string;
+      netErr: string;
+    };
+  };
   // Hardware（硬件健康矩阵）
   hardware: {
     title: string;

@@ -3,7 +3,7 @@
 //
 // 各信号域 Handler 方法分布在:
 //
-//	observe_metrics.go     — MetricsSummary / MetricsNodes / MetricsNodeRoute / MetricsHardware
+//	observe_metrics.go     — MetricsSummary / MetricsNodes / MetricsNodeRoute / MetricsHardware / MetricsCompare
 //	observe_logs.go        — LogsQuery / LogsSummary
 //	observe_apm.go         — TracesList / TracesServices / TracesTopology / TracesOperations / TracesDetail / TracesStats / APMServiceSeries
 //	observe_slo_query.go   — SLOSummary / SLOIngress / SLOServices / SLOEdges / SLOTimeSeries

@@ -21,6 +21,7 @@ import {
   NodeCard,
   HardwareSummaryTiles,
   HardwareMatrix,
+  NodeCompareTable,
 } from "./components";
 
 // OTel 可用性守卫
@@ -31,11 +32,12 @@ import {
   getClusterNodeMetrics,
   getNodeMetricsHistory,
   getHardwareHealth,
+  getNodeComparison,
 } from "@/datasource/metrics";
 import type { Summary } from "@/datasource/metrics";
 
 import type { NodeMetrics, Point } from "@/types/node-metrics";
-import type { HardwareHealth } from "@/types/hardware";
+import type { HardwareHealth, NodeComparison } from "@/types/hardware";
 
 // ==================== 主页面 ====================
 export default function MetricsPage() {
@@ -62,6 +64,7 @@ function MetricsPageContent() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [nodes, setNodes] = useState<NodeMetrics[]>([]);
   const [hardware, setHardware] = useState<HardwareHealth | null>(null);
+  const [comparison, setComparison] = useState<NodeComparison | null>(null);
 
   // 历史数据缓存（每个节点，按 metric 分组）
   const [historyCache, setHistoryCache] = useState<Record<string, Record<string, Point[]>>>({});
@@ -74,13 +77,15 @@ function MetricsPageContent() {
 
     try {
       // 硬件健康与节点指标来自同一份快照，并行取；硬件接口失败不应拖垮整页
-      const [result, hw] = await Promise.all([
+      const [result, hw, cmp] = await Promise.all([
         getClusterNodeMetrics(currentClusterId),
         getHardwareHealth(currentClusterId).catch(() => null),
+        getNodeComparison(currentClusterId).catch(() => null),
       ]);
       setSummary(result.summary);
       setNodes(result.nodes);
       setHardware(hw);
+      setComparison(cmp);
       setError(null);
       setLastUpdate(new Date());
     } finally {
@@ -246,6 +251,9 @@ function MetricsPageContent() {
         {nodes.length > 1 && currentClusterId && (
           <ClusterOverviewChart nodes={nodes} clusterId={currentClusterId} />
         )}
+
+        {/* 节点对比：先横向定位哪台不对，再展开那一台看细节 */}
+        <NodeCompareTable data={comparison} />
 
         {/* 节点过滤 chip */}
         <div className="flex flex-wrap gap-2">

@@ -111,3 +111,33 @@ type HardwareHealthResponse struct {
 	Rows    []HardwareRow   `json:"rows"`
 	Summary HardwareSummary `json:"summary"`
 }
+
+// ──────────────────────────────────────────────────────────────
+// 节点对比表（GET /api/v2/observe/metrics/compare）
+// ──────────────────────────────────────────────────────────────
+//
+// 与硬件矩阵的区别：矩阵只看硬件传感器，对比表把硬件与四大资源放在一张表里，
+// 用来横向找出「哪台不一样」。列顺序由后端固定（硬件优先），前端不重排。
+
+// CompareCell 对比表的一格。Value 为 nil 表示该节点取不到这个信号。
+type CompareCell struct {
+	Value *float64 `json:"value"`
+	// Text 带单位的展示串（"124 ms" / "62.5%"）。只放数字与单位，
+	// 任何需要翻译的文案都由前端按 i18n 出，后端不返回自然语言。
+	Text   string         `json:"text,omitempty"`
+	Status HardwareStatus `json:"status"`
+}
+
+// CompareRow 对比表一行 = 一个节点
+type CompareRow struct {
+	NodeName string                 `json:"nodeName"`
+	Profile  string                 `json:"profile"`
+	Cells    map[string]CompareCell `json:"cells"`
+	Overall  HardwareStatus         `json:"overall"`
+}
+
+// NodeComparisonResponse 完整响应 data
+type NodeComparisonResponse struct {
+	Columns []string     `json:"columns"`
+	Rows    []CompareRow `json:"rows"`
+}

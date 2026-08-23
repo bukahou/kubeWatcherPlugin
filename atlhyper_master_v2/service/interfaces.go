@@ -50,6 +50,8 @@ type QueryOTel interface {
 	GetOTelTimeline(ctx context.Context, clusterID string, since time.Time) ([]cluster.OTelEntry, error)
 	// GetHardwareHealth 硬件健康矩阵（阈值判定已在 Master 完成，前端只渲染）
 	GetHardwareHealth(ctx context.Context, clusterID string) (*model.HardwareHealthResponse, error)
+	// GetNodeComparison 节点横向对比表（硬件列复用 GetHardwareHealth 的判定）
+	GetNodeComparison(ctx context.Context, clusterID string) (*model.NodeComparisonResponse, error)
 }
 
 // QuerySLO SLO 服务网格查询 + SLO 目标/路由映射查询
