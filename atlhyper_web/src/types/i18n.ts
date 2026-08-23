@@ -1816,37 +1816,10 @@ interface NodeMetricsTranslations {
   temperature: {
     title: string;
     cpuTemp: string;
-    gpuTemp: string;
     sensors: string;
     critical: string;
     highWarning: string;
     na: string;
-  };
-  // GPU
-  gpu: {
-    title: string;
-    devices: string;
-    utilization: string;
-    gpuCompute: string;
-    memory: string;
-    temp: string;
-    fan: string;
-    power: string;
-    vram: string;
-    processes: string;
-  };
-  // Process
-  process: {
-    title: string;
-    processCount: string;
-    filter: string;
-    moreProcesses: string;
-    noMatch: string;
-    stateRunning: string;
-    stateSleep: string;
-    stateDiskWait: string;
-    stateZombie: string;
-    stateStopped: string;
   };
   // Chart
   chart: {

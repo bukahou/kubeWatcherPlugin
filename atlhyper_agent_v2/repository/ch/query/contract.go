@@ -67,6 +67,7 @@ func RunEnumContractChecks(ctx context.Context, client sdk.ClickHouseClient, int
 		return
 	}
 	VerifyEnumContracts(ctx, client)
+	VerifyMetricsCollected(ctx, client)
 
 	if interval <= 0 {
 		return
@@ -79,6 +80,7 @@ func RunEnumContractChecks(ctx context.Context, client sdk.ClickHouseClient, int
 			return
 		case <-ticker.C:
 			VerifyEnumContracts(ctx, client)
+			VerifyMetricsCollected(ctx, client)
 		}
 	}
 }
@@ -152,4 +154,74 @@ func diff(actual, expected []string) []string {
 		}
 	}
 	return unknown
+}
+
+// ──────────────────────────────────────────────────────────────
+// 指标采集契约：Agent 查的 node_* 指标，Collector 是否都采到了
+// ──────────────────────────────────────────────────────────────
+
+// metricsCollectedWindow 是判定"已采集"的时间窗口。node-exporter 每 15s 一轮，
+// 15 分钟内没有任何一行即视为未采集（留足 Collector 重启 / 网络抖动的余量）。
+const metricsCollectedWindow = "15 MINUTE"
+
+// VerifyMetricsCollected 核对 NodeExporterMetrics 清单里的每个指标近期在 ClickHouse 是否有数据。
+//
+// 缺失的指标意味着 Collector 的 keep regex 与 Agent 查询漂移 —— 查询会静默返回空，
+// 页面上对应卡片空白且无任何报错。2026-08 实测有 39 个指标处于此状态达数月。
+//
+// node-exporter 指标分布在 gauge 与 sum 两张表（counter 进 sum，瞬时值进 gauge），两张都查。
+func VerifyMetricsCollected(ctx context.Context, client sdk.ClickHouseClient) {
+	if client == nil {
+		return
+	}
+	collected := make(map[string]struct{})
+	for _, table := range []string{"otel_metrics_gauge", "otel_metrics_sum"} {
+		names, err := recentMetricNames(ctx, client, table)
+		if err != nil {
+			logger.Warn("[契约自检] 指标采集核对查询失败", "table", table, "err", err)
+			return // 一张表查不了就没法下结论，避免误报大批"未采集"
+		}
+		for _, n := range names {
+			collected[n] = struct{}{}
+		}
+	}
+
+	var missing []string
+	for _, m := range NodeExporterMetrics {
+		if _, ok := collected[m]; !ok {
+			missing = append(missing, m)
+		}
+	}
+	if len(missing) > 0 {
+		logger.Error("[契约漂移] Agent 查询的 node-exporter 指标未被采集，对应卡片将空白",
+			"缺失数", len(missing),
+			"缺失", strings.Join(missing, ","),
+			"处理", "用 NodeExporterKeepRegex() 重新生成 collector.yaml 的 keep regex")
+		return
+	}
+	logger.Info("[契约自检] 通过", "table", "otel_metrics", "column", "MetricName",
+		"清单", len(NodeExporterMetrics), "缺失", 0)
+}
+
+// recentMetricNames 取某表近期出现过的 node_* 指标名。
+func recentMetricNames(ctx context.Context, client sdk.ClickHouseClient, table string) ([]string, error) {
+	// table 来自本文件白名单，非外部输入。
+	q := fmt.Sprintf(
+		"SELECT DISTINCT MetricName FROM %s WHERE MetricName LIKE 'node_%%' AND TimeUnix > now() - INTERVAL %s",
+		table, metricsCollectedWindow)
+	rows, err := client.Query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			continue
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
 }
