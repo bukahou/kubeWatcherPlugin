@@ -15,19 +15,19 @@ type sloDialect struct{}
 // ==================== Targets ====================
 
 func (d *sloDialect) SelectTargets(clusterID string) (string, []any) {
-	return `SELECT id, cluster_id, host, ingress_name, ingress_class, namespace, tls, time_range, availability_target, p95_latency_target, created_at, updated_at
-		FROM slo_targets WHERE cluster_id = ? ORDER BY host, time_range`, []any{clusterID}
+	return `SELECT id, cluster_id, host, ingress_name, ingress_class, namespace, tls, window_days, availability_target, p95_latency_target, created_at, updated_at
+		FROM slo_targets WHERE cluster_id = ? ORDER BY host`, []any{clusterID}
 }
 
 func (d *sloDialect) SelectTargetsByHost(clusterID, host string) (string, []any) {
-	return `SELECT id, cluster_id, host, ingress_name, ingress_class, namespace, tls, time_range, availability_target, p95_latency_target, created_at, updated_at
-		FROM slo_targets WHERE cluster_id = ? AND host = ? ORDER BY time_range`, []any{clusterID, host}
+	return `SELECT id, cluster_id, host, ingress_name, ingress_class, namespace, tls, window_days, availability_target, p95_latency_target, created_at, updated_at
+		FROM slo_targets WHERE cluster_id = ? AND host = ?`, []any{clusterID, host}
 }
 
 func (d *sloDialect) UpsertTarget(t *database.SLOTarget) (string, []any) {
-	query := `INSERT INTO slo_targets (cluster_id, host, ingress_name, ingress_class, namespace, tls, time_range, availability_target, p95_latency_target, created_at, updated_at)
+	query := `INSERT INTO slo_targets (cluster_id, host, ingress_name, ingress_class, namespace, tls, window_days, availability_target, p95_latency_target, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(cluster_id, host, time_range) DO UPDATE SET
+		ON CONFLICT(cluster_id, host) DO UPDATE SET
 		ingress_name = excluded.ingress_name,
 		ingress_class = excluded.ingress_class,
 		namespace = excluded.namespace,
@@ -37,14 +37,14 @@ func (d *sloDialect) UpsertTarget(t *database.SLOTarget) (string, []any) {
 		updated_at = excluded.updated_at`
 	args := []any{
 		t.ClusterID, t.Host, t.IngressName, t.IngressClass, t.Namespace,
-		boolToInt(t.TLS), t.TimeRange, t.AvailabilityTarget, t.P95LatencyTarget,
+		boolToInt(t.TLS), t.WindowDays, t.AvailabilityTarget, t.P95LatencyTarget,
 		t.CreatedAt.Format(time.RFC3339), t.UpdatedAt.Format(time.RFC3339),
 	}
 	return query, args
 }
 
 func (d *sloDialect) DeleteTarget(clusterID, host, timeRange string) (string, []any) {
-	return `DELETE FROM slo_targets WHERE cluster_id = ? AND host = ? AND time_range = ?`,
+	return `DELETE FROM slo_targets WHERE cluster_id = ? AND host = ?`,
 		[]any{clusterID, host, timeRange}
 }
 
@@ -53,7 +53,7 @@ func (d *sloDialect) ScanTarget(rows *sql.Rows) (*database.SLOTarget, error) {
 	var tls int
 	var createdAt, updatedAt string
 	err := rows.Scan(&t.ID, &t.ClusterID, &t.Host, &t.IngressName, &t.IngressClass,
-		&t.Namespace, &tls, &t.TimeRange, &t.AvailabilityTarget, &t.P95LatencyTarget,
+		&t.Namespace, &tls, &t.WindowDays, &t.AvailabilityTarget, &t.P95LatencyTarget,
 		&createdAt, &updatedAt)
 	if err != nil {
 		return nil, err

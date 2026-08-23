@@ -9,6 +9,10 @@ import (
 	"AtlHyper/atlhyper_master_v2/model"
 )
 
+// defaultSLOWindowDays SLO 默认滚动窗口。取 7 天对齐 ClickHouse 的 TTL ——
+// 再长的窗口没有数据支撑，配了也只会显示空。
+const defaultSLOWindowDays = 7
+
 // SLOService SLO 写入服务
 type SLOService struct {
 	sloRepo database.SLORepository
@@ -21,10 +25,13 @@ func NewSLOService(sloRepo database.SLORepository) *SLOService {
 
 // UpsertSLOTarget 创建或更新 SLO 目标（model → database 转换）
 func (s *SLOService) UpsertSLOTarget(ctx context.Context, req *model.UpdateSLOTargetRequest) error {
+	if req.WindowDays <= 0 {
+		req.WindowDays = defaultSLOWindowDays
+	}
 	target := &database.SLOTarget{
 		ClusterID:          req.ClusterID,
 		Host:               req.Host,
-		TimeRange:          req.TimeRange,
+		WindowDays:         req.WindowDays,
 		AvailabilityTarget: req.AvailabilityTarget,
 		P95LatencyTarget:   req.P95LatencyTarget,
 	}

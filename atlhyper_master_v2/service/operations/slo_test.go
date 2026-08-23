@@ -57,7 +57,7 @@ func TestUpsertSLOTarget_Success(t *testing.T) {
 	req := &model.UpdateSLOTargetRequest{
 		ClusterID:          "cluster-1",
 		Host:               "example.com",
-		TimeRange:          "1d",
+		WindowDays:         7,
 		AvailabilityTarget: 99.9,
 		P95LatencyTarget:   200,
 	}
@@ -80,6 +80,28 @@ func TestUpsertSLOTarget_Success(t *testing.T) {
 	if repo.upsertedTarget.AvailabilityTarget != 99.9 {
 		t.Errorf("expected AvailabilityTarget=99.9, got %f", repo.upsertedTarget.AvailabilityTarget)
 	}
+	if repo.upsertedTarget.WindowDays != 7 {
+		t.Errorf("expected WindowDays=7, got %d", repo.upsertedTarget.WindowDays)
+	}
+}
+
+// 没指定窗口时用默认值 —— 而不是写进一个 0 天的 SLO（那会让预算计算除零）
+func TestUpsertSLOTarget_DefaultsWindowDays(t *testing.T) {
+	repo := &mockSLORepo{}
+	svc := NewSLOService(repo)
+
+	err := svc.UpsertSLOTarget(context.Background(), &model.UpdateSLOTargetRequest{
+		ClusterID:          "cluster-1",
+		Host:               "example.com",
+		AvailabilityTarget: 99.9,
+		P95LatencyTarget:   200,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.upsertedTarget.WindowDays != defaultSLOWindowDays {
+		t.Errorf("expected WindowDays=%d, got %d", defaultSLOWindowDays, repo.upsertedTarget.WindowDays)
+	}
 }
 
 func TestUpsertSLOTarget_Error(t *testing.T) {
@@ -89,7 +111,7 @@ func TestUpsertSLOTarget_Error(t *testing.T) {
 	req := &model.UpdateSLOTargetRequest{
 		ClusterID:          "cluster-1",
 		Host:               "example.com",
-		TimeRange:          "1d",
+		WindowDays:         7,
 		AvailabilityTarget: 99.9,
 		P95LatencyTarget:   200,
 	}

@@ -330,14 +330,17 @@ type AIReport struct {
 
 // SLOTarget SLO 目标配置
 type SLOTarget struct {
-	ID                 int64
-	ClusterID          string
-	Host               string
-	IngressName        string
-	IngressClass       string
-	Namespace          string
-	TLS                bool
-	TimeRange          string // "1d", "7d", "30d"
+	ID           int64
+	ClusterID    string
+	Host         string
+	IngressName  string
+	IngressClass string
+	Namespace    string
+	TLS          bool
+	// WindowDays SLO 的滚动窗口天数。一个 SLO = 一个固定窗口 + 一组目标，
+	// 与用户在页面上选的查看范围无关（那只影响图表画多长）。
+	// 默认 7 —— 对齐 ClickHouse 的 7 天 TTL，再长的窗口没有数据支撑。
+	WindowDays         int
 	AvailabilityTarget float64
 	P95LatencyTarget   int
 	CreatedAt          time.Time

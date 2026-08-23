@@ -2,27 +2,43 @@
 // SLO API 类型定义
 package model
 
+import "AtlHyper/atlhyper_master_v2/slo"
+
 // ==================== API 响应类型 ====================
 
 // DomainSLO 域名 SLO 信息
 type DomainSLO struct {
-	Host         string                    `json:"host"`
-	IngressName  string                    `json:"ingressName"`
-	IngressClass string                    `json:"ingressClass"`
-	Namespace    string                    `json:"namespace"`
-	TLS          bool                      `json:"tls"`
-	Targets      map[string]*SLOTargetSpec `json:"targets"` // "1d", "7d", "30d"
-	Current      *SLOMetrics               `json:"current"`
-	Previous     *SLOMetrics               `json:"previous,omitempty"`
-	ErrorBudget  float64                   `json:"errorBudgetRemaining"`
-	Status       string                    `json:"status"` // healthy / warning / critical
-	Trend        string                    `json:"trend"`  // up / down / stable
+	Host         string         `json:"host"`
+	IngressName  string         `json:"ingressName"`
+	IngressClass string         `json:"ingressClass"`
+	Namespace    string         `json:"namespace"`
+	TLS          bool           `json:"tls"`
+	Target       *SLOTargetSpec `json:"target"`
+	Budget       *SLOBudget     `json:"budget,omitempty"`
+	Current      *SLOMetrics    `json:"current"`
+	Previous     *SLOMetrics    `json:"previous,omitempty"`
+	ErrorBudget  float64        `json:"errorBudgetRemaining"`
+	Status       string         `json:"status"` // healthy / warning / critical
+	Trend        string         `json:"trend"`  // up / down / stable
 }
 
-// SLOTargetSpec SLO 目标规格
+// SLOTargetSpec SLO 目标规格。
+// 一个域名一组目标：固定滚动窗口 + 可用率 + P95 延迟。
+// 页面上的时间范围切换只影响图表画多长，不改变目标。
 type SLOTargetSpec struct {
 	Availability float64 `json:"availability"`
 	P95Latency   int     `json:"p95Latency"`
+	WindowDays   int     `json:"windowDays"`
+}
+
+// SLOBudget 错误预算与多窗口燃烧率（判定已在后端完成，前端只渲染）
+type SLOBudget struct {
+	RemainingPct   float64              `json:"remainingPct"`
+	AllowedEvents  int64                `json:"allowedEvents"`
+	ConsumedEvents int64                `json:"consumedEvents"`
+	BurnRates      []slo.BurnRateWindow `json:"burnRates"`
+	// ExhaustHours 按当前燃烧率还能撑多少小时；0 表示窗口内不会耗尽
+	ExhaustHours float64 `json:"exhaustHours"`
 }
 
 // SLOMetrics SLO 指标
@@ -33,6 +49,10 @@ type SLOMetrics struct {
 	ErrorRate      float64 `json:"errorRate"`
 	RequestsPerSec float64 `json:"requestsPerSec"`
 	TotalRequests  int64   `json:"totalRequests"`
+	// GoodRequests / BadRequests 把分子分母摆出来。低流量时百分比极具误导性：
+	// 10 个请求错 1 个，可用率 90% 看着像事故，其实什么都没发生。
+	GoodRequests int64 `json:"goodRequests"`
+	BadRequests  int64 `json:"badRequests"`
 }
 
 // SLOSummary SLO 汇总信息
@@ -58,29 +78,31 @@ type SLODomainsResponse struct {
 // DomainSLOResponseV2 域名级别的 SLO 响应 (V2)
 // 以真实域名为单位，包含该域名下的所有后端服务
 type DomainSLOResponseV2 struct {
-	Domain               string                    `json:"domain"`               // 真实域名（如 example.com）
-	TLS                  bool                      `json:"tls"`                  // 是否启用 TLS
-	Services             []ServiceSLO              `json:"services"`             // 该域名下的所有后端服务
-	Summary              *SLOMetrics               `json:"summary"`              // 域名级别汇总指标
-	Previous             *SLOMetrics               `json:"previous,omitempty"`   // 上一周期汇总指标
-	Targets              map[string]*SLOTargetSpec `json:"targets,omitempty"`    // 目标配置 ("1d"/"7d"/"30d")
-	Status               string                    `json:"status"`               // healthy / warning / critical
-	ErrorBudgetRemaining float64                   `json:"errorBudgetRemaining"` // 剩余错误预算
+	Domain               string         `json:"domain"`               // 真实域名（如 example.com）
+	TLS                  bool           `json:"tls"`                  // 是否启用 TLS
+	Services             []ServiceSLO   `json:"services"`             // 该域名下的所有后端服务
+	Summary              *SLOMetrics    `json:"summary"`              // 域名级别汇总指标
+	Previous             *SLOMetrics    `json:"previous,omitempty"`   // 上一周期汇总指标
+	Target               *SLOTargetSpec `json:"target"`               // 该域名的 SLO 目标
+	Budget               *SLOBudget     `json:"budget,omitempty"`     // 错误预算与燃烧率
+	Status               string         `json:"status"`               // healthy / warning / critical
+	ErrorBudgetRemaining float64        `json:"errorBudgetRemaining"` // 剩余错误预算
 }
 
 // ServiceSLO 后端服务级别的 SLO 数据（Metrics 的实际数据来源）
 type ServiceSLO struct {
-	ServiceKey  string                    `json:"serviceKey"`           // Traefik service key (namespace-name-port@kubernetes)
-	ServiceName string                    `json:"serviceName"`          // 服务名称
-	ServicePort int                       `json:"servicePort"`          // 服务端口
-	Namespace   string                    `json:"namespace"`            // 命名空间
-	Paths       []string                  `json:"paths"`                // 使用该服务的路径列表
-	IngressName string                    `json:"ingressName"`          // IngressRoute/Ingress 名称
-	Current     *SLOMetrics               `json:"current"`              // 当前周期指标
-	Previous    *SLOMetrics               `json:"previous,omitempty"`   // 上一周期指标（用于对比）
-	Targets     map[string]*SLOTargetSpec `json:"targets,omitempty"`    // 目标配置
-	Status      string                    `json:"status"`               // healthy / warning / critical
-	ErrorBudget float64                   `json:"errorBudgetRemaining"` // 剩余错误预算
+	ServiceKey  string         `json:"serviceKey"`           // Traefik service key (namespace-name-port@kubernetes)
+	ServiceName string         `json:"serviceName"`          // 服务名称
+	ServicePort int            `json:"servicePort"`          // 服务端口
+	Namespace   string         `json:"namespace"`            // 命名空间
+	Paths       []string       `json:"paths"`                // 使用该服务的路径列表
+	IngressName string         `json:"ingressName"`          // IngressRoute/Ingress 名称
+	Current     *SLOMetrics    `json:"current"`              // 当前周期指标
+	Previous    *SLOMetrics    `json:"previous,omitempty"`   // 上一周期指标（用于对比）
+	Target      *SLOTargetSpec `json:"target"`               // 该服务的 SLO 目标
+	Budget      *SLOBudget     `json:"budget,omitempty"`     // 错误预算与燃烧率
+	Status      string         `json:"status"`               // healthy / warning / critical
+	ErrorBudget float64        `json:"errorBudgetRemaining"` // 剩余错误预算
 }
 
 // SLODomainsResponseV2 域名列表响应 (V2)
@@ -158,7 +180,7 @@ type SLOTargetResponse struct {
 	ID                 int64   `json:"id"`
 	ClusterID          string  `json:"clusterId"`
 	Host               string  `json:"host"`
-	TimeRange          string  `json:"timeRange"`
+	WindowDays         int     `json:"windowDays"`
 	AvailabilityTarget float64 `json:"availabilityTarget"`
 	P95LatencyTarget   int     `json:"p95LatencyTarget"`
 	CreatedAt          string  `json:"createdAt"`
@@ -171,7 +193,7 @@ type SLOTargetResponse struct {
 type UpdateSLOTargetRequest struct {
 	ClusterID          string  `json:"clusterId"`
 	Host               string  `json:"host"`
-	TimeRange          string  `json:"timeRange"` // "1d", "7d", "30d"
+	WindowDays         int     `json:"windowDays"` // 滚动窗口天数，0 = 用默认值
 	AvailabilityTarget float64 `json:"availabilityTarget"`
 	P95LatencyTarget   int     `json:"p95LatencyTarget"`
 }

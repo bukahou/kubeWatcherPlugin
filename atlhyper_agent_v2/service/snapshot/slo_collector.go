@@ -1,9 +1,13 @@
 // Package snapshot SLO 多窗口数据采集
 //
 // 本文件实现 SLO 多窗口缓存逻辑：
-//   - 3 个窗口 (1d/7d/30d) 各有独立的缓存 TTL
+//   - 5 个窗口各有独立的缓存 TTL
 //   - 顺序执行查询以避免 ClickHouse 资源竞争
 //   - 每个窗口独立 3 分钟超时
+//
+// 窗口集对齐两件事：
+//   1. Google SRE 的多窗口燃烧率需要 1h / 6h / 24h / 3d 四档
+//   2. ClickHouse TTL 是 7 天，30d 窗口永远查不到数据 —— 留着只会让页面显示假的空值
 package snapshot
 
 import (
@@ -21,11 +25,17 @@ type sloWindowConfig struct {
 	cacheTTL time.Duration
 }
 
-// sloWindowConfigs 窗口配置列表
+// sloWindowConfigs 窗口配置列表。
+//
+// 前四个是燃烧率窗口（Google SRE：1h>14.4× 呼叫 / 6h>6× 工单 / 24h>3× 关注 / 3d>1× 观察），
+// 7d 是页面上能选的最长查看范围（受 ClickHouse TTL 限制）。
+// 缓存 TTL 按窗口长度递增：短窗口要及时，长窗口没必要频繁重算。
 var sloWindowConfigs = []sloWindowConfig{
-	{"1d", 24 * time.Hour, time.Hour, 5 * time.Minute},
-	{"7d", 7 * 24 * time.Hour, 6 * time.Hour, 30 * time.Minute},
-	{"30d", 30 * 24 * time.Hour, 24 * time.Hour, 2 * time.Hour},
+	{"1h", time.Hour, 5 * time.Minute, time.Minute},
+	{"6h", 6 * time.Hour, 30 * time.Minute, 5 * time.Minute},
+	{"24h", 24 * time.Hour, time.Hour, 10 * time.Minute},
+	{"3d", 3 * 24 * time.Hour, 3 * time.Hour, 30 * time.Minute},
+	{"7d", 7 * 24 * time.Hour, 6 * time.Hour, time.Hour},
 }
 
 // collectSLOWindows 采集多窗口 SLO 数据

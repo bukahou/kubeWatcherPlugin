@@ -47,8 +47,8 @@ func (h *SLOHandler) updateTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Host == "" || req.TimeRange == "" {
-		handler.WriteError(w, http.StatusBadRequest, "host and time_range required")
+	if req.Host == "" {
+		handler.WriteError(w, http.StatusBadRequest, "host required")
 		return
 	}
 

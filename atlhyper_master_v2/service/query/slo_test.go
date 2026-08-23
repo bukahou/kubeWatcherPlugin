@@ -62,12 +62,12 @@ func TestGetSLOTargets_Success(t *testing.T) {
 		targets: []*database.SLOTarget{
 			{
 				ID: 1, ClusterID: "cluster-1", Host: "example.com",
-				TimeRange: "1d", AvailabilityTarget: 99.9, P95LatencyTarget: 200,
+				WindowDays: 7, AvailabilityTarget: 99.9, P95LatencyTarget: 200,
 				CreatedAt: now, UpdatedAt: now,
 			},
 			{
 				ID: 2, ClusterID: "cluster-1", Host: "api.example.com",
-				TimeRange: "7d", AvailabilityTarget: 99.5, P95LatencyTarget: 500,
+				WindowDays: 30, AvailabilityTarget: 99.5, P95LatencyTarget: 500,
 				CreatedAt: now, UpdatedAt: now,
 			},
 		},

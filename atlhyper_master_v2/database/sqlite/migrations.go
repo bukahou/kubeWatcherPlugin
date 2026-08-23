@@ -270,12 +270,12 @@ func migrate(db *sql.DB) error {
 			ingress_class TEXT NOT NULL DEFAULT 'nginx',
 			namespace TEXT NOT NULL,
 			tls INTEGER NOT NULL DEFAULT 1,
-			time_range TEXT NOT NULL,
-			availability_target REAL NOT NULL DEFAULT 95.00,
+			window_days INTEGER NOT NULL DEFAULT 7,
+			availability_target REAL NOT NULL DEFAULT 99.00,
 			p95_latency_target INTEGER NOT NULL DEFAULT 300,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
-			UNIQUE(cluster_id, host, time_range)
+			UNIQUE(cluster_id, host)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_slo_targets_cluster ON slo_targets(cluster_id)`,
 

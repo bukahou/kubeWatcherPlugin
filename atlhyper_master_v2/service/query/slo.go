@@ -80,7 +80,7 @@ func toModelTargetResponse(src *database.SLOTarget) model.SLOTargetResponse {
 		ID:                 src.ID,
 		ClusterID:          src.ClusterID,
 		Host:               src.Host,
-		TimeRange:          src.TimeRange,
+		WindowDays:         src.WindowDays,
 		AvailabilityTarget: src.AvailabilityTarget,
 		P95LatencyTarget:   src.P95LatencyTarget,
 		CreatedAt:          src.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),

@@ -51,14 +51,14 @@ func (h *SLOHandler) defaultClusterID(_ context.Context) string {
 	return "default"
 }
 
-// buildTargetMap 构建目标配置 map
-func buildTargetMap(targets []model.SLOTargetResponse) map[string]map[string]model.SLOTargetResponse {
-	result := make(map[string]map[string]model.SLOTargetResponse)
+// buildTargetMap 构建 域名 → 目标 的映射。
+//
+// 一个域名只有一个 SLO 目标（固定窗口 + 可用率 + 延迟），
+// 不再按查看范围分成三套 —— 页面上的时间切换只影响图表画多长，不改变目标。
+func buildTargetMap(targets []model.SLOTargetResponse) map[string]model.SLOTargetResponse {
+	result := make(map[string]model.SLOTargetResponse, len(targets))
 	for _, t := range targets {
-		if result[t.Host] == nil {
-			result[t.Host] = make(map[string]model.SLOTargetResponse)
-		}
-		result[t.Host][t.TimeRange] = t
+		result[t.Host] = t
 	}
 	return result
 }
