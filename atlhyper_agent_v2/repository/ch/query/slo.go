@@ -72,6 +72,18 @@ const (
 	labelStatusClass = "status_class"
 )
 
+// labelInstance 上报实例标识（ResourceAttributes，非契约 label）。
+//
+// ingress 实现通常是 DaemonSet（每节点一个进程），每个进程维护自己的累积计数器。
+// 跨时间做差之前必须先按实例分区，否则不同实例的计数序列交错排序，
+// 每次切换实例都会产生一个巨大的假 delta。
+//
+// 2026-08-23 实测：两个 cilium-envoy 实例（计数器 12327 与 4556）混在一起，
+// 5 分钟内真实 10 个请求被算成 238679，偏差 24000 倍；histogram 同样受害，
+// 差值为负导致 P95 恒为 0。这与底层是哪个 ingress 实现无关 —— 任何多副本
+// 实现都有这个问题，所以按实例分区是通用要求，不是 Cilium 特例。
+const labelInstance = "service.instance.id"
+
 // ⚠️ 单位约定：ingress_request_duration_bucket 的桶边界单位是【毫秒】。
 //
 // 契约本想统一为秒，但 OTTL 无法改写 histogram 的 ExplicitBounds 数组，
@@ -103,37 +115,50 @@ func isErrorStatusClass(class string) bool {
 
 // buildIngressCountQuery 构造请求计数查询。
 //
-// 按 {namespace, service, status_class} 分组 —— 每个组合是独立的累积计数器，
-// 必须在最细粒度算 delta。算法等价于 Prometheus rate() 的 counterCorrection：
-// v[i] >= v[i-1] 取差值，否则视为 counter reset 取 v[i]。
+// 三层：
+//  1. 最内层按 {instance, namespace, service, status_class} 取相邻样本 —— 每个组合
+//     是一条独立的累积计数器序列，混在一起做差会得到垃圾（见 labelInstance 注释）
+//  2. 中间层对每条序列求 delta 之和。算法等价于 Prometheus rate() 的
+//     counterCorrection：v[i] >= v[i-1] 取差值，否则视为 counter reset 取 v[i]
+//  3. 最外层丢掉实例维度，按契约维度汇总 —— 调用方不该关心底下有几个副本
 func buildIngressCountQuery(timeFilter string) string {
 	return fmt.Sprintf(`
-		SELECT ns, svc, class,
-		       sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
+		SELECT ns, svc, class, sum(inst_delta) AS delta
 		FROM (
-		    SELECT Attributes['%s'] AS ns,
-		           Attributes['%s'] AS svc,
-		           Attributes['%s'] AS class,
-		           Value, TimeUnix,
-		           lagInFrame(Value, 1, Value) OVER
-		               (PARTITION BY Attributes['%s'], Attributes['%s'], Attributes['%s']
-		                ORDER BY TimeUnix) AS prevValue
-		    FROM otel_metrics_sum
-		    WHERE MetricName = '%s'
-		      %s
+		    SELECT ns, svc, class,
+		           sum(if(Value >= prevValue, Value - prevValue, Value)) AS inst_delta
+		    FROM (
+		        SELECT ResourceAttributes['%s'] AS inst,
+		               Attributes['%s'] AS ns,
+		               Attributes['%s'] AS svc,
+		               Attributes['%s'] AS class,
+		               Value, TimeUnix,
+		               lagInFrame(Value, 1, Value) OVER
+		                   (PARTITION BY ResourceAttributes['%s'], Attributes['%s'],
+		                                 Attributes['%s'], Attributes['%s']
+		                    ORDER BY TimeUnix) AS prevValue
+		        FROM otel_metrics_sum
+		        WHERE MetricName = '%s'
+		          %s
+		    )
+		    GROUP BY inst, ns, svc, class
 		)
 		GROUP BY ns, svc, class
 		HAVING delta > 0
-	`, labelNamespace, labelService, labelStatusClass,
-		labelNamespace, labelService, labelStatusClass,
+	`, labelInstance, labelNamespace, labelService, labelStatusClass,
+		labelInstance, labelNamespace, labelService, labelStatusClass,
 		metricIngressRequestTotal, timeFilter)
 }
 
 // buildIngressLatencyQuery 构造延迟直方图查询。
-// argMax/argMin(BucketCounts) 取窗口内最新/最旧快照做差。
+//
+// argMax/argMin(BucketCounts) 取窗口内最新/最旧快照做差。**必须按实例分组**：
+// 跨实例取 argMax/argMin 会拿到 A 的最新减 B 的最旧，差值可能为负，
+// 结果是 P95 恒为 0。分组后每个实例一行，由 addHistogramDelta 在 Go 侧逐行累加。
 func buildIngressLatencyQuery(timeFilter string) string {
 	return fmt.Sprintf(`
-		SELECT Attributes['%s'] AS ns,
+		SELECT ResourceAttributes['%s'] AS inst,
+		       Attributes['%s'] AS ns,
 		       Attributes['%s'] AS svc,
 		       argMax(ExplicitBounds, TimeUnix) AS bounds,
 		       argMax(BucketCounts, TimeUnix) AS latest,
@@ -145,36 +170,42 @@ func buildIngressLatencyQuery(timeFilter string) string {
 		FROM otel_metrics_histogram
 		WHERE MetricName = '%s'
 		  %s
-		GROUP BY ns, svc
+		GROUP BY inst, ns, svc
 		HAVING count() >= 2
-	`, labelNamespace, labelService, metricIngressDurationBucket, timeFilter)
+	`, labelInstance, labelNamespace, labelService, metricIngressDurationBucket, timeFilter)
 }
 
 // buildIngressHistoryQuery 构造按时间桶聚合的历史查询。
 func buildIngressHistoryQuery(timeFilter string, bucketSec int64) string {
 	return fmt.Sprintf(`
-		SELECT toStartOfInterval(TimeUnix, INTERVAL %d SECOND) AS ts,
-		       ns, svc, class,
-		       sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
+		SELECT ts, ns, svc, class, sum(inst_delta) AS delta
 		FROM (
-		    SELECT Attributes['%s'] AS ns,
-		           Attributes['%s'] AS svc,
-		           Attributes['%s'] AS class,
-		           Value, TimeUnix,
-		           lagInFrame(Value, 1, Value) OVER
-		               (PARTITION BY Attributes['%s'], Attributes['%s'], Attributes['%s'],
-		                             toStartOfInterval(TimeUnix, INTERVAL %d SECOND)
-		                ORDER BY TimeUnix) AS prevValue
-		    FROM otel_metrics_sum
-		    WHERE MetricName = '%s'
-		      %s
+		    SELECT toStartOfInterval(TimeUnix, INTERVAL %d SECOND) AS ts,
+		           inst, ns, svc, class,
+		           sum(if(Value >= prevValue, Value - prevValue, Value)) AS inst_delta
+		    FROM (
+		        SELECT ResourceAttributes['%s'] AS inst,
+		               Attributes['%s'] AS ns,
+		               Attributes['%s'] AS svc,
+		               Attributes['%s'] AS class,
+		               Value, TimeUnix,
+		               lagInFrame(Value, 1, Value) OVER
+		                   (PARTITION BY ResourceAttributes['%s'], Attributes['%s'],
+		                                 Attributes['%s'], Attributes['%s'],
+		                                 toStartOfInterval(TimeUnix, INTERVAL %d SECOND)
+		                    ORDER BY TimeUnix) AS prevValue
+		        FROM otel_metrics_sum
+		        WHERE MetricName = '%s'
+		          %s
+		    )
+		    GROUP BY ts, inst, ns, svc, class
 		)
 		GROUP BY ts, ns, svc, class
 		HAVING delta > 0
 		ORDER BY ts
 	`, bucketSec,
-		labelNamespace, labelService, labelStatusClass,
-		labelNamespace, labelService, labelStatusClass, bucketSec,
+		labelInstance, labelNamespace, labelService, labelStatusClass,
+		labelInstance, labelNamespace, labelService, labelStatusClass, bucketSec,
 		metricIngressRequestTotal, timeFilter)
 }
 
@@ -358,15 +389,17 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 	if lerr == nil && latencyRows != nil {
 		defer latencyRows.Close()
 		for latencyRows.Next() {
-			var ns, svc string
+			// 每个 {实例, 服务} 一行；同一服务的多行由 addHistogramDelta 累加
+			var inst, ns, svc string
 			var bounds []float64
 			var latest, earliest []uint64
 			var sumLatest, sumEarliest float64
 			var cntLatest, cntEarliest uint64
-			if err := latencyRows.Scan(&ns, &svc, &bounds, &latest, &earliest,
+			if err := latencyRows.Scan(&inst, &ns, &svc, &bounds, &latest, &earliest,
 				&sumLatest, &sumEarliest, &cntLatest, &cntEarliest); err != nil {
 				continue
 			}
+			_ = inst
 			svcKey := ingressServiceKey(ns, svc)
 			if svcKey == "" {
 				continue
@@ -425,25 +458,31 @@ func (r *sloRepository) GetSLOTimeSeries(ctx context.Context, name string, since
 	// name 为契约 serviceKey（"namespace/service"）。按 5 分钟窗口聚合，
 	// 每个 status_class 系列独立做 counter-reset-safe delta。
 	query := fmt.Sprintf(`
-		SELECT ts, class, sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
+		SELECT ts, class, sum(inst_delta) AS delta
 		FROM (
-			SELECT toStartOfInterval(TimeUnix, INTERVAL 300 SECOND) AS ts,
-			       Attributes['%s'] AS class,
-			       Value, TimeUnix,
-			       lagInFrame(Value, 1, Value) OVER
-			           (PARTITION BY Attributes['%s'],
-			                         toStartOfInterval(TimeUnix, INTERVAL 300 SECOND)
-			            ORDER BY TimeUnix) AS prevValue
-			FROM otel_metrics_sum
-			WHERE MetricName = '%s'
-			  AND concat(Attributes['%s'], '/', Attributes['%s']) = ?
-			  AND TimeUnix >= now() - INTERVAL %d SECOND
+			SELECT ts, inst, class,
+			       sum(if(Value >= prevValue, Value - prevValue, Value)) AS inst_delta
+			FROM (
+				SELECT toStartOfInterval(TimeUnix, INTERVAL 300 SECOND) AS ts,
+				       ResourceAttributes['%s'] AS inst,
+				       Attributes['%s'] AS class,
+				       Value, TimeUnix,
+				       lagInFrame(Value, 1, Value) OVER
+				           (PARTITION BY ResourceAttributes['%s'], Attributes['%s'],
+				                         toStartOfInterval(TimeUnix, INTERVAL 300 SECOND)
+				            ORDER BY TimeUnix) AS prevValue
+				FROM otel_metrics_sum
+				WHERE MetricName = '%s'
+				  AND concat(Attributes['%s'], '/', Attributes['%s']) = ?
+				  AND TimeUnix >= now() - INTERVAL %d SECOND
+			)
+			GROUP BY ts, inst, class
 		)
 		GROUP BY ts, class
 		HAVING delta > 0
 		ORDER BY ts
-	`, labelStatusClass, labelStatusClass, metricIngressRequestTotal,
-		labelNamespace, labelService, sec)
+	`, labelInstance, labelStatusClass, labelInstance, labelStatusClass,
+		metricIngressRequestTotal, labelNamespace, labelService, sec)
 
 	rows, err := r.client.Query(ctx, query, name)
 	if err != nil {

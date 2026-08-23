@@ -111,7 +111,7 @@ func (h *SLOHandler) Domains(w http.ResponseWriter, r *http.Request) {
 // buildDomainFromIngress 从 IngressSLO 构建 DomainSLO
 func (h *SLOHandler) buildDomainFromIngress(ctx context.Context, clusterID string, ing slomodel.IngressSLO, timeRange string, targetMap map[string]map[string]model.SLOTargetResponse) model.DomainSLO {
 	domain := model.DomainSLO{
-		Host:    ing.ServiceKey,
+		Host:    fallbackDomainName(ing),
 		Targets: make(map[string]*model.SLOTargetSpec),
 		Status:  statusUnknown,
 		Trend:   "stable",
@@ -476,11 +476,23 @@ func (h *SLOHandler) buildDomainSLOV2(ctx context.Context, clusterID, domain, ti
 	return resp
 }
 
+// fallbackDomainName 路由映射表为空时的域名来源。
+//
+// Agent 侧的 RouteRepository 已经从 HTTPRoute 解析出真实域名填进 DisplayName，
+// 这里直接用即可；只有它缺失（或未解析、等于 ServiceKey）时才退回 ServiceKey。
+// 否则页面会显示 "geass-v3/geass-gateway" 而不是 "geass-api.bukahou.com"。
+func fallbackDomainName(ing slomodel.IngressSLO) string {
+	if ing.DisplayName != "" && ing.DisplayName != ing.ServiceKey {
+		return ing.DisplayName
+	}
+	return ing.ServiceKey
+}
+
 // buildDomainSLOV2Fallback 当路由映射为空时，从单个 IngressSLO 直接构建 V2 响应
-// 以 ServiceKey 作为域名，单个服务条目
+// 一个服务一个条目，域名取 DisplayName
 func (h *SLOHandler) buildDomainSLOV2Fallback(ing slomodel.IngressSLO, prevIng slomodel.IngressSLO, timeRange string, targetMap map[string]map[string]model.SLOTargetResponse) model.DomainSLOResponseV2 {
 	resp := model.DomainSLOResponseV2{
-		Domain: ing.ServiceKey,
+		Domain: fallbackDomainName(ing),
 		TLS:    true,
 		Status: statusUnknown,
 	}

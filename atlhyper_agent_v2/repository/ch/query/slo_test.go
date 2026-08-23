@@ -1,6 +1,7 @@
 package query
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -206,5 +207,103 @@ func TestAddHistogramDelta_CounterReset(t *testing.T) {
 	}
 	if h.sum != 50 {
 		t.Errorf("reset 后 sum = %v, want 50 (取 latest)", h.sum)
+	}
+}
+
+// ──────────────────────────────────────────────────────────────
+// 多实例聚合
+// ──────────────────────────────────────────────────────────────
+//
+// cilium-envoy 是 DaemonSet，每个节点一个实例，各自维护独立的累积计数器。
+// 2026-08-23 实测：两个实例（12327 与 4556）在同一分区里按时间交错排序，
+// 每次切换实例都产生 ±7771 的假 delta —— 5 分钟真实 10 个请求被算成 238679，
+// 偏差 24000 倍，同时让 histogram 的差值变负、P95 恒为 0。
+//
+// 因此所有跨时间做差的查询都必须先按实例分区。
+
+func TestIngressSQL_PartitionsByInstance(t *testing.T) {
+	cases := map[string]string{
+		"count":   buildIngressCountQuery("AND 1=1"),
+		"history": buildIngressHistoryQuery("AND 1=1", 60),
+		"latency": buildIngressLatencyQuery("AND 1=1"),
+	}
+	for name, q := range cases {
+		if !strings.Contains(q, labelInstance) {
+			t.Errorf("%s 查询未按实例区分（缺 %s）—— 多个 envoy 实例的计数器会互相污染", name, labelInstance)
+		}
+	}
+}
+
+// 计数类查询必须在 PARTITION BY 里带上实例，光在 SELECT 里出现没有用。
+func TestIngressSQL_InstanceInPartitionClause(t *testing.T) {
+	for name, q := range map[string]string{
+		"count":   buildIngressCountQuery("AND 1=1"),
+		"history": buildIngressHistoryQuery("AND 1=1", 60),
+	} {
+		idx := strings.Index(q, "PARTITION BY")
+		if idx < 0 {
+			t.Fatalf("%s 查询没有 PARTITION BY", name)
+		}
+		end := strings.Index(q[idx:], "ORDER BY")
+		if end < 0 {
+			t.Fatalf("%s 的 PARTITION BY 后没有 ORDER BY", name)
+		}
+		if !strings.Contains(q[idx:idx+end], labelInstance) {
+			t.Errorf("%s 的 PARTITION BY 子句里没有实例维度:\n%s", name, q[idx:idx+end])
+		}
+	}
+}
+
+// 直方图按实例分组后会返回多行（实例数 × 服务数），Go 侧必须累加而非覆盖。
+// addHistogramDelta 已经是累加语义，这里锁住这个行为不被改坏。
+func TestAddHistogramDelta_MultipleInstancesAccumulate(t *testing.T) {
+	bounds := []float64{10, 50, 100}
+	hist := &svcHistogram{}
+
+	// 实例 A：窗口内 5 个请求
+	addHistogramDelta(hist, bounds, []uint64{3, 5, 6, 6}, []uint64{1, 2, 3, 3}, 500, 100, 20, 15)
+	// 实例 B：窗口内 4 个请求
+	addHistogramDelta(hist, bounds, []uint64{10, 12, 14, 14}, []uint64{9, 11, 12, 13}, 800, 700, 44, 40)
+
+	// 桶计数应为两个实例 delta 之和
+	want := []uint64{2 + 1, 3 + 1, 3 + 2, 3 + 1}
+	for i, w := range want {
+		if hist.counts[i] != w {
+			t.Errorf("桶 %d = %d，期望 %d（两实例 delta 之和）", i, hist.counts[i], w)
+		}
+	}
+	if hist.count != (20-15)+(44-40) {
+		t.Errorf("count = %d，期望 9", hist.count)
+	}
+	if hist.sum != (500-100)+(800-700) {
+		t.Errorf("sum = %v，期望 500", hist.sum)
+	}
+}
+
+// 时序查询同样跨时间做差，同样必须按实例分区 —— 否则趋势图上全是尖刺。
+func TestGetSLOTimeSeriesSQL_PartitionsByInstance(t *testing.T) {
+	// 用一个不会执行的 client 只为拿到 SQL 是不可能的（SQL 在函数内构造），
+	// 因此这里直接扫源码，与 metrics_catalog_test 同样的守护思路。
+	src, err := os.ReadFile("slo.go")
+	if err != nil {
+		t.Fatalf("读 slo.go 失败: %v", err)
+	}
+	body := string(src)
+	start := strings.Index(body, "func (r *sloRepository) GetSLOTimeSeries")
+	if start < 0 {
+		t.Fatal("找不到 GetSLOTimeSeries")
+	}
+	end := strings.Index(body[start:], "\n}\n")
+	fn := body[start : start+end]
+
+	idx := strings.Index(fn, "PARTITION BY")
+	if idx < 0 {
+		t.Fatal("GetSLOTimeSeries 没有 PARTITION BY")
+	}
+	clause := fn[idx : idx+strings.Index(fn[idx:], "ORDER BY")]
+	// 源码里是 %s 占位符，看不到常量名；但实例来自 ResourceAttributes，
+	// 而 ns/svc/class 来自 Attributes —— 本文件里 ResourceAttributes 只用于实例。
+	if !strings.Contains(clause, "ResourceAttributes[") {
+		t.Errorf("GetSLOTimeSeries 的 PARTITION BY 缺实例维度:\n%s", clause)
 	}
 }

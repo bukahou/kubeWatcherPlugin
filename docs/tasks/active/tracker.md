@@ -7,6 +7,24 @@
 
 ---
 
+## SLO 面板重构 — 🔄 进行中
+
+> 原设计文档: [slo-panel-redesign.md](../../design/active/slo-panel-redesign.md)
+>
+> 实测发现面板上每个数字都是错的（counter delta 跨 envoy 实例污染，偏差 24000 倍）；
+> 域名显示成 serviceKey；缺燃烧率。存储决策（emptyDir）待用户拍板，Phase 1–3 不依赖它。
+
+- Phase 1: 多实例聚合修复 + 真实域名 — 🔄 进行中
+  - slo.go 四个 build*Query 加 service.instance.id 分区
+  - 直方图逐实例差分后逐桶相加
+  - buildDomainSLOV2Fallback 用 DisplayName
+  - RouteUpdater 改消费 Agent 域名映射（Ingress → HTTPRoute，ServiceKey 统一 {ns}/{svc}）
+- Phase 2: 燃烧率 + 事件计数口径预算 + 目标模型（去 time_range，加 window_days）— 待办
+- Phase 3: 面板重构（SLO 清单表 + 多窗口燃烧率 + Good/Bad 计数）— 待办
+- Phase 4: 存储（依赖 emptyDir 决策 B/C）— 待决策
+
+---
+
 ## 节点指标：硬件健康 + USE 改版 — 🔄 收尾（Phase 0–3 已上线验证；Phase 4 待决策，UI 意见待用户反馈后合并一轮）
 
 > 原设计文档: [node-metrics-hardware-use-design.md](../../design/active/node-metrics-hardware-use-design.md)
