@@ -3,6 +3,8 @@ package query
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -522,7 +524,10 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	}
 	defer rows.Close()
 
-	diskMap := make(map[string]*metrics.NodeDisk)
+	// 一块物理盘可能挂多个分区，容量按行保留（用户看的是挂载点），
+	// IO 是设备级的，按归一化后的块设备名索引，稍后回填到它的每个分区行
+	var fsDisks []*metrics.NodeDisk
+	byBlockDev := make(map[string][]*metrics.NodeDisk)
 	for rows.Next() {
 		var d metrics.NodeDisk
 		var total, avail, inodes, inodesFree, readonly float64
@@ -538,7 +543,9 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 			d.InodeUsagePct = roundTo(clamp((1-inodesFree/inodes)*100, 0, 100), 2)
 		}
 		d.ReadOnly = readonly > 0
-		diskMap[d.Device] = &d
+		fsDisks = append(fsDisks, &d)
+		blk := normalizeBlockDevice(d.Device)
+		byBlockDev[blk] = append(byBlockDev[blk], &d)
 	}
 
 	// IO rates (sum)
@@ -563,9 +570,12 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	}
 	defer ioRows.Close()
 
-	// await 需要 time 与 ops 两条速率相除，先攒起来，循环结束再算
-	type ioTime struct{ read, write float64 }
-	ioTimes := make(map[string]*ioTime)
+	// 块设备级 IO 先攒在这里，最后回填到对应的分区行
+	type blockIO struct {
+		readBytes, writeBytes, readIOPS, writeIOPS, utilPct, queue float64
+		readTime, writeTime                                        float64
+	}
+	blockIOs := make(map[string]*blockIO)
 
 	for ioRows.Next() {
 		var device, metricName string
@@ -573,41 +583,54 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 		if err := ioRows.Scan(&device, &metricName, &rate); err != nil {
 			continue
 		}
-		d, ok := diskMap[device]
+		b, ok := blockIOs[device]
 		if !ok {
-			d = &metrics.NodeDisk{Device: device}
-			diskMap[device] = d
-		}
-		if _, ok := ioTimes[device]; !ok {
-			ioTimes[device] = &ioTime{}
+			b = &blockIO{}
+			blockIOs[device] = b
 		}
 		switch metricName {
 		case "node_disk_read_bytes_total":
-			d.ReadBytesPerSec = roundTo(rate, 2)
+			b.readBytes = rate
 		case "node_disk_written_bytes_total":
-			d.WriteBytesPerSec = roundTo(rate, 2)
+			b.writeBytes = rate
 		case "node_disk_reads_completed_total":
-			d.ReadIOPS = roundTo(rate, 2)
+			b.readIOPS = rate
 		case "node_disk_writes_completed_total":
-			d.WriteIOPS = roundTo(rate, 2)
+			b.writeIOPS = rate
 		case "node_disk_io_time_seconds_total":
-			d.IOUtilPct = roundTo(clamp(rate*100, 0, 100), 2)
+			b.utilPct = clamp(rate*100, 0, 100)
 		case "node_disk_read_time_seconds_total":
-			ioTimes[device].read = rate
+			b.readTime = rate
 		case "node_disk_write_time_seconds_total":
-			ioTimes[device].write = rate
+			b.writeTime = rate
 		case "node_disk_io_time_weighted_seconds_total":
-			d.QueueDepth = roundTo(rate, 2)
+			b.queue = rate
 		}
 	}
 
-	for device, t := range ioTimes {
-		d := diskMap[device]
-		d.AwaitReadMs = awaitMs(t.read, d.ReadIOPS)
-		d.AwaitWriteMs = awaitMs(t.write, d.WriteIOPS)
+	// 回填：同一块盘的所有分区行共享该盘的 IO 读数
+	for dev, b := range blockIOs {
+		targets := byBlockDev[dev]
+		if len(targets) == 0 {
+			// 没有任何文件系统挂在它上面（LVM 的 dm-N、未挂载的盘）——
+			// 单独成行，让 IO 至少可见，而不是悄悄丢掉
+			d := &metrics.NodeDisk{Device: dev}
+			fsDisks = append(fsDisks, d)
+			targets = []*metrics.NodeDisk{d}
+		}
+		for _, d := range targets {
+			d.ReadBytesPerSec = roundTo(b.readBytes, 2)
+			d.WriteBytesPerSec = roundTo(b.writeBytes, 2)
+			d.ReadIOPS = roundTo(b.readIOPS, 2)
+			d.WriteIOPS = roundTo(b.writeIOPS, 2)
+			d.IOUtilPct = roundTo(b.utilPct, 2)
+			d.QueueDepth = roundTo(b.queue, 2)
+			d.AwaitReadMs = awaitMs(b.readTime, b.readIOPS)
+			d.AwaitWriteMs = awaitMs(b.writeTime, b.writeIOPS)
+		}
 	}
 
-	for _, d := range diskMap {
+	for _, d := range fsDisks {
 		nm.Disks = append(nm.Disks, *d)
 	}
 }
@@ -833,6 +856,39 @@ func (r *metricsRepository) fillHardware(ctx context.Context, ip string, nm *met
 	}
 
 	nm.Hardware = hw
+}
+
+// 块设备的分区命名有两套规则，不能用一条正则概括：
+//   - 基名以数字结尾的（nvme0n1、mmcblk0）用 "p<N>" 分隔：nvme0n1p2
+//   - 基名以字母结尾的（sda、vdb）直接接数字：sda2
+//
+// 用一条 `.*?[a-z]` 之类的松正则会把 nvme0n1 自己切成 nvme0n + 1。
+var (
+	pPartition = regexp.MustCompile(`^(.+\d)p\d+$`)
+	// 只对 sd/hd/vd/xvd 这几族用「字母基名 + 数字」的分区规则。
+	// 不能用通用的 ^([a-z]+)\d+$ —— mmcblk0 是整盘不是分区，那条规则会把它切成 mmcblk。
+	sdaPartition = regexp.MustCompile(`^((?:x?vd|sd|hd)[a-z]+)\d+$`)
+)
+
+// normalizeBlockDevice 把文件系统的设备名归一到 diskstats 用的块设备名。
+//
+// 两边命名不一致（filesystem: /dev/nvme0n1p2，diskstats: nvme0n1），
+// 不归一化就会让同一块盘裂成「有容量无 IO」和「有 IO 无容量」两行。
+//
+// LVM 例外：/dev/mapper/xxx 在 diskstats 里叫 dm-N，无法从名字推导，保持原样
+// —— 那种情况下根分区拿不到 IO，但至少不会张冠李戴。
+func normalizeBlockDevice(dev string) string {
+	dev = strings.TrimPrefix(dev, "/dev/")
+	if dev == "" || strings.HasPrefix(dev, "mapper/") || strings.HasPrefix(dev, "dm-") {
+		return dev
+	}
+	if m := pPartition.FindStringSubmatch(dev); m != nil {
+		return m[1]
+	}
+	if m := sdaPartition.FindStringSubmatch(dev); m != nil {
+		return m[1]
+	}
+	return dev
 }
 
 // tempLimitCeilingC 超过它的温度阈值视为传感器垃圾值（实测 NVMe temp2 上报 max=65261.85）

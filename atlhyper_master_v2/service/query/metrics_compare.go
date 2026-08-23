@@ -24,8 +24,10 @@ var compareColumns = []string{
 const (
 	resourceWarnPct = 80.0
 	resourceCritPct = 90.0
-	psiWarnPct      = 20.0 // PSI：20% 的时间有任务在等资源已经很不健康
-	psiCritPct      = 50.0
+	// PSI 在 K8s 节点上常态就有 20–60%（一堆 Pod 抢 CPU 是设计如此），
+	// 实测同集群 6 台在 0.6–3%、1 台 53% —— 阈值要能把那 1 台挑出来，又不能把它判死
+	psiWarnPct = 50.0
+	psiCritPct = 80.0
 )
 
 // GetNodeComparison 产出节点横向对比表
@@ -86,7 +88,7 @@ func compareCells(nm *metrics.NodeMetrics, hw model.HardwareRow) map[string]mode
 	}
 
 	// 资源列：取该节点最差的那一项（对比表是找异常，不是看明细）
-	cells["diskUsage"] = pctCell(worstDiskUsagePct(nm.Disks), resourceWarnPct, resourceCritPct)
+	cells["diskUsage"] = pctCell(primaryDiskUsagePct(nm.Disks), resourceWarnPct, resourceCritPct)
 	cells["cpu"] = pctCell(nm.CPU.UsagePct, resourceWarnPct, resourceCritPct)
 	cells["psiCpu"] = pctCell(nm.PSI.CPUSomePct, psiWarnPct, psiCritPct)
 	cells["mem"] = pctCell(nm.Memory.UsagePct, resourceWarnPct, resourceCritPct)
@@ -116,11 +118,15 @@ func pctCell(v, warn, crit float64) model.CompareCell {
 	return cell
 }
 
-// netErrCell 网络错误 + 丢包速率之和。任何非零都值得看一眼，持续增长才是问题
+// netErrCell 只统计真错误（err），不含 drop。
+//
+// 虚拟接口（lxc*/cilium_*）的 drop 常态非零 —— 组播与广播被内核丢掉是正常的，
+// 实测 7 台全部 0.50/s。把 drop 算进来的结果是整列全黄，等于没有信号。
+// drop 仍然在节点卡的 NetworkCard 里按接口列出。
 func netErrCell(nets []metrics.NodeNetwork) model.CompareCell {
 	var total float64
 	for _, n := range nets {
-		total += n.RxErrPerSec + n.TxErrPerSec + n.RxDropPerSec + n.TxDropPerSec
+		total += n.RxErrPerSec + n.TxErrPerSec
 	}
 	total = hwRound(total, 2)
 	cell := model.CompareCell{Value: &total, Text: fmt.Sprintf("%.2f/s", total), Status: model.HardwareGood}
@@ -130,24 +136,37 @@ func netErrCell(nets []metrics.NodeNetwork) model.CompareCell {
 	return cell
 }
 
-func worstDiskUsagePct(disks []metrics.NodeDisk) float64 {
-	var worst float64
-	for _, d := range disks {
-		if d.UsagePct > worst {
-			worst = d.UsagePct
+// primaryDiskUsagePct 「这台机器的盘满没满」看根分区。
+//
+// 取所有分区里最满的那个是错的：/boot/firmware 只有 512MB，用掉 37% 毫无意义，
+// 却会盖住真正的根分区（实测三台 raspi5 都显示 37.24%，全是那个 boot 分区）。
+// 没有根分区时退回容量最大的那块盘。
+func primaryDiskUsagePct(disks []metrics.NodeDisk) float64 {
+	var primary *metrics.NodeDisk
+	for i := range disks {
+		d := &disks[i]
+		if d.MountPoint == "/" {
+			primary = d
+			break
 		}
-		// inode 用尽和容量用尽后果一样（写不进去），取两者更差的
-		if d.InodeUsagePct > worst {
-			worst = d.InodeUsagePct
+		if d.MountPoint != "" && (primary == nil || d.TotalBytes > primary.TotalBytes) {
+			primary = d
 		}
 	}
-	return worst
+	if primary == nil {
+		return 0
+	}
+	// inode 用尽和容量用尽后果一样（写不进去），取更差的
+	if primary.InodeUsagePct > primary.UsagePct {
+		return primary.InodeUsagePct
+	}
+	return primary.UsagePct
 }
 
 // resourceOverall 资源列里最差的状态，与硬件 overall 合并成整行结论
 func resourceOverall(nm *metrics.NodeMetrics) model.HardwareStatus {
 	cells := []model.CompareCell{
-		pctCell(worstDiskUsagePct(nm.Disks), resourceWarnPct, resourceCritPct),
+		pctCell(primaryDiskUsagePct(nm.Disks), resourceWarnPct, resourceCritPct),
 		pctCell(nm.CPU.UsagePct, resourceWarnPct, resourceCritPct),
 		pctCell(nm.PSI.CPUSomePct, psiWarnPct, psiCritPct),
 		pctCell(nm.Memory.UsagePct, resourceWarnPct, resourceCritPct),

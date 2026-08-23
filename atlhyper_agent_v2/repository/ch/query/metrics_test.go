@@ -112,3 +112,28 @@ func TestNodeExporterMetrics_ContainsSystemUSEMetrics(t *testing.T) {
 		}
 	}
 }
+
+// normalizeBlockDevice: 文件系统与 diskstats 用的是两套设备名 ——
+// 前者 /dev/nvme0n1p2（带前缀的分区），后者 nvme0n1（裸块设备）。
+// 不归一化就会让同一块盘裂成「有容量无 IO」和「有 IO 无容量」两行。
+func TestNormalizeBlockDevice(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"/dev/nvme0n1p2", "nvme0n1"},
+		{"/dev/nvme0n1p1", "nvme0n1"},
+		{"nvme0n1", "nvme0n1"},
+		{"/dev/sda2", "sda"},
+		{"/dev/sda", "sda"},
+		{"sda1", "sda"},
+		{"/dev/mmcblk0p2", "mmcblk0"},
+		{"mmcblk0", "mmcblk0"},
+		// LVM：/dev/mapper/xxx 在 diskstats 里叫 dm-N，无法从名字推导，保持原样
+		{"/dev/mapper/ubuntu--vg-ubuntu--lv", "mapper/ubuntu--vg-ubuntu--lv"},
+		{"dm-0", "dm-0"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := normalizeBlockDevice(c.in); got != c.want {
+			t.Errorf("normalizeBlockDevice(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

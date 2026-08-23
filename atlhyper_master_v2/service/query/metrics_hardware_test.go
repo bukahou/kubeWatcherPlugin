@@ -281,3 +281,69 @@ func TestGetHardwareHealth_ResourceColumns(t *testing.T) {
 		t.Errorf("raspi5 diskUsage = %+v", r5.DiskUsage)
 	}
 }
+
+// primaryDiskUsagePct: 「盘用量」要看根分区，不是所有分区里最满的那个。
+// 实测三台 raspi5 都显示 37.24%，那是 512MB 的 /boot/firmware —— 掩盖了真正的根分区。
+func TestPrimaryDiskUsagePct(t *testing.T) {
+	disks := []metrics.NodeDisk{
+		{Device: "nvme0n1", MountPoint: "/boot/firmware", UsagePct: 37.24, TotalBytes: 512 << 20},
+		{Device: "nvme0n1", MountPoint: "/", UsagePct: 8.24, InodeUsagePct: 1.03, TotalBytes: 200 << 30},
+	}
+	if got := primaryDiskUsagePct(disks); got != 8.24 {
+		t.Errorf("有根分区时应取根分区: got %v, want 8.24", got)
+	}
+
+	// 根分区的 inode 比容量更满时取 inode（两者后果一样：写不进去）
+	inodeFull := []metrics.NodeDisk{
+		{MountPoint: "/", UsagePct: 20, InodeUsagePct: 91, TotalBytes: 200 << 30},
+	}
+	if got := primaryDiskUsagePct(inodeFull); got != 91 {
+		t.Errorf("应取 inode: got %v, want 91", got)
+	}
+
+	// 没有根分区（容器里少见但要兜底）→ 取容量最大的那块，而不是使用率最高的
+	noRoot := []metrics.NodeDisk{
+		{MountPoint: "/boot", UsagePct: 90, TotalBytes: 512 << 20},
+		{MountPoint: "/data", UsagePct: 30, TotalBytes: 200 << 30},
+	}
+	if got := primaryDiskUsagePct(noRoot); got != 30 {
+		t.Errorf("无根分区时取容量最大的盘: got %v, want 30", got)
+	}
+
+	if got := primaryDiskUsagePct(nil); got != 0 {
+		t.Errorf("空列表应为 0，得到 %v", got)
+	}
+}
+
+// 网络「错误」列只看真错误。虚拟接口的 drop 常态非零（组播噪声），
+// 实测 7 台全部 0.50/s —— 全黄等于没有信号。
+func TestNetErrCell_IgnoresDrops(t *testing.T) {
+	nets := []metrics.NodeNetwork{
+		{Interface: "lxc123", RxDropPerSec: 0.5},
+		{Interface: "eno1", RxDropPerSec: 0.2},
+	}
+	if cell := netErrCell(nets); cell.Status != model.HardwareGood {
+		t.Errorf("只有 drop 不该报警: %+v", cell)
+	}
+
+	withErr := []metrics.NodeNetwork{
+		{Interface: "eno1", RxErrPerSec: 0.3, RxDropPerSec: 5},
+	}
+	cell := netErrCell(withErr)
+	if cell.Status != model.HardwareWarn || cell.Value == nil || *cell.Value != 0.3 {
+		t.Errorf("有真错误要报警且只计 err: %+v", cell)
+	}
+}
+
+// PSI 阈值：K8s 节点上 cpu-some 常态 20–60%，50% 判 crit 会把正常节点标红。
+func TestPsiThresholds(t *testing.T) {
+	if c := pctCell(53.6, psiWarnPct, psiCritPct); c.Status != model.HardwareWarn {
+		t.Errorf("53.6%% PSI 应为 warn（明显高于同集群其他节点，但未到危险）: %+v", c)
+	}
+	if c := pctCell(5, psiWarnPct, psiCritPct); c.Status != model.HardwareGood {
+		t.Errorf("5%% PSI 应为 good: %+v", c)
+	}
+	if c := pctCell(85, psiWarnPct, psiCritPct); c.Status != model.HardwareCrit {
+		t.Errorf("85%% PSI 应为 crit: %+v", c)
+	}
+}

@@ -50,7 +50,7 @@ func buildHardwareRow(nm *metrics.NodeMetrics) model.HardwareRow {
 		ProfileLabel: th.label,
 		CPUUsage:     usageCell(nm.CPU.UsagePct),
 		MemUsage:     usageCell(nm.Memory.UsagePct),
-		DiskUsage:    usageCell(worstDiskUsagePct(nm.Disks)),
+		DiskUsage:    usageCell(primaryDiskUsagePct(nm.Disks)),
 		CPUTemp:      tempCell(nm.Temperature.Sensors, metrics.TempClassCPU, th.cpu),
 		DiskTemp:     tempCell(nm.Temperature.Sensors, metrics.TempClassDisk, th.disk),
 		OtherTemp:    tempCell(nm.Temperature.Sensors, metrics.TempClassOther, th.other),
