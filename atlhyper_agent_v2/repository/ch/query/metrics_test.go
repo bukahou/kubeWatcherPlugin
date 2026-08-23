@@ -137,3 +137,20 @@ func TestNormalizeBlockDevice(t *testing.T) {
 		}
 	}
 }
+
+// /proc/diskstats 同时上报整盘和分区（mmcblk0、mmcblk0p1、mmcblk0p2 各一行）。
+// IO 只取整盘 —— 分区级记录的数据已包含在整盘里，重复计入会让孤儿行冒出来。
+func TestIsWholeBlockDevice(t *testing.T) {
+	whole := []string{"sda", "nvme0n1", "mmcblk0", "dm-0", "mapper/ubuntu--vg-ubuntu--lv"}
+	part := []string{"sda1", "sda2", "nvme0n1p2", "mmcblk0p1", "mmcblk0p2"}
+	for _, d := range whole {
+		if !isWholeBlockDevice(d) {
+			t.Errorf("%s 应视为整盘", d)
+		}
+	}
+	for _, d := range part {
+		if isWholeBlockDevice(d) {
+			t.Errorf("%s 是分区，不该视为整盘", d)
+		}
+	}
+}

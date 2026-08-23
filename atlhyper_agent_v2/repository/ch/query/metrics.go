@@ -11,6 +11,7 @@ import (
 	"AtlHyper/atlhyper_agent_v2/model"
 	"AtlHyper/atlhyper_agent_v2/repository"
 	"AtlHyper/atlhyper_agent_v2/sdk"
+	"AtlHyper/common/logger"
 	"AtlHyper/model_v3/metrics"
 )
 
@@ -412,6 +413,10 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 	}
 
 	// 各核当前频率 + 标称最高频率（cpufreq collector；热降频判定在 Master）
+	//
+	// 窗口取 5 分钟而非 2 分钟：实测偶发某个节点这一格变成「无数据」，
+	// 每次还换一台 —— ClickHouse 瞬时抖动而已，数据本身一直在。
+	// argMax 取的仍是最新值，放宽窗口不影响准确性。
 	freqRows, err := r.client.Query(ctx, `
 		SELECT toUInt32OrZero(Attributes['cpu']) AS cpu,
 		       argMaxIf(Value, TimeUnix, MetricName='node_cpu_scaling_frequency_hertz') AS cur,
@@ -419,11 +424,13 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 		FROM otel_metrics_gauge
 		WHERE MetricName IN ('node_cpu_scaling_frequency_hertz', 'node_cpu_scaling_frequency_max_hertz')
 		  AND ResourceAttributes['net.host.name'] = ?
-		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
+		  AND TimeUnix >= now() - INTERVAL 5 MINUTE
 		GROUP BY cpu
 		ORDER BY cpu
 	`, ip)
 	if err != nil {
+		// 静默失败会让页面显示「无数据」却查不出原因
+		logger.Warn("CPU 频率查询失败", "ip", ip, "err", err)
 		return
 	}
 	defer freqRows.Close()
@@ -582,6 +589,9 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 		var rate float64
 		if err := ioRows.Scan(&device, &metricName, &rate); err != nil {
 			continue
+		}
+		if !isWholeBlockDevice(device) {
+			continue // 分区级记录已包含在整盘行里
 		}
 		b, ok := blockIOs[device]
 		if !ok {
@@ -889,6 +899,13 @@ func normalizeBlockDevice(dev string) string {
 		return m[1]
 	}
 	return dev
+}
+
+// isWholeBlockDevice 判断是否整盘（而非分区）。
+// /proc/diskstats 会同时给出 mmcblk0 与 mmcblk0p1/p2 三行，
+// 分区行的读写已经计入整盘行，两者都取会让同一块盘的 IO 重复出现。
+func isWholeBlockDevice(dev string) bool {
+	return normalizeBlockDevice(dev) == dev
 }
 
 // tempLimitCeilingC 超过它的温度阈值视为传感器垃圾值（实测 NVMe temp2 上报 max=65261.85）
