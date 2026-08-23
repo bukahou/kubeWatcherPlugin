@@ -251,3 +251,33 @@ func TestGetHardwareHealth_SensorsListed(t *testing.T) {
 		t.Errorf("mystery.Sensors = %v，期望空数组", m.Sensors)
 	}
 }
+
+// 矩阵里排在最前的是四大件（CPU / 内存 / 磁盘），温度及其余硬件传感器跟在后面。
+// 这三列必须始终存在：使用率 0% 是真实读数，不是「无数据」。
+func TestGetHardwareHealth_ResourceColumns(t *testing.T) {
+	resp, _ := hardwareService(t).GetHardwareHealth(context.Background(), "c1")
+
+	r := findRow(t, resp, "desk-zero")
+	if r.CPUUsage == nil || r.CPUUsage.Value != 80 || r.CPUUsage.Status != model.HardwareWarn {
+		t.Errorf("desk-zero cpuUsage = %+v，期望 80%% warn", r.CPUUsage)
+	}
+	// overall 必须反映矩阵里看得见的列：CPU 80% warn 已经足以让整行是 warn
+	if r.Overall != model.HardwareWarn {
+		t.Errorf("desk-zero overall = %q", r.Overall)
+	}
+
+	// 什么数据都没有的节点，三列仍然存在且为 0%，不是 nil
+	m := findRow(t, resp, "mystery")
+	if m.CPUUsage == nil || m.MemUsage == nil || m.DiskUsage == nil {
+		t.Fatalf("资源列不该为 nil: cpu=%v mem=%v disk=%v", m.CPUUsage, m.MemUsage, m.DiskUsage)
+	}
+	if m.CPUUsage.Value != 0 || m.CPUUsage.Status != model.HardwareGood {
+		t.Errorf("mystery cpuUsage = %+v", m.CPUUsage)
+	}
+
+	// 磁盘列取容量与 inode 里更差的那个
+	r5 := findRow(t, resp, "raspi5-one")
+	if r5.DiskUsage == nil || r5.DiskUsage.Status != model.HardwareGood {
+		t.Errorf("raspi5 diskUsage = %+v", r5.DiskUsage)
+	}
+}

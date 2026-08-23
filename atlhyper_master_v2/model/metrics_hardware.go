@@ -52,6 +52,13 @@ type HardwareAwaitCell struct {
 	Status  HardwareStatus `json:"status"`
 }
 
+// HardwareUsageCell 资源使用率格（CPU / 内存 / 磁盘）。
+// 硬件矩阵里排在温度之前 —— 四大件先看，硬件传感器随后。
+type HardwareUsageCell struct {
+	Value  float64        `json:"value"`
+	Status HardwareStatus `json:"status"`
+}
+
 // HardwareSensorCell 单个温度传感器的判定结果（节点详情的温度卡用）。
 // 与矩阵里的三个温度格不同：那三格是每类取最热的一个，这里是逐个列出。
 type HardwareSensorCell struct {
@@ -66,16 +73,20 @@ type HardwareSensorCell struct {
 
 // HardwareRow 矩阵一行 = 一个节点
 type HardwareRow struct {
-	NodeName     string                 `json:"nodeName"`
-	Profile      string                 `json:"profile"`
-	ProfileLabel string                 `json:"profileLabel"`
-	CPUTemp      *HardwareTempCell      `json:"cpuTemp"`
-	DiskTemp     *HardwareTempCell      `json:"diskTemp"`
-	OtherTemp    *HardwareTempCell      `json:"otherTemp"`
-	Undervolt    *HardwareUndervoltCell `json:"undervolt"`
-	Fan          *HardwareFanCell       `json:"fan"`
-	CPUFreq      *HardwareFreqCell      `json:"cpuFreq"`
-	DiskAwait    *HardwareAwaitCell     `json:"diskAwait"`
+	NodeName     string `json:"nodeName"`
+	Profile      string `json:"profile"`
+	ProfileLabel string `json:"profileLabel"`
+	// 四大件：CPU / 内存 / 磁盘 在前，温度及其余硬件传感器在后
+	CPUUsage  *HardwareUsageCell     `json:"cpuUsage"`
+	MemUsage  *HardwareUsageCell     `json:"memUsage"`
+	DiskUsage *HardwareUsageCell     `json:"diskUsage"`
+	CPUTemp   *HardwareTempCell      `json:"cpuTemp"`
+	DiskTemp  *HardwareTempCell      `json:"diskTemp"`
+	OtherTemp *HardwareTempCell      `json:"otherTemp"`
+	Undervolt *HardwareUndervoltCell `json:"undervolt"`
+	Fan       *HardwareFanCell       `json:"fan"`
+	CPUFreq   *HardwareFreqCell      `json:"cpuFreq"`
+	DiskAwait *HardwareAwaitCell     `json:"diskAwait"`
 	// Sensors 全部温度传感器逐个判定，供节点详情的温度卡渲染；无传感器时为空数组
 	Sensors []HardwareSensorCell `json:"sensors"`
 	Overall HardwareStatus       `json:"overall"`

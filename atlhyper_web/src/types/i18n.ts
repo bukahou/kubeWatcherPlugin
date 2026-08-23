@@ -1870,6 +1870,9 @@ interface NodeMetricsTranslations {
     title: string;
     subtitle: string;
     node: string;
+    cpuUsage: string;
+    memUsage: string;
+    diskUsage: string;
     cpuTemp: string;
     diskTemp: string;
     otherTemp: string;

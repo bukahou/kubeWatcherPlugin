@@ -51,10 +51,19 @@ export interface HardwareSensorCell {
   status: HardwareStatus;
 }
 
+/** 资源使用率格。0% 是真实读数，所以这一格不会是 null */
+export interface HardwareUsageCell {
+  value: number;
+  status: HardwareStatus;
+}
+
 export interface HardwareRow {
   nodeName: string;
   profile: string;
   profileLabel: string;
+  cpuUsage: HardwareUsageCell | null;
+  memUsage: HardwareUsageCell | null;
+  diskUsage: HardwareUsageCell | null;
   cpuTemp: HardwareTempCell | null;
   diskTemp: HardwareTempCell | null;
   otherTemp: HardwareTempCell | null;

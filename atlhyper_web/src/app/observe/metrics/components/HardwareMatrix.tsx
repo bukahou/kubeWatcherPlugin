@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Cpu, HardDrive, Thermometer, Zap, Fan, Gauge, Timer, ShieldCheck } from "lucide-react";
+import { Cpu, MemoryStick, Database, HardDrive, Thermometer, Zap, Fan, Gauge, Timer, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import type {
   HardwareHealth,
@@ -52,18 +52,28 @@ export const HardwareMatrix = memo(function HardwareMatrix({ data }: HardwareMat
   const { t } = useI18n();
   const hw = t.nodeMetrics.hardware;
 
-  const columns: { key: string; label: string; icon: typeof Cpu }[] = [
+  const columns: { key: string; label: string; icon: typeof Cpu; divider?: boolean }[] = [
+    { key: "cpuUsage", label: hw.cpuUsage, icon: Cpu },
+    { key: "memUsage", label: hw.memUsage, icon: MemoryStick },
+    { key: "diskUsage", label: hw.diskUsage, icon: Database },
     { key: "cpuTemp", label: hw.cpuTemp, icon: Thermometer },
     { key: "diskTemp", label: hw.diskTemp, icon: HardDrive },
-    { key: "otherTemp", label: hw.otherTemp, icon: Thermometer },
-    { key: "undervolt", label: hw.undervolt, icon: Zap },
+    { key: "undervolt", label: hw.undervolt, icon: Zap, divider: true },
     { key: "fan", label: hw.fan, icon: Fan },
     { key: "cpuFreq", label: hw.cpuFreq, icon: Gauge },
     { key: "diskAwait", label: hw.diskAwait, icon: Timer },
+    { key: "otherTemp", label: hw.otherTemp, icon: Thermometer },
   ];
 
   const renderCell = (row: HardwareRow, key: string) => {
     switch (key) {
+      case "cpuUsage":
+      case "memUsage":
+      case "diskUsage": {
+        const cell = row[key];
+        if (!cell) return <NoData label={hw.noData} />;
+        return <Cell value={`${cell.value.toFixed(1)}%`} status={cell.status} />;
+      }
       case "cpuTemp":
       case "diskTemp":
       case "otherTemp": {
@@ -135,12 +145,15 @@ export const HardwareMatrix = memo(function HardwareMatrix({ data }: HardwareMat
         <div className="py-8 text-center text-sm text-muted">{hw.noData}</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left">
+          <table className="w-full min-w-[1020px] text-left">
             <thead>
               <tr className="border-b border-[var(--border-color)]">
                 <th className="py-2 pr-3 text-[11px] font-medium text-muted">{hw.node}</th>
                 {columns.map((c) => (
-                  <th key={c.key} className="py-2 px-3 text-[11px] font-medium text-muted">
+                  <th
+                    key={c.key}
+                    className={`py-2 px-3 text-[11px] font-medium text-muted ${c.divider ? "border-l border-[var(--border-color)]" : ""}`}
+                  >
                     <span className="inline-flex items-center gap-1">
                       <c.icon className="w-3 h-3" />
                       {c.label}
@@ -161,7 +174,10 @@ export const HardwareMatrix = memo(function HardwareMatrix({ data }: HardwareMat
                     <div className="text-[10px] text-muted">{row.profileLabel}</div>
                   </td>
                   {columns.map((c) => (
-                    <td key={c.key} className="py-2.5 px-3 whitespace-nowrap">
+                    <td
+                      key={c.key}
+                      className={`py-2.5 px-3 whitespace-nowrap ${c.divider ? "border-l border-[var(--border-color)]" : ""}`}
+                    >
                       {renderCell(row, c.key)}
                     </td>
                   ))}

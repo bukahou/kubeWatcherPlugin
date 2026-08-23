@@ -48,6 +48,9 @@ func buildHardwareRow(nm *metrics.NodeMetrics) model.HardwareRow {
 		NodeName:     nm.NodeName,
 		Profile:      string(profile),
 		ProfileLabel: th.label,
+		CPUUsage:     usageCell(nm.CPU.UsagePct),
+		MemUsage:     usageCell(nm.Memory.UsagePct),
+		DiskUsage:    usageCell(worstDiskUsagePct(nm.Disks)),
 		CPUTemp:      tempCell(nm.Temperature.Sensors, metrics.TempClassCPU, th.cpu),
 		DiskTemp:     tempCell(nm.Temperature.Sensors, metrics.TempClassDisk, th.disk),
 		OtherTemp:    tempCell(nm.Temperature.Sensors, metrics.TempClassOther, th.other),
@@ -57,11 +60,27 @@ func buildHardwareRow(nm *metrics.NodeMetrics) model.HardwareRow {
 		Sensors:      sensorCells(nm.Temperature.Sensors, th),
 	}
 	row.Fan = fanCell(nm.Hardware, row.CPUTemp)
+	// overall 覆盖矩阵里出现的每一列 —— 表里看得到 CPU 100%，overall 就不能是 good
 	row.Overall = worstStatus(
+		statusOf(row.CPUUsage), statusOf(row.MemUsage), statusOf(row.DiskUsage),
 		statusOf(row.CPUTemp), statusOf(row.DiskTemp), statusOf(row.OtherTemp),
 		statusOf(row.Undervolt), statusOf(row.Fan), statusOf(row.CPUFreq), statusOf(row.DiskAwait),
 	)
 	return row
+}
+
+// usageCell 资源使用率格。零值也照常返回 —— 使用率 0% 是真实读数，
+// 与「没有这个传感器」不同，不能都用 nil 表达。
+func usageCell(pct float64) *model.HardwareUsageCell {
+	v := hwRound(pct, 1)
+	cell := &model.HardwareUsageCell{Value: v, Status: model.HardwareGood}
+	switch {
+	case v >= resourceCritPct:
+		cell.Status = model.HardwareCrit
+	case v >= resourceWarnPct:
+		cell.Status = model.HardwareWarn
+	}
+	return cell
 }
 
 // tempCell 取某一类传感器里最热的一个成格。该类没有传感器 → nil。
@@ -319,6 +338,10 @@ func pickMaxTemp(cur *model.HardwareMaxTemp, cell *model.HardwareTempCell, node 
 // statusOf 取任意格的状态；nil（无数据）视为 good —— 缺传感器不是故障
 func statusOf(cell interface{}) model.HardwareStatus {
 	switch c := cell.(type) {
+	case *model.HardwareUsageCell:
+		if c != nil {
+			return c.Status
+		}
 	case *model.HardwareTempCell:
 		if c != nil {
 			return c.Status
