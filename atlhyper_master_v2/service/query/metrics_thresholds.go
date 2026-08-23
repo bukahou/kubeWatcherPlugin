@@ -20,6 +20,7 @@ type tempThreshold struct {
 type profileThresholds struct {
 	label string
 	cpu   tempThreshold
+	disk  tempThreshold
 	other tempThreshold
 }
 
@@ -27,6 +28,7 @@ type profileThresholds struct {
 var genericThresholds = profileThresholds{
 	label: "未识别硬件",
 	cpu:   tempThreshold{max: 70, crit: 85},
+	disk:  tempThreshold{max: 70, crit: 80},
 	other: tempThreshold{max: 85, crit: 95},
 }
 
@@ -37,18 +39,24 @@ var hardwareProfiles = map[metrics.HardwareProfile]profileThresholds{
 		label: "x86 小主机",
 		// Intel Tj 通常 100°C，但小机箱持续 85°C 已经不健康
 		cpu:   tempThreshold{max: 85, crit: 100},
+		disk:  tempThreshold{max: 60, crit: 70}, // SATA SSD 正常工作在 30–50°C
 		other: tempThreshold{max: 85, crit: 95},
 	},
 	metrics.ProfileRaspi5: {
 		label: "Raspberry Pi 5",
 		// BCM2712 在 85°C 硬降频，80°C 起软降频
-		cpu:   tempThreshold{max: 80, crit: 85},
+		cpu: tempThreshold{max: 80, crit: 85},
+		// NVMe 多数会自报 max/crit（优先用），这里只兜底没有自报的盘：
+		// 规格上 82°C 起限速，但 Pi 5 的小空间里持续 70°C 已经该关注了
+		disk:  tempThreshold{max: 70, crit: 80},
 		other: tempThreshold{max: 85, crit: 95},
 	},
 	metrics.ProfileRaspi4: {
 		label: "Raspberry Pi 4",
 		// BCM2711 同样 80 / 85
-		cpu:   tempThreshold{max: 80, crit: 85},
+		cpu: tempThreshold{max: 80, crit: 85},
+		// Pi 4 只有 SD 卡，没有温度传感器；留着是为了画像表结构一致
+		disk:  tempThreshold{max: 70, crit: 80},
 		other: tempThreshold{max: 85, crit: 95},
 	},
 }

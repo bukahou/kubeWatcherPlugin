@@ -191,3 +191,27 @@ func TestGetHardwareHealth_NoSnapshot(t *testing.T) {
 		t.Errorf("expected empty rows, got %+v", resp)
 	}
 }
+
+// 盘温没有自报阈值时，必须退回「磁盘」那一档，而不是宽松的「其他传感器」档
+// —— 实测 raspi5-two 的 SK hynix BC501 不上报 max/crit，用 85/95 判定等于永不报警。
+func TestTempCell_DiskFallbackUsesDiskThreshold(t *testing.T) {
+	sensors := []metrics.TempSensor{
+		{Chip: "nvme_nvme0", ChipName: "nvme", Sensor: "temp1", CurrentC: 72},
+	}
+	th := thresholdsFor(metrics.ProfileRaspi5)
+
+	cell := tempCell(sensors, metrics.TempClassDisk, th.disk)
+	if cell == nil {
+		t.Fatal("expected disk cell")
+	}
+	if cell.Max != 70 || cell.Crit != 80 {
+		t.Errorf("盘温阈值 = %v/%v，期望 70/80", cell.Max, cell.Crit)
+	}
+	if cell.Status != model.HardwareWarn {
+		t.Errorf("72°C 超过 70°C 应为 warn，得到 %q", cell.Status)
+	}
+	// 同样温度按「其他传感器」档判定会被漏掉 —— 这正是本用例要防的
+	if other := tempCell(sensors, metrics.TempClassDisk, th.other); other.Status != model.HardwareGood {
+		t.Errorf("对照组：other 档下 72°C 应为 good，得到 %q", other.Status)
+	}
+}
