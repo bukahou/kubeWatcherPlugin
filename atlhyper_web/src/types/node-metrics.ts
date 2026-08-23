@@ -30,6 +30,7 @@ export interface NodeMemory {
   swapTotalBytes: number;
   swapFreeBytes: number;
   swapUsagePct: number;
+  oomKillTotal: number;  // 内核 OOM 杀进程累计次数（内存 USE 的「错误」项）
 }
 
 // ============================================================================
@@ -47,9 +48,11 @@ export interface NodeDisk {
   readIOPS: number;
   writeIOPS: number;
   ioUtilPct: number;
-  awaitReadMs: number;  // 平均读延迟
-  awaitWriteMs: number; // 平均写延迟
-  queueDepth: number;   // 平均在途请求数
+  awaitReadMs: number;   // 平均读延迟
+  awaitWriteMs: number;  // 平均写延迟
+  queueDepth: number;    // 平均在途请求数
+  inodeUsagePct: number; // inode 用尽同样写不进去，且容量还很空
+  readOnly: boolean;     // 内核已把该文件系统改判只读
 }
 
 // ============================================================================
@@ -120,6 +123,11 @@ export interface NodeSystem {
   filefdAllocated: number;
   filefdMax: number;
   entropyBits: number;
+  procsRunning: number;  // 运行队列长度
+  procsBlocked: number;  // D 状态（不可中断 IO）进程数
+  arpEntries: number;
+  timeOffsetMs: number;
+  timeSynced: boolean;
 }
 
 // ============================================================================

@@ -53,6 +53,9 @@ var NodeExporterMetrics = []string{
 	"node_disk_io_time_weighted_seconds_total", // 速率 = 平均队列深度
 	"node_filesystem_size_bytes",
 	"node_filesystem_avail_bytes",
+	"node_filesystem_files",      // inode 总数
+	"node_filesystem_files_free", // inode 剩余
+	"node_filesystem_readonly",   // 1 = 内核已把该文件系统改判只读
 
 	// ── netdev / netclass ──
 	"node_network_up",
@@ -103,12 +106,20 @@ var NodeExporterMetrics = []string{
 	"node_filefd_allocated",
 	"node_filefd_maximum",
 	"node_entropy_available_bits",
+	"node_arp_entries",
+
+	// ── 运行队列 / 校时 ──
+	"node_procs_running",
+	"node_procs_blocked",
+	"node_timex_offset_seconds",
+	"node_timex_sync_status",
 
 	// ── vmstat ──
 	"node_vmstat_pgfault",
 	"node_vmstat_pgmajfault",
 	"node_vmstat_pswpin",
 	"node_vmstat_pswpout",
+	"node_vmstat_oom_kill", // 内存 USE 的「错误」项
 
 	// ── uname / boot ──
 	"node_uname_info",

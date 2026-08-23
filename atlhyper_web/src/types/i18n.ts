@@ -1724,6 +1724,8 @@ interface NodeMetricsTranslations {
     coreUsage: string;
     threads: string;
     load: string;
+    saturation: string;
+    perCore: string;
   };
   // Memory
   memory: {
@@ -1736,6 +1738,9 @@ interface NodeMetricsTranslations {
     buffers: string;
     swap: string;
     swapUsed: string;
+    noSwap: string;
+    oomKill: string;
+    oomKillNone: string;
   };
   // Disk
   disk: {
@@ -1746,6 +1751,14 @@ interface NodeMetricsTranslations {
     iops: string;
     ioUtil: string;
     totalIops: string;
+    inode: string;
+    await: string;
+    queue: string;
+    readOnly: string;
+    utilization: string;
+    saturation: string;
+    errors: string;
+    healthy: string;
   };
   // Network
   network: {
@@ -1800,6 +1813,9 @@ interface NodeMetricsTranslations {
   // System Resources
   system: {
     title: string;
+    runQueue: string;
+    blocked: string;
+    arpEntries: string;
     fileDescriptors: string;
     conntrackTable: string;
     used: string;

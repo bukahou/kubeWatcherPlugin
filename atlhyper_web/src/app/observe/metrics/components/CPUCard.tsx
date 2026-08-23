@@ -18,6 +18,8 @@ const getUsageTextColor = (usage: number) => {
 export const CPUCard = memo(function CPUCard({ data }: CPUCardProps) {
   const { t } = useI18n();
   const nm = t.nodeMetrics;
+  // 每核负载：load1 除以核数，跨机型可比（4 核的 load 4 和 12 核的 load 4 不是一回事）
+  const perCoreLoad = data.cores > 0 ? data.load1 / data.cores : 0;
   return (
     <div className="bg-card rounded-xl border border-[var(--border-color)] p-3 sm:p-5">
       {/* 头部 */}
@@ -37,6 +39,17 @@ export const CPUCard = memo(function CPUCard({ data }: CPUCardProps) {
           </div>
           <div className="text-[10px] sm:text-xs text-muted">{nm.cpu.usage}</div>
         </div>
+      </div>
+
+      {/* 饱和度：使用率满了只说明忙，每核负载 > 1 才说明有任务在排队等 CPU */}
+      <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-[var(--background)] rounded-lg flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Gauge className="w-3.5 h-3.5 text-muted" />
+          <span className="text-[10px] sm:text-xs text-muted">{nm.cpu.saturation} · {nm.cpu.perCore}</span>
+        </div>
+        <span className={`text-xs sm:text-sm font-semibold tabular-nums ${perCoreLoad >= 1.5 ? "text-red-500" : perCoreLoad >= 1 ? "text-yellow-500" : "text-emerald-500"}`}>
+          {perCoreLoad.toFixed(2)}
+        </span>
       </div>
 
       {/* CPU 使用率分解 */}

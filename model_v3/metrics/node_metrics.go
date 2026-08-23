@@ -63,6 +63,9 @@ type NodeMemory struct {
 	SwapTotalBytes int64   `json:"swapTotalBytes"`
 	SwapFreeBytes  int64   `json:"swapFreeBytes"`
 	SwapUsagePct   float64 `json:"swapUsagePct"`
+	// OOMKillTotal 内核 OOM 杀进程的累计次数。USE 里内存的「错误」项 ——
+	// 使用率回落后现场就没了，只有这个计数留得住痕迹。
+	OOMKillTotal int64 `json:"oomKillTotal"`
 }
 
 type NodeDisk struct {
@@ -77,9 +80,11 @@ type NodeDisk struct {
 	ReadIOPS         float64 `json:"readIOPS"`
 	WriteIOPS        float64 `json:"writeIOPS"`
 	IOUtilPct        float64 `json:"ioUtilPct"`
-	AwaitReadMs      float64 `json:"awaitReadMs"`  // 平均读延迟 = read_time 速率 ÷ reads_completed 速率
-	AwaitWriteMs     float64 `json:"awaitWriteMs"` // 平均写延迟
-	QueueDepth       float64 `json:"queueDepth"`   // 平均在途请求数 = io_time_weighted 速率
+	AwaitReadMs      float64 `json:"awaitReadMs"`   // 平均读延迟 = read_time 速率 ÷ reads_completed 速率
+	AwaitWriteMs     float64 `json:"awaitWriteMs"`  // 平均写延迟
+	QueueDepth       float64 `json:"queueDepth"`    // 平均在途请求数 = io_time_weighted 速率
+	InodeUsagePct    float64 `json:"inodeUsagePct"` // inode 用尽同样会让写入失败，且容量还很空
+	ReadOnly         bool    `json:"readOnly"`      // 文件系统被内核改判只读 = 盘出错的强信号
 }
 
 type NodeNetwork struct {
@@ -135,6 +140,14 @@ type NodeSystem struct {
 	FilefdAllocated  int64 `json:"filefdAllocated"`
 	FilefdMax        int64 `json:"filefdMax"`
 	EntropyBits      int64 `json:"entropyBits"`
+	// ProcsRunning / ProcsBlocked 运行队列与 D 状态进程数：
+	// Blocked 持续大于 0 说明进程卡在不可中断 IO 上，是磁盘故障的早期信号
+	ProcsRunning int64 `json:"procsRunning"`
+	ProcsBlocked int64 `json:"procsBlocked"`
+	ArpEntries   int64 `json:"arpEntries"`
+	// TimeOffsetMs / TimeSynced NTP 校时状态。时钟漂移会让日志与 trace 的时间线对不上
+	TimeOffsetMs float64 `json:"timeOffsetMs"`
+	TimeSynced   bool    `json:"timeSynced"`
 }
 
 type NodeVMStat struct {

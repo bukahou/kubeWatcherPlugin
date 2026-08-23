@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { HardDrive, RefreshCw } from "lucide-react";
+import { HardDrive, RefreshCw, Skull } from "lucide-react";
 import type { NodeMemory } from "@/types/node-metrics";
 import { formatBytes } from "@/lib/format";
 import { useI18n } from "@/i18n/context";
@@ -113,27 +113,36 @@ export const MemoryCard = memo(function MemoryCard({ data }: MemoryCardProps) {
         </div>
       </div>
 
-      {/* Swap */}
-      {data.swapTotalBytes > 0 && (
-        <div className="pt-3 sm:pt-4 border-t border-[var(--border-color)]">
-          <div className="flex items-center gap-2 mb-2">
-            <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted" />
-            <span className="text-xs sm:text-sm font-medium text-default">{nm.memory.swap}</span>
-            <span className="text-[10px] sm:text-xs text-muted ml-auto">
-              {formatBytes(swapUsedBytes)} / {formatBytes(data.swapTotalBytes)}
-            </span>
-          </div>
-          <div className="h-1.5 sm:h-2 bg-[var(--background)] rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${getUsageColor(data.swapUsagePct)}`}
-              style={{ width: `${Math.min(100, data.swapUsagePct)}%` }}
-            />
-          </div>
-          <div className="text-[10px] sm:text-xs text-muted mt-1 text-right">
-            {data.swapUsagePct.toFixed(1)}% {nm.memory.swapUsed}
-          </div>
+      {/* Swap：未启用也要显示。K8s 默认关 swap，但「关着」和「查不到」是两回事 */}
+      <div className="pt-3 sm:pt-4 border-t border-[var(--border-color)]">
+        <div className="flex items-center gap-2 mb-2">
+          <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted" />
+          <span className="text-xs sm:text-sm font-medium text-default">{nm.memory.swap}</span>
+          <span className="text-[10px] sm:text-xs text-muted ml-auto">
+            {data.swapTotalBytes > 0 ? `${formatBytes(swapUsedBytes)} / ${formatBytes(data.swapTotalBytes)}` : nm.memory.noSwap}
+          </span>
         </div>
-      )}
+        <div className="h-1.5 sm:h-2 bg-[var(--background)] rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${getUsageColor(data.swapUsagePct)}`}
+            style={{ width: `${Math.min(100, data.swapUsagePct)}%` }}
+          />
+        </div>
+        <div className="text-[10px] sm:text-xs text-muted mt-1 text-right">
+          {data.swapUsagePct.toFixed(1)}% {nm.memory.swapUsed}
+        </div>
+      </div>
+
+      {/* OOM：使用率回落后现场就没了，这个计数是唯一留得住的痕迹 */}
+      <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Skull className={`w-3.5 h-3.5 ${data.oomKillTotal > 0 ? "text-red-500" : "text-muted"}`} />
+          <span className="text-[10px] sm:text-xs text-muted">{nm.memory.oomKill}</span>
+        </div>
+        <span className={`text-xs sm:text-sm font-semibold tabular-nums ${data.oomKillTotal > 0 ? "text-red-500" : "text-emerald-500"}`}>
+          {data.oomKillTotal > 0 ? data.oomKillTotal.toLocaleString() : nm.memory.oomKillNone}
+        </span>
+      </div>
     </div>
   );
 });

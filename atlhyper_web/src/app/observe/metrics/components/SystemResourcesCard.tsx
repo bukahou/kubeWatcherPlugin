@@ -1,4 +1,4 @@
-import { Activity, FileText, Shield, Zap } from "lucide-react";
+import { Activity, FileText, Shield, Zap, ListOrdered, Network, Clock } from "lucide-react";
 import type { NodeSystem } from "@/types/node-metrics";
 import { useI18n } from "@/i18n/context";
 
@@ -46,6 +46,46 @@ export function SystemResourcesCard({ system }: { system: NodeSystem }) {
             </div>
           </div>
         ))}
+
+        {/* 运行队列：blocked 持续 > 0 说明进程卡在不可中断 IO 上，是磁盘出问题的早期信号 */}
+        <div className="p-2 sm:p-3 bg-[var(--background)] rounded-lg grid grid-cols-3 gap-2">
+          <div>
+            <div className="flex items-center gap-1 text-[10px] text-muted mb-0.5">
+              <ListOrdered className="w-3 h-3" />
+              {nm.system.runQueue}
+            </div>
+            <div className="text-xs sm:text-sm font-semibold text-default tabular-nums">{system.procsRunning}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-muted mb-0.5">{nm.system.blocked}</div>
+            <div className={`text-xs sm:text-sm font-semibold tabular-nums ${system.procsBlocked > 0 ? "text-yellow-500" : "text-emerald-500"}`}>
+              {system.procsBlocked}
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-1 text-[10px] text-muted mb-0.5">
+              <Network className="w-3 h-3" />
+              {nm.system.arpEntries}
+            </div>
+            <div className="text-xs sm:text-sm font-semibold text-default tabular-nums">{system.arpEntries}</div>
+          </div>
+        </div>
+
+        {/* 校时：时钟漂移会让日志与 trace 的时间线对不上，排查时非常费解 */}
+        <div className="p-2 sm:p-3 bg-[var(--background)] rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-muted" />
+            <span className="text-xs sm:text-sm text-default">{nm.system.ntpSync}</span>
+          </div>
+          <div className="text-right">
+            <div className={`text-xs sm:text-sm font-bold ${system.timeSynced ? "text-green-500" : "text-red-500"}`}>
+              {system.timeSynced ? nm.system.synced : nm.system.notSynced}
+            </div>
+            <div className="text-[10px] text-muted tabular-nums">
+              {nm.system.offset}: {system.timeOffsetMs.toFixed(3)} ms
+            </div>
+          </div>
+        </div>
 
         {/* Entropy */}
         <div className="p-2 sm:p-3 bg-[var(--background)] rounded-lg">

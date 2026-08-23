@@ -1692,6 +1692,8 @@ Deployment 已更新，新的 Pod 正在启动中
       coreUsage: "核心使用率",
       threads: "线程",
       load: "负载",
+      saturation: "饱和度",
+      perCore: "每核负载",
     },
     memory: {
       title: "内存",
@@ -1703,6 +1705,9 @@ Deployment 已更新，新的 Pod 正在启动中
       buffers: "缓冲区",
       swap: "Swap",
       swapUsed: "已使用",
+      noSwap: "未启用",
+      oomKill: "OOM 终止",
+      oomKillNone: "无",
     },
     disk: {
       title: "磁盘",
@@ -1712,6 +1717,14 @@ Deployment 已更新，新的 Pod 正在启动中
       iops: "IOPS",
       ioUtil: "IO 利用率",
       totalIops: "总 IOPS",
+      inode: "inode",
+      await: "延迟",
+      queue: "队列",
+      readOnly: "只读",
+      utilization: "利用率",
+      saturation: "饱和度",
+      errors: "错误",
+      healthy: "正常",
     },
     network: {
       title: "网络",
@@ -1772,6 +1785,9 @@ Deployment 已更新，新的 Pod 正在启动中
       synced: "已同步",
       notSynced: "未同步",
       offset: "偏移",
+      runQueue: "运行队列",
+      blocked: "阻塞进程",
+      arpEntries: "ARP 表项",
     },
     temperature: {
       title: "温度",

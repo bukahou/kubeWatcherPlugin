@@ -501,9 +501,15 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 		       Attributes['mountpoint'] AS mp,
 		       Attributes['fstype'] AS fs,
 		       argMaxIf(Value, TimeUnix, MetricName='node_filesystem_size_bytes') AS total,
-		       argMaxIf(Value, TimeUnix, MetricName='node_filesystem_avail_bytes') AS avail
+		       argMaxIf(Value, TimeUnix, MetricName='node_filesystem_avail_bytes') AS avail,
+		       argMaxIf(Value, TimeUnix, MetricName='node_filesystem_files') AS inodes,
+		       argMaxIf(Value, TimeUnix, MetricName='node_filesystem_files_free') AS inodesFree,
+		       argMaxIf(Value, TimeUnix, MetricName='node_filesystem_readonly') AS readonly
 		FROM otel_metrics_gauge
-		WHERE MetricName IN ('node_filesystem_size_bytes', 'node_filesystem_avail_bytes')
+		WHERE MetricName IN (
+			'node_filesystem_size_bytes', 'node_filesystem_avail_bytes',
+			'node_filesystem_files', 'node_filesystem_files_free', 'node_filesystem_readonly'
+		)
 		  AND ResourceAttributes['net.host.name'] = ?
 		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
 		  AND Attributes['fstype'] NOT IN ('tmpfs', 'devtmpfs', 'overlay', 'squashfs')
@@ -519,8 +525,8 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	diskMap := make(map[string]*metrics.NodeDisk)
 	for rows.Next() {
 		var d metrics.NodeDisk
-		var total, avail float64
-		if err := rows.Scan(&d.Device, &d.MountPoint, &d.FSType, &total, &avail); err != nil {
+		var total, avail, inodes, inodesFree, readonly float64
+		if err := rows.Scan(&d.Device, &d.MountPoint, &d.FSType, &total, &avail, &inodes, &inodesFree, &readonly); err != nil {
 			continue
 		}
 		d.TotalBytes = int64(total)
@@ -528,6 +534,10 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 		if total > 0 {
 			d.UsagePct = roundTo(clamp((1-avail/total)*100, 0, 100), 2)
 		}
+		if inodes > 0 {
+			d.InodeUsagePct = roundTo(clamp((1-inodesFree/inodes)*100, 0, 100), 2)
+		}
+		d.ReadOnly = readonly > 0
 		diskMap[d.Device] = &d
 	}
 
@@ -940,7 +950,10 @@ func (r *metricsRepository) fillSystem(ctx context.Context, ip string, nm *metri
 		WHERE MetricName IN (
 			'node_nf_conntrack_entries', 'node_nf_conntrack_entries_limit',
 			'node_filefd_allocated', 'node_filefd_maximum',
-			'node_entropy_available_bits'
+			'node_entropy_available_bits',
+			'node_procs_running', 'node_procs_blocked',
+			'node_arp_entries',
+			'node_timex_offset_seconds', 'node_timex_sync_status'
 		)
 		AND ResourceAttributes['net.host.name'] = ?
 		AND TimeUnix >= now() - INTERVAL 2 MINUTE
@@ -969,6 +982,17 @@ func (r *metricsRepository) fillSystem(ctx context.Context, ip string, nm *metri
 			nm.System.FilefdMax = int64(val)
 		case "node_entropy_available_bits":
 			nm.System.EntropyBits = int64(val)
+		case "node_procs_running":
+			nm.System.ProcsRunning = int64(val)
+		case "node_procs_blocked":
+			nm.System.ProcsBlocked = int64(val)
+		case "node_arp_entries":
+			// 按网卡上报，多网卡时 argMax 只会留一条；家庭集群每台只有一块业务网卡
+			nm.System.ArpEntries = int64(val)
+		case "node_timex_offset_seconds":
+			nm.System.TimeOffsetMs = roundTo(val*1000, 3)
+		case "node_timex_sync_status":
+			nm.System.TimeSynced = val > 0
 		}
 	}
 }
@@ -1020,6 +1044,19 @@ func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metri
 			}
 		}
 		rows.Close()
+	}
+
+	// OOM kill 用累计值而非速率：一次 OOM 之后速率立刻归零，
+	// 但「这台机器杀过进程」这件事必须一直看得见
+	var oomKill float64
+	if err := r.client.QueryRow(ctx, `
+		SELECT argMax(Value, TimeUnix)
+		FROM otel_metrics_gauge
+		WHERE MetricName = 'node_vmstat_oom_kill'
+		  AND ResourceAttributes['net.host.name'] = ?
+		  AND TimeUnix >= now() - INTERVAL 5 MINUTE
+	`, ip).Scan(&oomKill); err == nil {
+		nm.Memory.OOMKillTotal = int64(oomKill)
 	}
 }
 

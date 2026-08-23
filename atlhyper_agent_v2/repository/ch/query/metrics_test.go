@@ -69,3 +69,46 @@ func TestNodeExporterMetrics_ContainsHardwareMetrics(t *testing.T) {
 		}
 	}
 }
+
+// 磁盘 USE 的三类信号各自依赖不同指标，缺任何一个对应格子就会空白。
+func TestNodeExporterMetrics_ContainsDiskUSEMetrics(t *testing.T) {
+	required := map[string]string{
+		"node_filesystem_size_bytes":               "利用率（容量）",
+		"node_filesystem_avail_bytes":              "利用率（容量）",
+		"node_filesystem_files":                    "利用率（inode）",
+		"node_filesystem_files_free":               "利用率（inode）",
+		"node_filesystem_readonly":                 "错误（只读）",
+		"node_disk_io_time_seconds_total":          "饱和度（繁忙比例）",
+		"node_disk_io_time_weighted_seconds_total": "饱和度（队列深度）",
+	}
+	have := make(map[string]struct{}, len(NodeExporterMetrics))
+	for _, m := range NodeExporterMetrics {
+		have[m] = struct{}{}
+	}
+	for m, why := range required {
+		if _, ok := have[m]; !ok {
+			t.Errorf("清单缺少 %s（%s）", m, why)
+		}
+	}
+}
+
+// 内存 / 系统 USE 的信号来源
+func TestNodeExporterMetrics_ContainsSystemUSEMetrics(t *testing.T) {
+	required := map[string]string{
+		"node_vmstat_oom_kill":      "内存错误（OOM 杀进程）",
+		"node_procs_running":        "CPU 饱和度（运行队列）",
+		"node_procs_blocked":        "IO 饱和度（D 状态进程）",
+		"node_arp_entries":          "网络（邻居表）",
+		"node_timex_offset_seconds": "校时偏移",
+		"node_timex_sync_status":    "校时状态",
+	}
+	have := make(map[string]struct{}, len(NodeExporterMetrics))
+	for _, m := range NodeExporterMetrics {
+		have[m] = struct{}{}
+	}
+	for m, why := range required {
+		if _, ok := have[m]; !ok {
+			t.Errorf("清单缺少 %s（%s）", m, why)
+		}
+	}
+}

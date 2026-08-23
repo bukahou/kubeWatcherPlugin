@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Database, ArrowDown, ArrowUp, Activity } from "lucide-react";
+import { Database, ArrowDown, ArrowUp, Activity, Lock } from "lucide-react";
 import type { NodeDisk } from "@/types/node-metrics";
 import { formatBytes, formatBytesPS } from "@/lib/format";
 import { useI18n } from "@/i18n/context";
@@ -89,8 +89,51 @@ export const DiskCard = memo(function DiskCard({ data }: DiskCardProps) {
                 </div>
               </div>
 
-              {/* I/O 详情 */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] sm:text-xs">
+              {/* USE：利用率 / 饱和度 / 错误 —— 容量满、inode 满、盘变慢、盘只读是四种不同的坏法 */}
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                <div>
+                  <div className="text-[10px] text-muted mb-0.5">{nm.disk.utilization}</div>
+                  <div className="text-[10px] sm:text-xs">
+                    <span className="text-muted">{nm.disk.inode} </span>
+                    <span className={`font-medium tabular-nums ${getUsageTextColor(disk.inodeUsagePct)}`}>
+                      {disk.inodeUsagePct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="text-[10px] sm:text-xs">
+                    <span className="text-muted">{nm.disk.ioUtil} </span>
+                    <span className={`font-medium tabular-nums ${getUsageTextColor(disk.ioUtilPct)}`}>
+                      {disk.ioUtilPct.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted mb-0.5">{nm.disk.saturation}</div>
+                  <div className="text-[10px] sm:text-xs">
+                    <span className="text-muted">{nm.disk.await} </span>
+                    <span className="text-default font-medium tabular-nums">
+                      {disk.awaitReadMs.toFixed(1)}/{disk.awaitWriteMs.toFixed(1)} ms
+                    </span>
+                  </div>
+                  <div className="text-[10px] sm:text-xs">
+                    <span className="text-muted">{nm.disk.queue} </span>
+                    <span className="text-default font-medium tabular-nums">{disk.queueDepth.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted mb-0.5">{nm.disk.errors}</div>
+                  {disk.readOnly ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 text-[10px] font-medium">
+                      <Lock className="w-3 h-3" />
+                      {nm.disk.readOnly}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] sm:text-xs text-emerald-500 font-medium">{nm.disk.healthy}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* I/O 吞吐 */}
+              <div className="grid grid-cols-3 gap-2 text-[10px] sm:text-xs">
                 <div>
                   <div className="text-muted">{nm.disk.read}</div>
                   <div className="text-default font-medium">{formatBytesPS(disk.readBytesPerSec)}</div>
@@ -99,15 +142,9 @@ export const DiskCard = memo(function DiskCard({ data }: DiskCardProps) {
                   <div className="text-muted">{nm.disk.write}</div>
                   <div className="text-default font-medium">{formatBytesPS(disk.writeBytesPerSec)}</div>
                 </div>
-                <div className="hidden sm:block">
+                <div>
                   <div className="text-muted">{nm.disk.iops}</div>
-                  <div className="text-default font-medium">{(disk.readIOPS + disk.writeIOPS).toLocaleString()}</div>
-                </div>
-                <div className="hidden sm:block">
-                  <div className="text-muted">{nm.disk.ioUtil}</div>
-                  <div className={`font-medium ${getUsageTextColor(disk.ioUtilPct)}`}>
-                    {disk.ioUtilPct.toFixed(1)}%
-                  </div>
+                  <div className="text-default font-medium tabular-nums">{(disk.readIOPS + disk.writeIOPS).toLocaleString()}</div>
                 </div>
               </div>
             </div>

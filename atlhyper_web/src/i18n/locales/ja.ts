@@ -1692,6 +1692,8 @@ Deployment が更新され、新しい Pod が起動中です
       coreUsage: "コア使用率",
       threads: "スレッド",
       load: "負荷",
+      saturation: "飽和度",
+      perCore: "コアあたり負荷",
     },
     memory: {
       title: "メモリ",
@@ -1703,6 +1705,9 @@ Deployment が更新され、新しい Pod が起動中です
       buffers: "バッファ",
       swap: "Swap",
       swapUsed: "使用中",
+      noSwap: "無効",
+      oomKill: "OOM 強制終了",
+      oomKillNone: "なし",
     },
     disk: {
       title: "ディスク",
@@ -1712,6 +1717,14 @@ Deployment が更新され、新しい Pod が起動中です
       iops: "IOPS",
       ioUtil: "IO 使用率",
       totalIops: "合計 IOPS",
+      inode: "inode",
+      await: "遅延",
+      queue: "キュー",
+      readOnly: "読み取り専用",
+      utilization: "使用率",
+      saturation: "飽和度",
+      errors: "エラー",
+      healthy: "正常",
     },
     network: {
       title: "ネットワーク",
@@ -1772,6 +1785,9 @@ Deployment が更新され、新しい Pod が起動中です
       synced: "同期済み",
       notSynced: "未同期",
       offset: "オフセット",
+      runQueue: "実行キュー",
+      blocked: "ブロック中プロセス",
+      arpEntries: "ARP エントリ",
     },
     temperature: {
       title: "温度",

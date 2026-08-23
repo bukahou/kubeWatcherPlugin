@@ -38,6 +38,7 @@ export const MOCK_NODES: NodeMetrics[] = [
       swapTotalBytes: 2147483648,
       swapFreeBytes: 2040109465,
       swapUsagePct: 5.0,
+      oomKillTotal: 0,
     },
     disks: [
       {
@@ -55,6 +56,8 @@ export const MOCK_NODES: NodeMetrics[] = [
         awaitReadMs: 6.2,
         awaitWriteMs: 14.8,
         queueDepth: 0.18,
+        inodeUsagePct: 3.2,
+        readOnly: false,
       },
       {
         device: "sda1",
@@ -71,6 +74,8 @@ export const MOCK_NODES: NodeMetrics[] = [
         awaitReadMs: 1.8,
         awaitWriteMs: 3.1,
         queueDepth: 0.28,
+        inodeUsagePct: 3.2,
+        readOnly: false,
       },
     ],
     networks: [
@@ -117,6 +122,11 @@ export const MOCK_NODES: NodeMetrics[] = [
       filefdAllocated: 2960,
       filefdMax: 524288,
       entropyBits: 3842,
+      procsRunning: 2,
+      procsBlocked: 0,
+      arpEntries: 21,
+      timeOffsetMs: 0.12,
+      timeSynced: true,
     },
     vmstat: {
       pgFaultPerSec: 3500,
@@ -158,6 +168,7 @@ export const MOCK_NODES: NodeMetrics[] = [
       swapTotalBytes: 4294967296,
       swapFreeBytes: 3221225472,
       swapUsagePct: 25.0,
+      oomKillTotal: 0,
     },
     disks: [
       {
@@ -175,6 +186,8 @@ export const MOCK_NODES: NodeMetrics[] = [
         awaitReadMs: 0.4,
         awaitWriteMs: 0.6,
         queueDepth: 0.74,
+        inodeUsagePct: 3.2,
+        readOnly: false,
       },
     ],
     networks: [
@@ -237,6 +250,11 @@ export const MOCK_NODES: NodeMetrics[] = [
       filefdAllocated: 24320,
       filefdMax: 1048576,
       entropyBits: 2856,
+      procsRunning: 2,
+      procsBlocked: 0,
+      arpEntries: 21,
+      timeOffsetMs: 0.12,
+      timeSynced: true,
     },
     vmstat: {
       pgFaultPerSec: 45000,
@@ -278,6 +296,7 @@ export const MOCK_NODES: NodeMetrics[] = [
       swapTotalBytes: 4294967296,
       swapFreeBytes: 4080218931,
       swapUsagePct: 5.0,
+      oomKillTotal: 0,
     },
     disks: [
       {
@@ -295,6 +314,8 @@ export const MOCK_NODES: NodeMetrics[] = [
         awaitReadMs: 0.4,
         awaitWriteMs: 0.6,
         queueDepth: 0.39,
+        inodeUsagePct: 3.2,
+        readOnly: false,
       },
       {
         device: "sdb1",
@@ -311,6 +332,8 @@ export const MOCK_NODES: NodeMetrics[] = [
         awaitReadMs: 1.8,
         awaitWriteMs: 3.1,
         queueDepth: 0.58,
+        inodeUsagePct: 3.2,
+        readOnly: false,
       },
     ],
     networks: [
@@ -359,6 +382,11 @@ export const MOCK_NODES: NodeMetrics[] = [
       filefdAllocated: 15680,
       filefdMax: 1048576,
       entropyBits: 3156,
+      procsRunning: 2,
+      procsBlocked: 0,
+      arpEntries: 21,
+      timeOffsetMs: 0.12,
+      timeSynced: true,
     },
     vmstat: {
       pgFaultPerSec: 28000,
