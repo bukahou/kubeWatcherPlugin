@@ -19,10 +19,22 @@
   - contract.go 新增 `VerifyMetricsCollected`「查而不采」检查（启动 + 10 分钟周期）✅
   - 删 GPUCard / ProcessTable + i18n 词条 ✅
   - agent v0.5.4 自检日志 `清单=55 缺失=0`；API 实测 PSI / TCP / 系统 / VMStat 四卡 7 节点全部有数据 ✅
-- Phase 1a: 硬件模型 + 采集 + /metrics/hardware + 矩阵 + 速览 tile — 待办
-- Phase 1b: 温度卡全传感器化 — 待办
-- Phase 2a: 磁盘 USE → DiskCard — 待办
-- Phase 2b: 网络/内存/CPU/系统 USE + 详情折叠 + 页面重排 — 待办
+- Phase 1a: 硬件模型 + 采集 + /metrics/hardware + 矩阵 + 速览 tile — ✅ 完成（4838e1d / e7c4609）
+  - model_v3: NodeHardware（欠压/风扇/散热）+ FreqMaxHz + await/queue + ChipName + 画像/分类纯函数
+  - Agent: fillHardware、全传感器温度、频率、await；清单 55 → 65
+  - Master: 画像阈值表 + GET /observe/metrics/hardware，判定全在后端
+  - Web: HardwareMatrix + HardwareSummaryTiles
+  - 集群实测 7 节点全部出数；盘温无自报阈值时改用磁盘档（e7c4609）
+- Phase 1b: 温度卡全传感器化 — ✅ 完成（a3c4530）
+  - HardwareRow.Sensors 逐传感器判定（与矩阵共用同一套阈值来源）
+  - TemperatureCard 按 CPU/磁盘/其他分组 + 供电/风扇行，无传感器显示「无数据」
+- Phase 2a: 磁盘 USE → DiskCard — ✅ 完成（3875883）
+  - inode 使用率 + 只读标记；DiskCard 按 利用率/饱和度/错误 三列重排
+- Phase 2b: 网络/内存/CPU/系统 USE — ✅ 完成（3875883）
+  - OOMKillTotal（累计值）、ProcsRunning/Blocked、ArpEntries、校时；CPU 每核负载
+  - swap 段改为常驻显示（「关着」与「查不到」是两回事）
+  - 清单 65 → 74，config f0a6ee2 已部署
+  - 待办：agent v0.5.6 / controller v0.4.5 / web v0.5.6 部署后集群验证
 - Phase 3: 节点对比表 — 待办
 - Phase 4: drivetemp / systemd / SMART — 待决策
 
