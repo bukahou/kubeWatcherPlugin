@@ -58,10 +58,9 @@ export interface DomainCardTranslations {
   // Modal
   configSloTarget: string;
   targetDomain: string;
-  selectPeriod: string;
-  day: string;
-  week: string;
-  month: string;
+  sloWindow: string;
+  sloWindowHint: string;
+  days: string;
   targetAvailability: string;
   targetAvailabilityHint: string;
   targetP95: string;
@@ -106,8 +105,11 @@ export function DomainCard({ domain, expanded, onToggle, timeRange, clusterId, o
   const prevErrorRate = domain.previous?.errorRate ?? errorRate;
 
   const trend = availability > prevAvailability ? "up" : availability < prevAvailability ? "down" : "stable";
-  const domainTargets = domain.targets?.[timeRange] || domain.targets?.["1d"] || { availability: 95, p95Latency: 300 };
-  const targets = { availability: domainTargets.availability, p95Latency: domainTargets.p95Latency };
+  // 目标由后端给出（一个域名一组，与查看范围无关）
+  const targets = {
+    availability: domain.target?.availability ?? 99,
+    p95Latency: domain.target?.p95Latency ?? 300,
+  };
 
   // Reset cached data when timeRange changes
   useEffect(() => {
@@ -261,15 +263,14 @@ export function DomainCard({ domain, expanded, onToggle, timeRange, clusterId, o
         onClose={() => setShowTargetModal(false)}
         domain={domain.domain}
         clusterId={clusterId}
-        timeRange={timeRange}
+        currentWindowDays={domain.target?.windowDays}
         onSaved={onRefresh}
         t={{
           configSloTarget: t.configSloTarget,
           targetDomain: t.targetDomain,
-          selectPeriod: t.selectPeriod,
-          day: t.day,
-          week: t.week,
-          month: t.month,
+          sloWindow: t.sloWindow,
+          sloWindowHint: t.sloWindowHint,
+          days: t.days,
           targetAvailability: t.targetAvailability,
           targetAvailabilityHint: t.targetAvailabilityHint,
           targetP95: t.targetP95,

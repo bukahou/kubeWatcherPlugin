@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SummaryCard, formatNumber } from "@/components/slo/common";
 import { DomainCard } from "@/components/slo/DomainCard";
+import { SLOListTable } from "@/components/slo/SLOListTable";
 import type { DomainSLOV2, SLOSummary } from "@/types/slo";
 
 type TimeRange = "1d" | "7d" | "30d";
@@ -154,10 +155,9 @@ function SLOPageContent() {
     previousPeriod: sloT.previousPeriod,
     configSloTarget: sloT.configSloTarget,
     targetDomain: sloT.targetDomain,
-    selectPeriod: sloT.selectPeriod,
-    day: sloT.day,
-    week: sloT.week,
-    month: sloT.month,
+    sloWindow: sloT.sloWindow,
+    sloWindowHint: sloT.sloWindowHint,
+    days: sloT.days,
     targetAvailability: sloT.targetAvailability,
     targetAvailabilityHint: sloT.targetAvailabilityHint,
     targetP95: sloT.targetP95,
@@ -257,12 +257,44 @@ function SLOPageContent() {
           {domains.length > 0 && (
             <>
 
-              {/* Domain SLO List */}
+              {/* SLO 清单表 —— 一行一个域名，一眼看出谁在烧预算 */}
+              <div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <h2 className="text-sm font-semibold text-default">
+                    {sloT.sloListTitle}
+                    <span className="ml-2 text-xs font-normal text-muted">({summaryData.totalDomains})</span>
+                  </h2>
+                  <p className="text-[11px] text-muted hidden lg:block">{sloT.sloListHint}</p>
+                </div>
+                <SLOListTable
+                  domains={domains}
+                  expandedId={expandedId}
+                  onSelect={(d) => setExpandedId(expandedId === d ? null : d)}
+                  t={{
+                    domain: sloT.monitoredDomains,
+                    target: sloT.target,
+                    currentSli: sloT.currentSli,
+                    errorBudget: sloT.errorBudget,
+                    burnRate: sloT.burnRate,
+                    p95Latency: sloT.p95Latency,
+                    status: sloT.sloStatus,
+                    healthy: sloT.healthy,
+                    warning: sloT.warning,
+                    critical: sloT.critical,
+                    unknown: sloT.unknown,
+                    noData: sloT.noData,
+                    goodBad: sloT.goodBad,
+                    exhaustIn: sloT.exhaustIn,
+                    hours: sloT.hours,
+                  }}
+                />
+              </div>
+
+              {/* 展开的域名详情 */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-default">
                     {sloT.domainSloStatus}
-                    <span className="ml-2 text-xs font-normal text-muted">({summaryData.totalDomains})</span>
                   </h2>
                 </div>
                 <div className="space-y-3">

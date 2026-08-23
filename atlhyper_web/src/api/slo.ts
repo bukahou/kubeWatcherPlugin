@@ -87,7 +87,7 @@ export const upsertSLOTarget = (params: SLOTargetCreateParams) => {
   return put<{ status: string }>("/api/v2/slo/targets", {
     clusterId: params.clusterId,
     host: params.host,
-    timeRange: params.timeRange,
+    windowDays: params.windowDays,
     availabilityTarget: params.availabilityTarget,
     p95LatencyTarget: params.p95LatencyTarget,
   });

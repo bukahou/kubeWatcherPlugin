@@ -4,15 +4,15 @@ import { useState } from "react";
 import { Target, X } from "lucide-react";
 import { upsertSLOTarget } from "@/api/slo";
 
-type TimeRange = "1d" | "7d" | "30d";
+/** SLO 的滚动窗口，不是查看范围。上限 7 天 —— ClickHouse 只保留 7 天数据。 */
+const WINDOW_OPTIONS = [1, 3, 7] as const;
 
 interface SLOTargetModalTranslations {
   configSloTarget: string;
   targetDomain: string;
-  selectPeriod: string;
-  day: string;
-  week: string;
-  month: string;
+  sloWindow: string;
+  sloWindowHint: string;
+  days: string;
   targetAvailability: string;
   targetAvailabilityHint: string;
   targetP95: string;
@@ -29,7 +29,7 @@ export function SLOTargetModal({
   onClose,
   domain,
   clusterId,
-  timeRange,
+  currentWindowDays,
   onSaved,
   t,
 }: {
@@ -37,12 +37,13 @@ export function SLOTargetModal({
   onClose: () => void;
   domain: string;
   clusterId: string;
-  timeRange: TimeRange;
+  /** 该域名当前的 SLO 窗口（天）；未配置时用 7 */
+  currentWindowDays?: number;
   onSaved: () => void;
   t: SLOTargetModalTranslations;
 }) {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>(timeRange);
-  const [availability, setAvailability] = useState(95);
+  const [windowDays, setWindowDays] = useState<number>(currentWindowDays ?? 7);
+  const [availability, setAvailability] = useState(99);
   const [p95Latency, setP95Latency] = useState(300);
   const [saving, setSaving] = useState(false);
 
@@ -54,7 +55,7 @@ export function SLOTargetModal({
       await upsertSLOTarget({
         clusterId,
         host: domain,
-        timeRange: selectedRange,
+        windowDays,
         availabilityTarget: availability,
         p95LatencyTarget: p95Latency,
       });
@@ -92,26 +93,23 @@ export function SLOTargetModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-default mb-2">{t.selectPeriod}</label>
+            <label className="block text-sm font-medium text-default mb-2">{t.sloWindow}</label>
             <div className="flex gap-2">
-              {([
-                { value: "1d", label: t.day },
-                { value: "7d", label: t.week },
-                { value: "30d", label: t.month },
-              ] as const).map((range) => (
+              {WINDOW_OPTIONS.map((d) => (
                 <button
-                  key={range.value}
-                  onClick={() => setSelectedRange(range.value)}
+                  key={d}
+                  onClick={() => setWindowDays(d)}
                   className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
-                    selectedRange === range.value
+                    windowDays === d
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-[var(--border-color)] text-muted hover:text-default hover:bg-[var(--hover-bg)]"
                   }`}
                 >
-                  {range.label}
+                  {d} {t.days}
                 </button>
               ))}
             </div>
+            <p className="mt-1 text-xs text-muted">{t.sloWindowHint}</p>
           </div>
 
           <div>

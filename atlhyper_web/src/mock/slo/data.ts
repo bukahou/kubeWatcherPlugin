@@ -39,7 +39,12 @@ function mkMetrics(
   rps: number,
   total: number,
 ): SLOMetrics {
-  return { availability, p95Latency: p95, p99Latency: p99, errorRate, requestsPerSec: rps, totalRequests: total };
+  const bad = Math.round(total * errorRate / 100);
+  return {
+    availability, p95Latency: p95, p99Latency: p99, errorRate,
+    requestsPerSec: rps, totalRequests: total,
+    goodRequests: total - bad, badRequests: bad,
+  };
 }
 
 function mkService(
@@ -57,7 +62,7 @@ function mkService(
   return {
     serviceKey, serviceName, servicePort: port, namespace, paths, ingressName,
     current, previous: previous ?? null,
-    targets: { "1d": { availability: 99.9, p95Latency: 200 } },
+    target: { availability: 99.9, p95Latency: 200, windowDays: 7 },
     status, errorBudgetRemaining: errorBudget,
   };
 }
@@ -98,7 +103,7 @@ const domainGeass: DomainSLOV2 = {
   services: geassServices,
   summary: mkMetrics(99.95, 12, 35, 0.05, 85, 7344000),
   previous: mkMetrics(99.93, 14, 38, 0.07, 80, 6912000),
-  targets: { "1d": { availability: 99.9, p95Latency: 200 } },
+  target: { availability: 99.9, p95Latency: 200, windowDays: 7 },
   status: "healthy",
   errorBudgetRemaining: 92.0,
 };
@@ -126,7 +131,7 @@ const domainAtlhyper: DomainSLOV2 = {
   services: atlhyperServices,
   summary: mkMetrics(99.42, 25, 75, 0.58, 6, 518400),
   previous: mkMetrics(99.65, 20, 60, 0.35, 7, 604800),
-  targets: { "1d": { availability: 99.9, p95Latency: 200 } },
+  target: { availability: 99.9, p95Latency: 200, windowDays: 7 },
   status: "warning",
   errorBudgetRemaining: 28.0,
 };

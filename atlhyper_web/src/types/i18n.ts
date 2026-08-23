@@ -1176,6 +1176,16 @@ export interface SLOTranslations {
   week: string;
   month: string;
   selectPeriod: string;
+  sloWindow: string;
+  burnRate: string;
+  currentSli: string;
+  goodBad: string;
+  exhaustIn: string;
+  hours: string;
+  sloListTitle: string;
+  sloListHint: string;
+  sloWindowHint: string;
+  days: string;
   previousPeriod: string;
   currentVsPrevious: string;
   // 指标

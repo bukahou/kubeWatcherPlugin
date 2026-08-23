@@ -16,13 +16,36 @@ export interface SLOMetrics {
   p99Latency: number;         // P99 延迟 (ms)
   errorRate: number;           // 错误率 (0-100)
   requestsPerSec: number;     // 每秒请求数
-  totalRequests: number;       // 总请求数
+  totalRequests: number;
+  goodRequests: number;
+  badRequests: number;       // 总请求数
 }
 
 // SLO 目标规格（对应 model.SLOTargetSpec）
+// 一个域名一组目标：固定滚动窗口 + 可用率 + P95。
+// 页面上的时间范围切换只影响图表画多长，不改变目标。
 export interface SLOTargetSpec {
   availability: number;       // 目标可用性
   p95Latency: number;         // 目标 P95 延迟 (ms)
+  windowDays: number;         // 滚动窗口天数
+}
+
+// 单个窗口的燃烧率判定（对应 slo.BurnRateWindow）
+export interface BurnRateWindow {
+  window: string;             // 1h / 6h / 24h / 3d
+  rate: number;               // 燃烧率倍数
+  threshold: number;          // 该窗口的告警阈值
+  status: "good" | "warn" | "crit";
+}
+
+// 错误预算与燃烧率（对应 model.SLOBudget）
+// 判定全部在后端完成，前端只渲染颜色与进度条。
+export interface SLOBudget {
+  remainingPct: number;
+  allowedEvents: number;      // 窗口内允许出错的请求数
+  consumedEvents: number;     // 已经出错的请求数
+  burnRates: BurnRateWindow[];
+  exhaustHours: number;       // 按当前燃烧率还能撑多少小时；0 = 窗口内不会耗尽
 }
 
 // 域名 SLO（对应 model.DomainSLO）
@@ -32,7 +55,8 @@ export interface DomainSLO {
   ingressClass: string;
   namespace: string;
   tls: boolean;
-  targets: Record<string, SLOTargetSpec>;  // "1d", "7d", "30d"
+  target: SLOTargetSpec;
+  budget?: SLOBudget;
   current: SLOMetrics | null;
   previous?: SLOMetrics | null;
   errorBudgetRemaining: number;
@@ -83,7 +107,7 @@ export interface SLOTarget {
   id?: number;
   clusterId: string;
   host: string;
-  timeRange: string;
+  windowDays: number;
   availabilityTarget: number;
   p95LatencyTarget: number;
   createdAt?: string;
@@ -118,7 +142,8 @@ export interface ServiceSLO {
   ingressName: string;             // IngressRoute/Ingress 名称
   current: SLOMetrics | null;      // 当前周期指标
   previous?: SLOMetrics | null;    // 上一周期指标
-  targets?: Record<string, SLOTargetSpec>;  // 目标配置
+  target: SLOTargetSpec;          // 该服务的 SLO 目标
+  budget?: SLOBudget;             // 错误预算与燃烧率
   status: SLOStatus;               // 状态
   errorBudgetRemaining: number;    // 剩余错误预算
 }
@@ -130,7 +155,8 @@ export interface DomainSLOV2 {
   services: ServiceSLO[];          // 该域名下的所有后端服务
   summary: SLOMetrics | null;      // 域名级别汇总指标
   previous?: SLOMetrics | null;    // 上一周期汇总指标
-  targets?: Record<string, SLOTargetSpec>;  // 目标配置 ("1d"/"7d"/"30d")
+  target: SLOTargetSpec;           // 该域名的 SLO 目标
+  budget?: SLOBudget;              // 错误预算与燃烧率
   status: SLOStatus;               // 域名状态
   errorBudgetRemaining: number;    // 域名剩余错误预算
 }
@@ -192,7 +218,7 @@ export interface SLOLatencyParams {
 // API 请求参数
 export interface SLODomainsParams {
   clusterId?: string;
-  timeRange?: string;  // "1d" | "7d" | "30d"
+  timeRange?: string;  // 查看范围：1h | 6h | 24h | 3d | 7d（不影响 SLO 目标窗口）
 }
 
 export interface SLODomainDetailParams {
@@ -210,7 +236,7 @@ export interface SLODomainHistoryParams {
 export interface SLOTargetCreateParams {
   clusterId: string;
   host: string;
-  timeRange: string;
+  windowDays: number;
   availabilityTarget: number;
   p95LatencyTarget: number;
 }
