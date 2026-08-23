@@ -62,14 +62,6 @@ func (r *dashboardRepository) GetIngressSLOHistory(ctx context.Context, since, b
 	return r.slo.GetIngressSLOHistory(ctx, since, bucket)
 }
 
-func (r *dashboardRepository) ListServiceSLO(ctx context.Context, since time.Duration) ([]slo.ServiceSLO, error) {
-	return r.slo.ListServiceSLO(ctx, since)
-}
-
-func (r *dashboardRepository) ListServiceEdges(ctx context.Context, since time.Duration) ([]slo.ServiceEdge, error) {
-	return r.slo.ListServiceEdges(ctx, since)
-}
-
 func (r *dashboardRepository) ListAPMOperations(ctx context.Context) ([]apm.OperationStats, error) {
 	if r.trace == nil {
 		return nil, nil

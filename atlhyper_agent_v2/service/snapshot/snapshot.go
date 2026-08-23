@@ -67,9 +67,9 @@ type snapshotService struct {
 	dashboardRepo   repository.OTelDashboardRepository
 
 	// OTel 缓存（分离 TTL：Summary 慢变化 5min / Dashboard 列表快变化 30s）
-	otelCache             *cluster.OTelSnapshot
-	otelCacheTime         time.Time
-	otelDashboardCache    *dashboardCacheData
+	otelCache              *cluster.OTelSnapshot
+	otelCacheTime          time.Time
+	otelDashboardCache     *dashboardCacheData
 	otelDashboardCacheTime time.Time
 
 	// SLO 多窗口缓存（TTL 按窗口大小递增）
@@ -456,12 +456,12 @@ func (s *snapshotService) calculateNamespaceResources(snapshot *cluster.ClusterS
 	type nsStats struct {
 		pods, podsRunning, podsPending, podsFailed, podsSucceeded int
 		deployments, statefulSets, daemonSets, replicaSets        int
-		jobs, cronJobs                                             int
-		services, ingresses, networkPolicies                       int
-		configMaps, secrets, serviceAccounts                       int
-		pvcs                                                       int
-		quotas                                                     []cluster.ResourceQuota
-		limitRanges                                                []cluster.LimitRange
+		jobs, cronJobs                                            int
+		services, ingresses, networkPolicies                      int
+		configMaps, secrets, serviceAccounts                      int
+		pvcs                                                      int
+		quotas                                                    []cluster.ResourceQuota
+		limitRanges                                               []cluster.LimitRange
 	}
 	statsByNs := make(map[string]*nsStats)
 

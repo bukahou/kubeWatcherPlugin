@@ -133,7 +133,7 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 	} else if s.dashboardRepo != nil {
 		defaultSince := 5 * time.Minute
 
-		wg.Add(11) // RecentLogs 已移除，日志走 Command 按需查询
+		wg.Add(9) // RecentLogs 已移除(走 Command 按需查询); SLOServices/SLOEdges 已移除(SLO 去 mesh)
 
 		go func() {
 			defer wg.Done()
@@ -216,30 +216,6 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 			}
 			mu.Lock()
 			snapshot.SLOIngress = result
-			mu.Unlock()
-		}()
-
-		go func() {
-			defer wg.Done()
-			result, err := s.dashboardRepo.ListServiceSLO(ctx, defaultSince)
-			if err != nil {
-				log.Warn("Dashboard SLOServices 查询失败", "err", err)
-				return
-			}
-			mu.Lock()
-			snapshot.SLOServices = result
-			mu.Unlock()
-		}()
-
-		go func() {
-			defer wg.Done()
-			result, err := s.dashboardRepo.ListServiceEdges(ctx, defaultSince)
-			if err != nil {
-				log.Warn("Dashboard SLOEdges 查询失败", "err", err)
-				return
-			}
-			mu.Lock()
-			snapshot.SLOEdges = result
 			mu.Unlock()
 		}()
 

@@ -39,7 +39,14 @@ var enumContracts = []enumContract{
 	{"otel_traces", "SpanKind", apm.ExpectedSpanKinds},
 	{"otel_traces", "StatusCode", apm.ExpectedStatusCodes},
 	{"otel_logs", "SeverityText", logmodel.ExpectedSeverityTexts},
+	// Ingress SLO 契约: status_class 由 Collector 从各 ingress 实现归一化而来
+	// (Envoy 的 envoy_response_code_class / Traefik 的 code 首字符 / ...)。
+	// 实现换代时若 transform 规则遗漏, 这里会第一时间报出来。
+	{"otel_metrics_sum", "Attributes['status_class']", expectedStatusClasses},
 }
+
+// expectedStatusClasses 是 ingress_request_total 的 status_class 取值域。
+var expectedStatusClasses = []string{"1", "2", "3", "4", "5"}
 
 // RunEnumContractChecks 立即执行一次契约自检，之后每 interval 重跑一次，直到 ctx 结束。
 // 供 Agent 启动时以 goroutine 调用；不阻塞、不返回错误 —— 可观测性缺失属于降级，

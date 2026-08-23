@@ -74,22 +74,11 @@ func (s *snapshotService) fetchSLOWindow(wc sloWindowConfig) *slo.SLOWindowData 
 	previous, _ := s.dashboardRepo.ListIngressSLOPrevious(windowCtx, wc.since)
 	history, _ := s.dashboardRepo.GetIngressSLOHistory(windowCtx, wc.since, wc.bucket)
 
-	// Mesh 数据（Linkerd 服务网格）
-	meshServices, err := s.dashboardRepo.ListServiceSLO(windowCtx, wc.since)
-	if err != nil {
-		log.Warn("SLO 窗口 meshServices 查询失败", "window", wc.key, "err", err)
-	}
-
-	meshEdges, err := s.dashboardRepo.ListServiceEdges(windowCtx, wc.since)
-	if err != nil {
-		log.Warn("SLO 窗口 meshEdges 查询失败", "window", wc.key, "err", err)
-	}
-
+	// 服务网格 SLO 已移除：SLO 只做 ingress 外部视角，
+	// 服务间调用质量由 APM 承担（见 slo-ingress-contract-design.md）。
 	return &slo.SLOWindowData{
-		Current:      current,
-		Previous:     previous,
-		History:      history,
-		MeshServices: meshServices,
-		MeshEdges:    meshEdges,
+		Current:  current,
+		Previous: previous,
+		History:  history,
 	}
 }

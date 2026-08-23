@@ -197,11 +197,9 @@ func (s *commandService) handleQuerySLO(ctx context.Context, cmd *command.Comman
 	case "list_ingress":
 		return s.sloQueryRepo.ListIngressSLO(ctx, since)
 
-	case "list_service":
-		return s.sloQueryRepo.ListServiceSLO(ctx, since)
-
-	case "list_edges":
-		return s.sloQueryRepo.ListServiceEdges(ctx, since)
+	// list_service / list_edges 已移除：SLO 只做 ingress 外部视角，
+	// 服务间调用关系改由 APM 指令 (query_traces 的 topology) 提供。
+	// 见 docs/design/active/slo-ingress-contract-design.md
 
 	case "get_time_series":
 		name := getStringParam(cmd.Params, "name")

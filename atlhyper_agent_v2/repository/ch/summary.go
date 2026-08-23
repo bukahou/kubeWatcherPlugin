@@ -61,7 +61,7 @@ func (r *summaryRepository) GetSLOSummary(ctx context.Context) (ingressServices 
 		FROM (
 		    SELECT Attributes['service'] AS svc, ` + query.CounterRateExpr + ` AS rate_val
 		    FROM otel_metrics_sum
-		    WHERE MetricName = 'traefik_service_requests_total'
+		    WHERE MetricName = 'ingress_request_total'
 		      AND TimeUnix >= now() - INTERVAL 5 MINUTE
 		    GROUP BY svc HAVING count() >= 2
 		)

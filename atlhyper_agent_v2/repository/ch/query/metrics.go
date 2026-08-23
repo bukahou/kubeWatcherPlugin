@@ -18,10 +18,10 @@ type metricsRepository struct {
 	nodeRepo repository.NodeRepository
 
 	// IP → NodeName 缓存
-	ipMapMu    sync.RWMutex
-	ipMap      map[string]string
-	ipMapTime  time.Time
-	ipMapTTL   time.Duration
+	ipMapMu   sync.RWMutex
+	ipMap     map[string]string
+	ipMapTime time.Time
+	ipMapTTL  time.Duration
 }
 
 // NewMetricsQueryRepository 创建 Metrics 查询仓库
@@ -1038,7 +1038,8 @@ func (r *metricsRepository) GetNodeMetricsHistory(ctx context.Context, nodeName 
 // queryCPUHistory 查询 CPU 使用率历史
 //
 // CPU 是 counter 类型 (node_cpu_seconds_total)，按 mode 分组后计算:
-//   cpu_usage_pct = (1 - idle_delta / total_delta) * 100
+//
+//	cpu_usage_pct = (1 - idle_delta / total_delta) * 100
 func (r *metricsRepository) queryCPUHistory(ctx context.Context, ip string, sinceSec int64, intervalSec int) ([]metrics.Point, error) {
 	query := fmt.Sprintf(`
 		SELECT ts, 1 - sumIf(delta, mode = 'idle') / sum(delta) AS cpu_pct
@@ -1191,4 +1192,3 @@ func (r *metricsRepository) queryTempHistory(ctx context.Context, ip string, sin
 	}
 	return points, rows.Err()
 }
-

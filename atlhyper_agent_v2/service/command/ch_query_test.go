@@ -323,32 +323,6 @@ func TestExecute_QuerySLO_ListIngress(t *testing.T) {
 	}
 }
 
-func TestExecute_QuerySLO_ListEdges(t *testing.T) {
-	sloRepo := &mock.SLOQueryRepository{
-		ListServiceEdgesFn: func(ctx context.Context, since time.Duration) ([]slo.ServiceEdge, error) {
-			return []slo.ServiceEdge{
-				{SrcName: "frontend", DstName: "backend", RPS: 50},
-			}, nil
-		},
-	}
-
-	svc := newTestService(nil, nil, nil, sloRepo)
-	cmd := &command.Command{
-		ID:     "cmd-slo-2",
-		Action: command.ActionQuerySLO,
-		Params: map[string]any{"sub_action": "list_edges"},
-	}
-
-	result := svc.Execute(context.Background(), cmd)
-
-	if !result.Success {
-		t.Fatalf("expected success, got error: %s", result.Error)
-	}
-	if !strings.Contains(result.Output, "frontend") {
-		t.Errorf("expected output to contain edge source, got: %s", result.Output)
-	}
-}
-
 func TestExecute_QuerySLO_GetSummary(t *testing.T) {
 	sloRepo := &mock.SLOQueryRepository{
 		GetSLOSummaryFn: func(ctx context.Context) (*slo.SLOSummary, error) {

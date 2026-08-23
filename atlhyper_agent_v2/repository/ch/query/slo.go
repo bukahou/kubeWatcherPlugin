@@ -50,6 +50,141 @@ func NewSLOQueryRepository(client sdk.ClickHouseClient) repository.SLOQueryRepos
 }
 
 // ──────────────────────────────────────────────────────────────
+// Ingress 契约 —— 与具体 ingress 实现解耦的唯一接口
+// ──────────────────────────────────────────────────────────────
+//
+// 本文件的查询只允许出现下列契约名，不得出现任何 ingress 实现
+// （Traefik / Envoy / Nginx / Cilium …）的指标名或 label 名。
+// 实现差异一律由 Collector 的 transform 归一化处理。
+// 契约定义见 docs/design/active/slo-ingress-contract-design.md。
+//
+// 历史教训：Ingress 一路曾直接查 traefik_service_requests_total +
+// Attributes['code']，Traefik 从集群移除后 SLO 页长期空白且无人察觉；
+// 而 Mesh 一路因为做了统一契约，Istio 装了又拆都未伤及代码。
+// slo_test.go 的 TestIngressSQL_NoVendorNames 会强制守护这条边界。
+const (
+	metricIngressRequestTotal   = "ingress_request_total"
+	metricIngressDurationBucket = "ingress_request_duration_bucket"
+
+	// 契约 label
+	labelNamespace   = "namespace"
+	labelService     = "service"
+	labelStatusClass = "status_class"
+)
+
+// ⚠️ 单位约定：ingress_request_duration_bucket 的桶边界单位是【毫秒】。
+//
+// 契约本想统一为秒，但 OTTL 无法改写 histogram 的 ExplicitBounds 数组，
+// Collector 侧做不了换算。若要求各实现自报单位，Agent 就得知道底下是谁 ——
+// 那等于放弃抽象。因此契约直接规定桶为毫秒，由各实现在 Collector 侧对齐，
+// Agent 一律按毫秒处理（正好是 IngressSLO.P*Ms 字段所需单位，无需换算）。
+
+// ingressServiceKey 由契约 label 组合出服务标识。
+//
+// 用 namespace/service 而非某实现的内部 service 名（如 Traefik 的
+// "geass-v3-geass-web@kubernetes"）—— K8s 原生概念，换实现不变。
+func ingressServiceKey(namespace, service string) string {
+	if service == "" {
+		return ""
+	}
+	if namespace == "" {
+		return service
+	}
+	return namespace + "/" + service
+}
+
+// isErrorStatusClass 判定某状态码类别是否计入 SLO 违约。
+//
+// 只有 5xx 计入：4xx 是客户端问题（参数错误、鉴权失败、请求不存在的资源），
+// 属于业务正常流程，不构成服务质量违约。
+func isErrorStatusClass(class string) bool {
+	return class == "5"
+}
+
+// buildIngressCountQuery 构造请求计数查询。
+//
+// 按 {namespace, service, status_class} 分组 —— 每个组合是独立的累积计数器，
+// 必须在最细粒度算 delta。算法等价于 Prometheus rate() 的 counterCorrection：
+// v[i] >= v[i-1] 取差值，否则视为 counter reset 取 v[i]。
+func buildIngressCountQuery(timeFilter string) string {
+	return fmt.Sprintf(`
+		SELECT ns, svc, class,
+		       sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
+		FROM (
+		    SELECT Attributes['%s'] AS ns,
+		           Attributes['%s'] AS svc,
+		           Attributes['%s'] AS class,
+		           Value, TimeUnix,
+		           lagInFrame(Value, 1, Value) OVER
+		               (PARTITION BY Attributes['%s'], Attributes['%s'], Attributes['%s']
+		                ORDER BY TimeUnix) AS prevValue
+		    FROM otel_metrics_sum
+		    WHERE MetricName = '%s'
+		      %s
+		)
+		GROUP BY ns, svc, class
+		HAVING delta > 0
+	`, labelNamespace, labelService, labelStatusClass,
+		labelNamespace, labelService, labelStatusClass,
+		metricIngressRequestTotal, timeFilter)
+}
+
+// buildIngressLatencyQuery 构造延迟直方图查询。
+// argMax/argMin(BucketCounts) 取窗口内最新/最旧快照做差。
+func buildIngressLatencyQuery(timeFilter string) string {
+	return fmt.Sprintf(`
+		SELECT Attributes['%s'] AS ns,
+		       Attributes['%s'] AS svc,
+		       argMax(ExplicitBounds, TimeUnix) AS bounds,
+		       argMax(BucketCounts, TimeUnix) AS latest,
+		       argMin(BucketCounts, TimeUnix) AS earliest
+		FROM otel_metrics_histogram
+		WHERE MetricName = '%s'
+		  %s
+		GROUP BY ns, svc
+		HAVING count() >= 2
+	`, labelNamespace, labelService, metricIngressDurationBucket, timeFilter)
+}
+
+// buildIngressHistoryQuery 构造按时间桶聚合的历史查询。
+func buildIngressHistoryQuery(timeFilter string, bucketSec int64) string {
+	return fmt.Sprintf(`
+		SELECT toStartOfInterval(TimeUnix, INTERVAL %d SECOND) AS ts,
+		       ns, svc, class,
+		       sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
+		FROM (
+		    SELECT Attributes['%s'] AS ns,
+		           Attributes['%s'] AS svc,
+		           Attributes['%s'] AS class,
+		           Value, TimeUnix,
+		           lagInFrame(Value, 1, Value) OVER
+		               (PARTITION BY Attributes['%s'], Attributes['%s'], Attributes['%s'],
+		                             toStartOfInterval(TimeUnix, INTERVAL %d SECOND)
+		                ORDER BY TimeUnix) AS prevValue
+		    FROM otel_metrics_sum
+		    WHERE MetricName = '%s'
+		      %s
+		)
+		GROUP BY ts, ns, svc, class
+		HAVING delta > 0
+		ORDER BY ts
+	`, bucketSec,
+		labelNamespace, labelService, labelStatusClass,
+		labelNamespace, labelService, labelStatusClass, bucketSec,
+		metricIngressRequestTotal, timeFilter)
+}
+
+// buildIngressSummaryQuery 构造概览用的服务数与总量查询。
+func buildIngressSummaryQuery() string {
+	return fmt.Sprintf(`
+		SELECT uniqExact(concat(Attributes['%s'], '/', Attributes['%s'])) AS svc_count
+		FROM otel_metrics_sum
+		WHERE MetricName = '%s'
+		  AND TimeUnix >= now() - INTERVAL 5 MINUTE
+	`, labelNamespace, labelService, metricIngressRequestTotal)
+}
+
+// ──────────────────────────────────────────────────────────────
 // 共用辅助：从 ClickHouse histogram delta 行汇聚到 per-svc 桶
 // ──────────────────────────────────────────────────────────────
 
@@ -77,10 +212,13 @@ func addHistogramDelta(hist *svcHistogram, bounds []float64, latest, earliest []
 
 // histToLatency 从聚合后的 histogram 提取分位数和桶列表
 func histToLatency(hist *svcHistogram) (p50, p90, p95, p99 float64, buckets []slo.LatencyBucket) {
-	p50 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.50)*1000, 2)
-	p90 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.90)*1000, 2)
-	p95 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.95)*1000, 2)
-	p99 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.99)*1000, 2)
+	// 契约桶单位已是毫秒，直接取用 —— 不再 ×1000。
+	// （Traefik 时代桶为秒，故旧实现有换算；换算残留会让 P99 放大一千倍，
+	//   且不产生任何报错，只是数字离谱。见 TestHistToLatency_BucketsAreMilliseconds）
+	p50 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.50), 2)
+	p90 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.90), 2)
+	p95 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.95), 2)
+	p99 = roundTo(histogramPercentile(hist.bounds, hist.counts, 0.99), 2)
 
 	for i, b := range hist.bounds {
 		var cnt int64
@@ -88,7 +226,7 @@ func histToLatency(hist *svcHistogram) (p50, p90, p95, p99 float64, buckets []sl
 			cnt = int64(hist.counts[i])
 		}
 		buckets = append(buckets, slo.LatencyBucket{
-			LE:    roundTo(b*1000, 2),
+			LE:    roundTo(b, 2), // 契约单位毫秒
 			Count: cnt,
 		})
 	}
@@ -134,24 +272,7 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 	//   - v[i] <  v[i-1]: counter reset，delta = v[i]（reset 后从 0 开始）
 	// 最后 sum 得到窗口内的总增量，正确处理任意次数的 reset。
 	// lagInFrame 第三参数 Value 让首行 prevValue = 自身，首行 delta = 0。
-	countQuery := fmt.Sprintf(`
-		SELECT svc, code, method,
-		       sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
-		FROM (
-		    SELECT Attributes['service'] AS svc,
-		           Attributes['code']    AS code,
-		           Attributes['method']  AS method,
-		           Value, TimeUnix,
-		           lagInFrame(Value, 1, Value) OVER
-		               (PARTITION BY Attributes['service'], Attributes['code'], Attributes['method']
-		                ORDER BY TimeUnix) AS prevValue
-		    FROM otel_metrics_sum
-		    WHERE MetricName = 'traefik_service_requests_total'
-		      %s
-		)
-		GROUP BY svc, code, method
-		HAVING delta > 0
-	`, timeFilter)
+	countQuery := buildIngressCountQuery(timeFilter)
 
 	rows, err := r.client.Query(ctx, countQuery)
 	if err != nil {
@@ -168,9 +289,13 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 	svcMap := make(map[string]*svcData)
 
 	for rows.Next() {
-		var svcKey, code, method string
+		var ns, svc, class string
 		var delta float64
-		if err := rows.Scan(&svcKey, &code, &method, &delta); err != nil {
+		if err := rows.Scan(&ns, &svc, &class, &delta); err != nil {
+			continue
+		}
+		svcKey := ingressServiceKey(ns, svc)
+		if svcKey == "" {
 			continue
 		}
 		d, ok := svcMap[svcKey]
@@ -183,38 +308,31 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 			continue
 		}
 		d.totalReqs += cnt
-		d.codes[code] += cnt
-		if method != "" {
-			d.methods[method] += cnt
-		}
-		if len(code) > 0 && code[0] == '5' {
+		// 契约用 status_class（"2"/"4"/"5"…）而非精确码：各 ingress 实现
+		// 的粒度不同，契约取最小公分母。展示层把它渲染为 "2xx"/"5xx"。
+		d.codes[class+"xx"] += cnt
+		if isErrorStatusClass(class) {
 			d.totalErrors += cnt
 		}
 	}
 
 	// ── Histogram: 按 {svc, code, method} 分组，计算 delta 桶 ──
 	// argMax/argMin(BucketCounts, TimeUnix) 取窗口内最新/最旧快照做差
-	latencyQuery := fmt.Sprintf(`
-		SELECT Attributes['service'] AS svc,
-		       argMax(ExplicitBounds, TimeUnix) AS bounds,
-		       argMax(BucketCounts, TimeUnix) AS latest,
-		       argMin(BucketCounts, TimeUnix) AS earliest
-		FROM otel_metrics_histogram
-		WHERE MetricName = 'traefik_service_request_duration_seconds'
-		  %s
-		GROUP BY svc, Attributes['code'], Attributes['method']
-		HAVING count() >= 2
-	`, timeFilter)
+	latencyQuery := buildIngressLatencyQuery(timeFilter)
 
 	histMap := make(map[string]*svcHistogram)
 	latencyRows, lerr := r.client.Query(ctx, latencyQuery)
 	if lerr == nil && latencyRows != nil {
 		defer latencyRows.Close()
 		for latencyRows.Next() {
-			var svcKey string
+			var ns, svc string
 			var bounds []float64
 			var latest, earliest []uint64
-			if err := latencyRows.Scan(&svcKey, &bounds, &latest, &earliest); err != nil {
+			if err := latencyRows.Scan(&ns, &svc, &bounds, &latest, &earliest); err != nil {
+				continue
+			}
+			svcKey := ingressServiceKey(ns, svc)
+			if svcKey == "" {
 				continue
 			}
 			hist, ok := histMap[svcKey]
@@ -259,247 +377,35 @@ func (r *sloRepository) queryIngressSLO(ctx context.Context, timeFilter string, 
 }
 
 // ──────────────────────────────────────────────────────────────
-// ListServiceSLO — 服务网格（通用契约，适配 Linkerd/Istio）
-// ──────────────────────────────────────────────────────────────
-
-// ListServiceSLO 查询服务网格 SLO（从 inbound 视角统计：服务作为被调用方）
-//
-// 数据源：mesh_request_total（OTel Collector 在 transform 层把 Linkerd
-// response_total / Istio istio_requests_total 统一重命名为 mesh_request_total，
-// label 归一为 workload / namespace / dst_workload / dst_namespace / direction
-// / status_code / mtls）。详见 atlhyper 主仓库 docs/design/active/
-// agent-mesh-generic-monitoring-design.md
-//
-// 延迟分布（P50/P95/P99）依赖 mesh_request_duration_ms_bucket，当前 OTel
-// Prometheus receiver 对只含 _bucket（无 _count/_sum）的 histogram 会丢弃，
-// 需独立任务修复。本版本延迟分布暂空。
-func (r *sloRepository) ListServiceSLO(ctx context.Context, since time.Duration) ([]slo.ServiceSLO, error) {
-	sec := sinceSeconds(since)
-
-	// 请求计数：按 (workload, namespace, status_code, mtls, pod) 最细粒度算
-	// reset-safe delta，再汇总到 (workload, namespace, status_code, mtls)
-	query := fmt.Sprintf(`
-		SELECT workload, namespace, status_code, mtls, sum(delta) AS delta
-		FROM (
-			SELECT Attributes['workload']    AS workload,
-			       Attributes['namespace']   AS namespace,
-			       Attributes['status_code'] AS status_code,
-			       Attributes['mtls']        AS mtls,
-			       `+gaugeCounterDelta+` AS delta
-			FROM atlhyper.otel_metrics_sum
-			WHERE MetricName = 'mesh_request_total'
-			  AND Attributes['direction'] = 'inbound'
-			  AND TimeUnix >= now() - INTERVAL %d SECOND
-			GROUP BY workload, namespace, status_code, mtls, Attributes['pod']
-			HAVING count() >= 2
-		)
-		GROUP BY workload, namespace, status_code, mtls
-	`, sec)
-
-	rows, err := r.client.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query service SLO: %w", err)
-	}
-	defer rows.Close()
-
-	type svcKey struct {
-		name, ns string
-	}
-	type svcData struct {
-		totalReqs   float64
-		successReqs float64
-		mtlsEnabled bool
-		codes       map[string]int64
-	}
-	svcMap := make(map[svcKey]*svcData)
-
-	for rows.Next() {
-		var workload, namespace, code, mtls string
-		var delta float64
-		if err := rows.Scan(&workload, &namespace, &code, &mtls, &delta); err != nil {
-			continue
-		}
-		if delta <= 0 {
-			continue // counter reset 或无增量
-		}
-		key := svcKey{workload, namespace}
-		d, ok := svcMap[key]
-		if !ok {
-			d = &svcData{codes: make(map[string]int64)}
-			svcMap[key] = d
-		}
-		d.totalReqs += delta
-		if len(code) > 0 && code[0] != '5' {
-			d.successReqs += delta // 1xx/2xx/3xx/4xx 均视为成功，仅 5xx 计为错误
-		}
-		if mtls == "true" {
-			d.mtlsEnabled = true
-		}
-		d.codes[code] += int64(delta)
-	}
-
-	// 延迟分布（histogram）：当前 Prometheus receiver 对只含 _bucket（无 _count/_sum）
-	// 的 histogram 会丢弃，mesh_request_duration_ms_bucket 暂未进入 ClickHouse。
-	// 独立任务修复后可恢复此段查询，暂留空占位。
-
-	// 延迟桶数据暂为空（histogram 未进 ClickHouse，见上方注释）
-	type latKey struct {
-		name, ns string
-	}
-	latBuckets := make(map[latKey]struct {
-		bounds []float64
-		counts []uint64
-	})
-
-	duration := float64(sec)
-	var result []slo.ServiceSLO
-	for key, d := range svcMap {
-		item := slo.ServiceSLO{
-			Namespace: key.ns,
-			Name:      key.name,
-			RPS:       roundRPS(d.totalReqs / duration),
-		}
-		if d.totalReqs > 0 {
-			item.SuccessRate = roundTo(d.successReqs/d.totalReqs*100, 2)
-		}
-		item.MTLSEnabled = d.mtlsEnabled
-		for code, cnt := range d.codes {
-			item.StatusCodes = append(item.StatusCodes, slo.StatusCodeCount{Code: code, Count: cnt})
-		}
-		lk := latKey{key.name, key.ns}
-		if lb, ok := latBuckets[lk]; ok && len(lb.counts) > 0 {
-			// Linkerd le 桶是 Prometheus 风格累积桶，需先转为差分
-			diffCounts := cumulativeToDifferential(lb.counts)
-			item.P50Ms = roundTo(histogramPercentile(lb.bounds, diffCounts, 0.50), 2)
-			item.P90Ms = roundTo(histogramPercentile(lb.bounds, diffCounts, 0.90), 2)
-			item.P99Ms = roundTo(histogramPercentile(lb.bounds, diffCounts, 0.99), 2)
-			// 填充延迟分布桶（差分后每个桶独立，单位已是 ms）
-			for i, bound := range lb.bounds {
-				if i < len(diffCounts) {
-					item.LatencyBuckets = append(item.LatencyBuckets, slo.LatencyBucket{
-						LE:    bound,
-						Count: int64(diffCounts[i]),
-					})
-				}
-			}
-		}
-		result = append(result, item)
-	}
-	if result == nil {
-		result = []slo.ServiceSLO{}
-	}
-	return result, nil
-}
-
-// ──────────────────────────────────────────────────────────────
-// ListServiceEdges — 服务间调用拓扑（通用契约，适配 Linkerd/Istio）
-// ──────────────────────────────────────────────────────────────
-
-// ListServiceEdges 查询服务间调用拓扑（从 outbound 视角：A 调用 B）
-func (r *sloRepository) ListServiceEdges(ctx context.Context, since time.Duration) ([]slo.ServiceEdge, error) {
-	sec := sinceSeconds(since)
-
-	query := fmt.Sprintf(`
-		SELECT workload, namespace, dst_workload, dst_namespace, status_code, sum(delta) AS delta
-		FROM (
-			SELECT Attributes['workload']      AS workload,
-			       Attributes['namespace']     AS namespace,
-			       Attributes['dst_workload']  AS dst_workload,
-			       Attributes['dst_namespace'] AS dst_namespace,
-			       Attributes['status_code']   AS status_code,
-			       `+gaugeCounterDelta+` AS delta
-			FROM atlhyper.otel_metrics_sum
-			WHERE MetricName = 'mesh_request_total'
-			  AND Attributes['direction'] = 'outbound'
-			  AND TimeUnix >= now() - INTERVAL %d SECOND
-			GROUP BY workload, namespace, dst_workload, dst_namespace, status_code, Attributes['pod']
-			HAVING count() >= 2
-		)
-		GROUP BY workload, namespace, dst_workload, dst_namespace, status_code
-	`, sec)
-
-	rows, err := r.client.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("query service edges: %w", err)
-	}
-	defer rows.Close()
-
-	type edgeKey struct {
-		srcNs, src, dstNs, dst string
-	}
-	type edgeData struct {
-		total, success float64
-	}
-	edgeMap := make(map[edgeKey]*edgeData)
-
-	for rows.Next() {
-		var src, srcNs, dst, dstNs, code string
-		var delta float64
-		if err := rows.Scan(&src, &srcNs, &dst, &dstNs, &code, &delta); err != nil {
-			continue
-		}
-		if delta <= 0 {
-			continue
-		}
-		key := edgeKey{srcNs, src, dstNs, dst}
-		d, ok := edgeMap[key]
-		if !ok {
-			d = &edgeData{}
-			edgeMap[key] = d
-		}
-		d.total += delta
-		if len(code) > 0 && code[0] != '5' {
-			d.success += delta // 仅 5xx 计为错误
-		}
-	}
-
-	duration := float64(sec)
-	var result []slo.ServiceEdge
-	for key, d := range edgeMap {
-		edge := slo.ServiceEdge{
-			SrcNamespace: key.srcNs,
-			SrcName:      key.src,
-			DstNamespace: key.dstNs,
-			DstName:      key.dst,
-			RPS:          roundRPS(d.total / duration),
-		}
-		if d.total > 0 {
-			edge.SuccessRate = roundTo(d.success/d.total*100, 2)
-		}
-		result = append(result, edge)
-	}
-	if result == nil {
-		result = []slo.ServiceEdge{}
-	}
-	return result, nil
-}
-
-// ──────────────────────────────────────────────────────────────
-// GetSLOTimeSeries — Linkerd 服务 SLO 时序
+// GetSLOTimeSeries — 单个 ingress 服务的 SLO 时序
 // ──────────────────────────────────────────────────────────────
 
 // GetSLOTimeSeries 查询 SLO 时序数据
 func (r *sloRepository) GetSLOTimeSeries(ctx context.Context, name string, since time.Duration) (*slo.TimeSeries, error) {
 	sec := sinceSeconds(since)
 
-	// 按 5 分钟窗口聚合，子查询隔离每个计数器系列（用 pod 做最细粒度）
+	// name 为契约 serviceKey（"namespace/service"）。按 5 分钟窗口聚合，
+	// 每个 status_class 系列独立做 counter-reset-safe delta。
 	query := fmt.Sprintf(`
-		SELECT ts, code, sum(delta) AS delta
+		SELECT ts, class, sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
 		FROM (
 			SELECT toStartOfInterval(TimeUnix, INTERVAL 300 SECOND) AS ts,
-			       Attributes['status_code'] AS code,
-			       `+gaugeCounterDelta+` AS delta
-			FROM atlhyper.otel_metrics_sum
-			WHERE MetricName = 'mesh_request_total'
-			  AND Attributes['direction'] = 'inbound'
-			  AND Attributes['workload'] = ?
+			       Attributes['%s'] AS class,
+			       Value, TimeUnix,
+			       lagInFrame(Value, 1, Value) OVER
+			           (PARTITION BY Attributes['%s'],
+			                         toStartOfInterval(TimeUnix, INTERVAL 300 SECOND)
+			            ORDER BY TimeUnix) AS prevValue
+			FROM otel_metrics_sum
+			WHERE MetricName = '%s'
+			  AND concat(Attributes['%s'], '/', Attributes['%s']) = ?
 			  AND TimeUnix >= now() - INTERVAL %d SECOND
-			GROUP BY ts, code, Attributes['pod']
-			HAVING count() >= 2
 		)
-		GROUP BY ts, code
+		GROUP BY ts, class
+		HAVING delta > 0
 		ORDER BY ts
-	`, sec)
+	`, labelStatusClass, labelStatusClass, metricIngressRequestTotal,
+		labelNamespace, labelService, sec)
 
 	rows, err := r.client.Query(ctx, query, name)
 	if err != nil {
@@ -514,9 +420,9 @@ func (r *sloRepository) GetSLOTimeSeries(ctx context.Context, name string, since
 
 	for rows.Next() {
 		var ts time.Time
-		var code string
+		var class string
 		var delta float64
-		if err := rows.Scan(&ts, &code, &delta); err != nil {
+		if err := rows.Scan(&ts, &class, &delta); err != nil {
 			continue
 		}
 		if delta <= 0 {
@@ -528,7 +434,7 @@ func (r *sloRepository) GetSLOTimeSeries(ctx context.Context, name string, since
 			tsMap[ts] = d
 		}
 		d.total += delta
-		if len(code) > 0 && code[0] != '5' {
+		if !isErrorStatusClass(class) {
 			d.success += delta // 仅 5xx 计为错误
 		}
 	}
@@ -568,20 +474,9 @@ func (r *sloRepository) GetSLOSummary(ctx context.Context) (*slo.SLOSummary, err
 		err  error
 	}
 
-	ingCh := make(chan ingressResult, 1)
-	svcCh := make(chan serviceResult, 1)
-
-	go func() {
-		data, err := r.ListIngressSLO(ctx, since)
-		ingCh <- ingressResult{data, err}
-	}()
-	go func() {
-		data, err := r.ListServiceSLO(ctx, since)
-		svcCh <- serviceResult{data, err}
-	}()
-
-	ingRes := <-ingCh
-	svcRes := <-svcCh
+	// SLO 只覆盖 ingress（外部视角）。服务间调用质量由 APM 承担，
+	// 详见 docs/design/active/slo-ingress-contract-design.md 的范围决策。
+	ingData, ingErr := r.ListIngressSLO(ctx, since)
 
 	summary := &slo.SLOSummary{}
 
@@ -589,25 +484,8 @@ func (r *sloRepository) GetSLOSummary(ctx context.Context) (*slo.SLOSummary, err
 	var totalSuccRate, totalRPS, totalP99 float64
 	var count int
 
-	if ingRes.err == nil {
-		for _, s := range ingRes.data {
-			count++
-			totalSuccRate += s.SuccessRate
-			totalRPS += s.RPS
-			totalP99 += s.P99Ms
-
-			if s.SuccessRate >= 99.9 {
-				summary.HealthyServices++
-			} else if s.SuccessRate >= 99.0 {
-				summary.WarningServices++
-			} else {
-				summary.CriticalServices++
-			}
-		}
-	}
-
-	if svcRes.err == nil {
-		for _, s := range svcRes.data {
+	if ingErr == nil {
+		for _, s := range ingData {
 			count++
 			totalSuccRate += s.SuccessRate
 			totalRPS += s.RPS
@@ -643,30 +521,11 @@ func (r *sloRepository) GetIngressSLOHistory(ctx context.Context, since, bucket 
 	sec := sinceSeconds(since)
 	bucketSec := sinceSeconds(bucket)
 
-	// ── 请求计数时序：按 {ts, svc, code, method} 四维分组 ──
+	// ── 请求计数时序：按 {ts, namespace, service, status_class} 分组 ──
 	// 算法同 queryIngressSLO 的 Prometheus rate() 逻辑，但分区键加上桶 ts，
-	// 每个 (svc, code, method, bucket) 内独立做 counter-reset-safe 累加。
-	countQuery := fmt.Sprintf(`
-		SELECT ts, svc, code, method,
-		       sum(if(Value >= prevValue, Value - prevValue, Value)) AS delta
-		FROM (
-		    SELECT toStartOfInterval(TimeUnix, INTERVAL %d SECOND) AS ts,
-		           Attributes['service'] AS svc,
-		           Attributes['code']    AS code,
-		           Attributes['method']  AS method,
-		           Value, TimeUnix,
-		           lagInFrame(Value, 1, Value) OVER
-		               (PARTITION BY Attributes['service'], Attributes['code'], Attributes['method'],
-		                             toStartOfInterval(TimeUnix, INTERVAL %d SECOND)
-		                ORDER BY TimeUnix) AS prevValue
-		    FROM otel_metrics_sum
-		    WHERE MetricName = 'traefik_service_requests_total'
-		      AND TimeUnix >= now() - INTERVAL %d SECOND
-		)
-		GROUP BY ts, svc, code, method
-		HAVING delta > 0
-		ORDER BY ts
-	`, bucketSec, bucketSec, sec)
+	// 每个 (ns, svc, class, bucket) 内独立做 counter-reset-safe 累加。
+	countQuery := buildIngressHistoryQuery(
+		fmt.Sprintf("AND TimeUnix >= now() - INTERVAL %d SECOND", sec), bucketSec)
 
 	rows, err := r.client.Query(ctx, countQuery)
 	if err != nil {
@@ -686,10 +545,13 @@ func (r *sloRepository) GetIngressSLOHistory(ctx context.Context, since, bucket 
 
 	for rows.Next() {
 		var ts time.Time
-		var svcKey, code, method string
+		var ns, svc, class string
 		var delta float64
-		_ = method // method 仅用于保证 GROUP BY 正确，值不需要
-		if err := rows.Scan(&ts, &svcKey, &code, &method, &delta); err != nil {
+		if err := rows.Scan(&ts, &ns, &svc, &class, &delta); err != nil {
+			continue
+		}
+		svcKey := ingressServiceKey(ns, svc)
+		if svcKey == "" {
 			continue
 		}
 		key := bucketKey{ts: ts, svc: svcKey}
@@ -703,36 +565,41 @@ func (r *sloRepository) GetIngressSLOHistory(ctx context.Context, since, bucket 
 			continue
 		}
 		d.totalReqs += cnt
-		if len(code) > 0 && code[0] == '5' {
+		if isErrorStatusClass(class) {
 			d.totalErrors += cnt
 		}
 	}
 
 	// ── 延迟时序：按 {svc, ts, code, method} 分组，计算 delta 桶 ──
 	latencyQuery := fmt.Sprintf(`
-		SELECT Attributes['service'] AS svc,
+		SELECT Attributes['%s'] AS ns,
+		       Attributes['%s'] AS svc,
 		       toStartOfInterval(TimeUnix, INTERVAL %d SECOND) AS ts,
 		       argMax(ExplicitBounds, TimeUnix) AS bounds,
 		       argMax(BucketCounts, TimeUnix) AS latest,
 		       argMin(BucketCounts, TimeUnix) AS earliest
 		FROM otel_metrics_histogram
-		WHERE MetricName = 'traefik_service_request_duration_seconds'
+		WHERE MetricName = '%s'
 		  AND TimeUnix >= now() - INTERVAL %d SECOND
-		GROUP BY svc, ts, Attributes['code'], Attributes['method']
+		GROUP BY ns, svc, ts
 		HAVING count() >= 2
-		ORDER BY svc, ts
-	`, bucketSec, sec)
+		ORDER BY ns, svc, ts
+	`, labelNamespace, labelService, bucketSec, metricIngressDurationBucket, sec)
 
 	latencyByBucket := make(map[bucketKey]*svcHistogram)
 	latRows, latErr := r.client.Query(ctx, latencyQuery)
 	if latErr == nil && latRows != nil {
 		defer latRows.Close()
 		for latRows.Next() {
-			var svcKey string
+			var ns, svc string
 			var ts time.Time
 			var bounds []float64
 			var latest, earliest []uint64
-			if err := latRows.Scan(&svcKey, &ts, &bounds, &latest, &earliest); err != nil {
+			if err := latRows.Scan(&ns, &svc, &ts, &bounds, &latest, &earliest); err != nil {
+				continue
+			}
+			svcKey := ingressServiceKey(ns, svc)
+			if svcKey == "" {
 				continue
 			}
 			key := bucketKey{ts: ts, svc: svcKey}
