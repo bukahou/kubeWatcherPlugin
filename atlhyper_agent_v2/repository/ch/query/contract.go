@@ -32,17 +32,28 @@ type enumContract struct {
 	table    string
 	column   string
 	expected []string
+	// filter 是可选的额外 WHERE 条件（不含 WHERE 关键字）。
+	//
+	// 大表必须带：otel_metrics_sum 有千万行级数据，裸 SELECT DISTINCT 会全表扫描
+	// 直至超时（实测 i/o timeout）。用指标名 + 时间窗口把扫描范围收敛到最近数据，
+	// 既避免超时，也让检查更精确（只看目标指标的取值）。
+	filter string
 }
 
 // enumContracts 是全部受检契约。新增信号源时在此登记。
 var enumContracts = []enumContract{
-	{"otel_traces", "SpanKind", apm.ExpectedSpanKinds},
-	{"otel_traces", "StatusCode", apm.ExpectedStatusCodes},
-	{"otel_logs", "SeverityText", logmodel.ExpectedSeverityTexts},
+	{table: "otel_traces", column: "SpanKind", expected: apm.ExpectedSpanKinds},
+	{table: "otel_traces", column: "StatusCode", expected: apm.ExpectedStatusCodes},
+	{table: "otel_logs", column: "SeverityText", expected: logmodel.ExpectedSeverityTexts},
 	// Ingress SLO 契约: status_class 由 Collector 从各 ingress 实现归一化而来
 	// (Envoy 的 envoy_response_code_class / Traefik 的 code 首字符 / ...)。
 	// 实现换代时若 transform 规则遗漏, 这里会第一时间报出来。
-	{"otel_metrics_sum", "Attributes['status_class']", expectedStatusClasses},
+	{
+		table:    "otel_metrics_sum",
+		column:   "Attributes['status_class']",
+		expected: expectedStatusClasses,
+		filter:   "MetricName = 'ingress_request_total' AND TimeUnix > now() - INTERVAL 15 MINUTE",
+	},
 }
 
 // expectedStatusClasses 是 ingress_request_total 的 status_class 取值域。
@@ -77,7 +88,7 @@ func RunEnumContractChecks(ctx context.Context, client sdk.ClickHouseClient, int
 // 表/列为空时跳过（没有数据不代表契约错误，可能只是还没有服务上报）。
 func VerifyEnumContracts(ctx context.Context, client sdk.ClickHouseClient) {
 	for _, c := range enumContracts {
-		actual, err := distinctValues(ctx, client, c.table, c.column)
+		actual, err := distinctValues(ctx, client, c)
 		if err != nil {
 			logger.Warn("[契约自检] 查询失败", "table", c.table, "column", c.column, "err", err)
 			continue
@@ -102,9 +113,13 @@ func VerifyEnumContracts(ctx context.Context, client sdk.ClickHouseClient) {
 }
 
 // distinctValues 取某表某列的去重取值（上限 20 个，防止异常数据撑爆）。
-func distinctValues(ctx context.Context, client sdk.ClickHouseClient, table, column string) ([]string, error) {
-	// table / column 来自本文件内的白名单常量，非外部输入，不存在注入风险。
-	q := fmt.Sprintf("SELECT DISTINCT %s FROM %s LIMIT 20", column, table)
+func distinctValues(ctx context.Context, client sdk.ClickHouseClient, c enumContract) ([]string, error) {
+	// table / column / filter 均来自本文件内的白名单常量，非外部输入，无注入风险。
+	q := fmt.Sprintf("SELECT DISTINCT %s FROM %s", c.column, c.table)
+	if c.filter != "" {
+		q += " WHERE " + c.filter
+	}
+	q += " LIMIT 20"
 	rows, err := client.Query(ctx, q)
 	if err != nil {
 		return nil, err
