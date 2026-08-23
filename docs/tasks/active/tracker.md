@@ -7,7 +7,7 @@
 
 ---
 
-## 节点指标：硬件健康 + USE 改版 — 🔄 进行中（Phase 0–3 代码完成，待 agent v0.5.6 / controller v0.4.5 / web v0.5.6 部署验证）
+## 节点指标：硬件健康 + USE 改版 — 🔄 收尾（Phase 0–3 已上线验证；Phase 4 待决策，UI 意见待用户反馈后合并一轮）
 
 > 原设计文档: [node-metrics-hardware-use-design.md](../../design/active/node-metrics-hardware-use-design.md)
 >
@@ -37,6 +37,17 @@
 - Phase 3: 节点对比表 — ✅ 完成（1dcc186）
   - GET /observe/metrics/compare（硬件 5 列 + 资源 6 列），硬件列复用矩阵判定不重算
   - NodeCompareTable：节点列 sticky、硬件/资源分隔线、异常格加粗
+- 部署后实测修复 — ✅ 完成（93ef979 / 上一条 commit）
+  - 磁盘条目分裂（filesystem 与 diskstats 设备名不一致）→ normalizeBlockDevice + IO 回填到分区行
+  - 磁盘 IO 只取整盘（/proc/diskstats 同时上报 mmcblk0 与 mmcblk0p1/p2，分区行重复）
+  - 盘用量取根分区（原取所有分区最大值 → 三台 raspi5 都显示 512MB boot 分区的 37.24%）
+  - 网络错误列只算 err 不算 drop（虚拟网卡丢组播是常态，原来 7 台全黄）
+  - PSI 阈值 warn 50 / crit 80（K8s 节点常态 20–60%，原 crit 50 把 desk-one 标红）
+  - CPU 频率查询窗口 2 → 5 分钟 + 失败记 Warn（偶发某节点显示无数据，每次换一台）
+  - 复验：频率列 7 节点全有数据；raspi4/raspi5 各 2 行零孤儿；desk 仅剩 dm-0 一行
+  - 线上版本：agent v0.5.8 / controller v0.4.7 / web v0.5.7
+- 已知限制（不修）：LVM 根分区（/dev/mapper/x）与 diskstats 的 dm-N 无法从名字关联，
+  三台 desk 的根分区行拿不到 IO，dm-0 独立成行。宁可缺 IO 也不张冠李戴。
 - Phase 4: drivetemp / systemd / SMART — 待决策
 
 ---
