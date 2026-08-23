@@ -1165,11 +1165,9 @@ export const zh: Translations = {
     tabServices: "服务明细",
     tabCompare: "周期对比",
     tabOverview: "SLO 概览",
-    tabMesh: "服务网格",
     tabLatency: "延迟分布",
     // 服务网格
     serviceTopology: "服务调用拓扑",
-    meshOverview: "服务网格概览",
     mtls: "mTLS",
     inbound: "Inbound",
     outbound: "Outbound",
@@ -1190,7 +1188,7 @@ export const zh: Translations = {
     totalBackendServices: "共 {count} 个后端服务",
     // 汇总卡片
     totalServices: "服务总数",
-    linkerdMesh: "Linkerd mesh",
+    ingressBackends: "Ingress 后端",
     monitoredDomains: "域名数",
     avgAvailability: "平均可用性",
     avgP95: "平均 P95",

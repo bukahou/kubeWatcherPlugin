@@ -10,7 +10,6 @@ export * as logs from "./logs";
 export * as apm from "./apm";
 export * as cluster from "./cluster";
 export * as slo from "./slo";
-export * as mesh from "./mesh";
 export * as overview from "./overview";
 export * as github from "./github";
 export * as deploy from "./deploy";

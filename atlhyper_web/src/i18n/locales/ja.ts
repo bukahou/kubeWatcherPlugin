@@ -1203,11 +1203,9 @@ export const ja: Translations = {
     tabServices: "サービス詳細",
     tabCompare: "期間比較",
     tabOverview: "SLO 概要",
-    tabMesh: "サービスメッシュ",
     tabLatency: "レイテンシ分布",
     // サービスメッシュ
     serviceTopology: "サービス呼び出しトポロジー",
-    meshOverview: "サービスメッシュ概要",
     mtls: "mTLS",
     inbound: "Inbound",
     outbound: "Outbound",
@@ -1228,7 +1226,7 @@ export const ja: Translations = {
     totalBackendServices: "合計 {count} 個のバックエンドサービス",
     // サマリーカード
     totalServices: "サービス総数",
-    linkerdMesh: "Linkerd mesh",
+    ingressBackends: "Ingress バックエンド",
     monitoredDomains: "ドメイン数",
     avgAvailability: "平均可用性",
     avgP95: "平均 P95",

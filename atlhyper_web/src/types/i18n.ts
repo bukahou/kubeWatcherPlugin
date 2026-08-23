@@ -1230,11 +1230,9 @@ export interface SLOTranslations {
   tabServices: string;
   tabCompare: string;
   tabOverview: string;
-  tabMesh: string;
   tabLatency: string;
   // 服务网格
   serviceTopology: string;
-  meshOverview: string;
   mtls: string;
   inbound: string;
   outbound: string;
@@ -1255,7 +1253,7 @@ export interface SLOTranslations {
   totalBackendServices: string;
   // 汇总卡片
   totalServices: string;
-  linkerdMesh: string;
+  ingressBackends: string;
   monitoredDomains: string;
   avgAvailability: string;
   avgP95: string;

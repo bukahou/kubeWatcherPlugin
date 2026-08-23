@@ -127,7 +127,6 @@ function SLOPageContent() {
     errorBudget: sloT.errorBudget,
     throughput: sloT.throughput,
     tabOverview: sloT.tabOverview,
-    tabMesh: sloT.tabMesh,
     tabCompare: sloT.tabCompare,
     tabLatency: sloT.tabLatency,
     configTarget: sloT.configTarget,
@@ -137,7 +136,6 @@ function SLOPageContent() {
     errorBudgetBurn: sloT.errorBudgetBurn,
     current: sloT.current,
     serviceTopology: sloT.serviceTopology,
-    meshOverview: sloT.meshOverview,
     service: sloT.services,
     rps: sloT.rps,
     mtls: sloT.mtls,
@@ -236,7 +234,7 @@ function SLOPageContent() {
           {/* Summary Cards — 始终显示 */}
           {!loading && !error && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-              <SummaryCard icon={Server} label={sloT.totalServices} value={summaryData.totalServices.toString()} subValue={sloT.linkerdMesh} color="bg-blue-500/10 text-blue-500" />
+              <SummaryCard icon={Server} label={sloT.totalServices} value={summaryData.totalServices.toString()} subValue={sloT.ingressBackends} color="bg-blue-500/10 text-blue-500" />
               <SummaryCard icon={Globe} label={sloT.monitoredDomains} value={summaryData.totalDomains.toString()} subValue={`${summaryData.healthyCount} ${sloT.healthy}`} color="bg-violet-500/10 text-violet-500" />
               <SummaryCard icon={Activity} label={sloT.avgAvailability} value={`${summaryData.avgAvailability.toFixed(2)}%`} color="bg-emerald-500/10 text-emerald-500" />
               <SummaryCard icon={Gauge} label={sloT.avgP95} value={`${Math.round(summaryData.avgP95)}ms`} color="bg-cyan-500/10 text-cyan-500" />
