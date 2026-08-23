@@ -13,11 +13,12 @@
 >
 > 数据源只有 node-exporter；硬件健康置顶；每信号独立判定；无传感器显示「无数据」；阈值判定全部在 Master。
 
-- Phase 0: 采集对齐 + 契约自检 + 删死代码 — 待办
-  - Collector keep regex 16 → Agent 引用全集
-  - metrics.go 指标名抽常量
-  - contract.go 新增「查而不采」检查
-  - 删 GPUCard / ProcessTable
+- Phase 0: 采集对齐 + 契约自检 + 删死代码 — ✅ 完成（fc1608b，agent v0.5.4 已上线）
+  - Collector keep regex 16 → 55，由 `metrics_catalog.go` 的 `NodeExporterKeepRegex()` 生成 ✅（config 0343a08，ClickHouse 实测 55/55 到齐）
+  - 指标名对齐：未抽常量（内联 SQL 1100+ 行，抽常量伤可读性），改为 `metrics_catalog_test.go` 扫源码守护 ✅
+  - contract.go 新增 `VerifyMetricsCollected`「查而不采」检查（启动 + 10 分钟周期）✅
+  - 删 GPUCard / ProcessTable + i18n 词条 ✅
+  - agent v0.5.4 自检日志 `清单=55 缺失=0`；API 实测 PSI / TCP / 系统 / VMStat 四卡 7 节点全部有数据 ✅
 - Phase 1a: 硬件模型 + 采集 + /metrics/hardware + 矩阵 + 速览 tile — 待办
 - Phase 1b: 温度卡全传感器化 — 待办
 - Phase 2a: 磁盘 USE → DiskCard — 待办
