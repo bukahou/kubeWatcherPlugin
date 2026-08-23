@@ -1780,6 +1780,11 @@ Deployment 已更新，新的 Pod 正在启动中
       critical: "温度过高!",
       highWarning: "高温警告",
       na: "N/A",
+      groupCpu: "CPU / SoC",
+      groupDisk: "磁盘",
+      groupOther: "其他",
+      power: "供电",
+      fanSpeed: "风扇转速",
     },
     hardware: {
       title: "硬件健康",

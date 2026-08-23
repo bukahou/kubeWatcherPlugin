@@ -1,4 +1,5 @@
 import { useI18n } from "@/i18n/context";
+import type { HardwareRow } from "@/types/hardware";
 import {
   Server,
   ChevronDown,
@@ -42,11 +43,14 @@ const getTempColor = (t: number) => {
 export function NodeCard({
   metrics,
   historyData,
+  hardware,
   expanded,
   onToggle,
 }: {
   metrics: NodeMetrics;
   historyData: Record<string, Point[]>;
+  /** 该节点的硬件判定结果（/observe/metrics/hardware）；接口不可用时为 null */
+  hardware: HardwareRow | null;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -109,7 +113,7 @@ export function NodeCard({
           </div>
 
           {/* 第三行：Temperature */}
-          <TemperatureCard data={metrics.temperature} />
+          <TemperatureCard data={metrics.temperature} hardware={hardware} />
 
           {/* 第四行：PSI + TCP */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">

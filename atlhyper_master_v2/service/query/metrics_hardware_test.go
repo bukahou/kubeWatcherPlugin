@@ -215,3 +215,39 @@ func TestTempCell_DiskFallbackUsesDiskThreshold(t *testing.T) {
 		t.Errorf("对照组：other 档下 72°C 应为 good，得到 %q", other.Status)
 	}
 }
+
+// 温度卡要展示全部传感器（不只是每类最热的那个），且每个都带后端判定。
+func TestGetHardwareHealth_SensorsListed(t *testing.T) {
+	resp, _ := hardwareService(t).GetHardwareHealth(context.Background(), "c1")
+
+	r := findRow(t, resp, "raspi5-one")
+	if len(r.Sensors) != 4 {
+		t.Fatalf("raspi5 应列出全部 4 个传感器，得到 %d", len(r.Sensors))
+	}
+	byLabel := map[string]model.HardwareSensorCell{}
+	for _, s := range r.Sensors {
+		byLabel[s.Label+"/"+s.Sensor] = s
+	}
+	// 自报阈值的 NVMe temp1
+	if c, ok := byLabel["nvme0/temp1"]; !ok || c.Class != "disk" || c.Max != 82.85 || c.Status != model.HardwareGood {
+		t.Errorf("nvme0/temp1 = %+v", c)
+	}
+	// 无自报阈值的 NVMe temp2 → 退回磁盘档 70/80
+	if c, ok := byLabel["nvme0/temp2"]; !ok || c.Max != 70 || c.Crit != 80 {
+		t.Errorf("nvme0/temp2 应退回磁盘档 70/80，得到 %+v", c)
+	}
+	// SoC 温度走 CPU 档
+	if c, ok := byLabel["cpu_thermal/temp1"]; !ok || c.Class != "cpu" || c.Max != 80 || c.Crit != 85 {
+		t.Errorf("cpu_thermal/temp1 = %+v", c)
+	}
+	// RP1 走其他档
+	if c, ok := byLabel["rp1_adc/temp1"]; !ok || c.Class != "other" || c.Max != 85 {
+		t.Errorf("rp1_adc/temp1 = %+v", c)
+	}
+
+	// 没有传感器的节点必须是空数组而非 nil —— 前端 .map 不该拿到 null
+	m := findRow(t, resp, "mystery")
+	if m.Sensors == nil || len(m.Sensors) != 0 {
+		t.Errorf("mystery.Sensors = %v，期望空数组", m.Sensors)
+	}
+}

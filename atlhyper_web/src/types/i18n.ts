@@ -1820,6 +1820,11 @@ interface NodeMetricsTranslations {
     critical: string;
     highWarning: string;
     na: string;
+    groupCpu: string;
+    groupDisk: string;
+    groupOther: string;
+    power: string;
+    fanSpeed: string;
   };
   // Hardware（硬件健康矩阵）
   hardware: {

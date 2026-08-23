@@ -54,6 +54,7 @@ func buildHardwareRow(nm *metrics.NodeMetrics) model.HardwareRow {
 		Undervolt:    undervoltCell(nm.Hardware),
 		CPUFreq:      freqCell(nm.CPU),
 		DiskAwait:    awaitCell(nm.Disks),
+		Sensors:      sensorCells(nm.Temperature.Sensors, th),
 	}
 	row.Fan = fanCell(nm.Hardware, row.CPUTemp)
 	row.Overall = worstStatus(
@@ -78,33 +79,73 @@ func tempCell(sensors []metrics.TempSensor, class metrics.TempSensorClass, fallb
 		return nil
 	}
 
-	// 传感器自带阈值优先；只有 crit 没有 max 时，把 crit 的 90% 当作提前量
-	max, crit := hottest.MaxC, hottest.CritC
-	switch {
-	case max > 0 && crit > 0:
-	case max > 0:
-		crit = fallback.crit
-	case crit > 0:
-		max = hwRound(crit*0.9, 2)
-	default:
-		max, crit = fallback.max, fallback.crit
+	max, crit := resolveTempLimits(hottest.MaxC, hottest.CritC, fallback)
+	return &model.HardwareTempCell{
+		Value:  hottest.CurrentC,
+		Max:    max,
+		Crit:   crit,
+		Label:  sensorLabel(*hottest, class),
+		Status: tempStatus(hottest.CurrentC, max, crit),
 	}
+}
 
-	cell := &model.HardwareTempCell{
-		Value: hottest.CurrentC,
-		Max:   max,
-		Crit:  crit,
-		Label: sensorLabel(*hottest, class),
-	}
+// resolveTempLimits 阈值来源优先级：传感器自报 > 画像表。
+// 只有 crit 没有 max 的传感器（Intel coretemp 常见），把 crit 的 90% 当提前量。
+func resolveTempLimits(sensorMax, sensorCrit float64, fallback tempThreshold) (max, crit float64) {
 	switch {
-	case cell.Value >= crit:
-		cell.Status = model.HardwareCrit
-	case cell.Value >= max:
-		cell.Status = model.HardwareWarn
+	case sensorMax > 0 && sensorCrit > 0:
+		return sensorMax, sensorCrit
+	case sensorMax > 0:
+		return sensorMax, fallback.crit
+	case sensorCrit > 0:
+		return hwRound(sensorCrit*0.9, 2), sensorCrit
 	default:
-		cell.Status = model.HardwareGood
+		return fallback.max, fallback.crit
 	}
-	return cell
+}
+
+func tempStatus(value, max, crit float64) model.HardwareStatus {
+	switch {
+	case value >= crit:
+		return model.HardwareCrit
+	case value >= max:
+		return model.HardwareWarn
+	default:
+		return model.HardwareGood
+	}
+}
+
+// sensorCells 逐个判定所有温度传感器，供节点详情的温度卡渲染。
+// 与矩阵格共用同一套阈值来源，避免同一个读数在两处显示不同颜色。
+func sensorCells(sensors []metrics.TempSensor, th profileThresholds) []model.HardwareSensorCell {
+	cells := make([]model.HardwareSensorCell, 0, len(sensors))
+	for _, s := range sensors {
+		class := s.Class()
+		max, crit := resolveTempLimits(s.MaxC, s.CritC, fallbackFor(class, th))
+		cell := model.HardwareSensorCell{
+			Label:  sensorLabel(s, class),
+			Sensor: s.Sensor,
+			Class:  string(class),
+			Value:  s.CurrentC,
+			Max:    max,
+			Crit:   crit,
+			Status: tempStatus(s.CurrentC, max, crit),
+		}
+		cells = append(cells, cell)
+	}
+	return cells
+}
+
+// fallbackFor 传感器不自报阈值时，按类别取画像表里对应的一档
+func fallbackFor(class metrics.TempSensorClass, th profileThresholds) tempThreshold {
+	switch class {
+	case metrics.TempClassCPU:
+		return th.cpu
+	case metrics.TempClassDisk:
+		return th.disk
+	default:
+		return th.other
+	}
 }
 
 // sensorLabel 给传感器起一个人看得懂的名字。

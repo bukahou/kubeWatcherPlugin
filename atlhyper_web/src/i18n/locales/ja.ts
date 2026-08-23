@@ -1780,6 +1780,11 @@ Deployment が更新され、新しい Pod が起動中です
       critical: "温度危険!",
       highWarning: "高温警告",
       na: "N/A",
+      groupCpu: "CPU / SoC",
+      groupDisk: "ディスク",
+      groupOther: "その他",
+      power: "電源",
+      fanSpeed: "ファン回転数",
     },
     hardware: {
       title: "ハードウェア健全性",

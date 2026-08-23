@@ -40,6 +40,17 @@ export interface HardwareAwaitCell {
   status: HardwareStatus;
 }
 
+/** 单个温度传感器的判定结果（节点详情温度卡用；矩阵那三格是每类取最热的一个）*/
+export interface HardwareSensorCell {
+  label: string;
+  sensor: string;
+  class: "cpu" | "disk" | "other";
+  value: number;
+  max: number;
+  crit: number;
+  status: HardwareStatus;
+}
+
 export interface HardwareRow {
   nodeName: string;
   profile: string;
@@ -51,6 +62,7 @@ export interface HardwareRow {
   fan: HardwareFanCell | null;
   cpuFreq: HardwareFreqCell | null;
   diskAwait: HardwareAwaitCell | null;
+  sensors: HardwareSensorCell[];
   overall: HardwareStatus;
 }
 

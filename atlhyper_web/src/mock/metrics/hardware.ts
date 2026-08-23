@@ -21,6 +21,9 @@ export const MOCK_HARDWARE: HardwareHealth = {
       fan: null,
       cpuFreq: { currentGHz: 1.5, maxGHz: 1.5, ratioPct: 100, status: "good" },
       diskAwait: { valueMs: 8.4, device: "mmcblk0", status: "good" },
+      sensors: [
+        { label: "cpu_thermal", sensor: "temp1", class: "cpu", value: 58.2, max: 80, crit: 85, status: "good" },
+      ],
       overall: "good",
     },
     {
@@ -34,6 +37,12 @@ export const MOCK_HARDWARE: HardwareHealth = {
       fan: { rpm: 5423, state: 2, maxState: 4, status: "good" },
       cpuFreq: { currentGHz: 1.5, maxGHz: 2.4, ratioPct: 62.5, status: "good" },
       diskAwait: { valueMs: 1.1, device: "nvme0n1", status: "good" },
+      sensors: [
+        { label: "cpu_thermal", sensor: "temp1", class: "cpu", value: 61.0, max: 80, crit: 85, status: "good" },
+        { label: "nvme0", sensor: "temp1", class: "disk", value: 49.9, max: 82.85, crit: 84.85, status: "good" },
+        { label: "nvme0", sensor: "temp2", class: "disk", value: 49.9, max: 70, crit: 80, status: "good" },
+        { label: "rp1_adc", sensor: "temp1", class: "other", value: 61.3, max: 85, crit: 95, status: "good" },
+      ],
       overall: "good",
     },
     {
@@ -47,6 +56,11 @@ export const MOCK_HARDWARE: HardwareHealth = {
       fan: { rpm: 6100, state: 4, maxState: 4, status: "good" },
       cpuFreq: { currentGHz: 1.2, maxGHz: 2.4, ratioPct: 50, status: "warn" },
       diskAwait: { valueMs: 62.5, device: "nvme0n1", status: "warn" },
+      sensors: [
+        { label: "cpu_thermal", sensor: "temp1", class: "cpu", value: 81.4, max: 80, crit: 85, status: "warn" },
+        { label: "nvme0", sensor: "temp1", class: "disk", value: 71.2, max: 82.85, crit: 84.85, status: "good" },
+        { label: "rp1_adc", sensor: "temp1", class: "other", value: 64.8, max: 85, crit: 95, status: "good" },
+      ],
       overall: "warn",
     },
   ],
