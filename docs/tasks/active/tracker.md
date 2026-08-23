@@ -7,6 +7,26 @@
 
 ---
 
+## 节点指标：硬件健康 + USE 改版 — 🔄 进行中
+
+> 原设计文档: [node-metrics-hardware-use-design.md](../../design/active/node-metrics-hardware-use-design.md)
+>
+> 数据源只有 node-exporter；硬件健康置顶；每信号独立判定；无传感器显示「无数据」；阈值判定全部在 Master。
+
+- Phase 0: 采集对齐 + 契约自检 + 删死代码 — 待办
+  - Collector keep regex 16 → Agent 引用全集
+  - metrics.go 指标名抽常量
+  - contract.go 新增「查而不采」检查
+  - 删 GPUCard / ProcessTable
+- Phase 1a: 硬件模型 + 采集 + /metrics/hardware + 矩阵 + 速览 tile — 待办
+- Phase 1b: 温度卡全传感器化 — 待办
+- Phase 2a: 磁盘 USE → DiskCard — 待办
+- Phase 2b: 网络/内存/CPU/系统 USE + 详情折叠 + 页面重排 — 待办
+- Phase 3: 节点对比表 — 待办
+- Phase 4: drivetemp / systemd / SMART — 待决策
+
+---
+
 ## QueryService 拆分重构 — 待办
 
 > 原设计文档: [master-v2-query-service-split-design.md](../../design/active/master-v2-query-service-split-design.md)
