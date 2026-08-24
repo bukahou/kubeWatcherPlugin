@@ -6,6 +6,8 @@ import { LoadingSpinner } from "@/components/common";
 import { useI18n } from "@/i18n/context";
 import { OTelGuard } from "@/components/observe/OTelGuard";
 import { getSLODomainsV2 } from "@/datasource/slo";
+import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
+import { TimeRangePicker } from "@/components/common";
 import { getClusterList } from "@/api/cluster";
 import { getDataSourceMode } from "@/config/data-source";
 import {
@@ -22,10 +24,7 @@ import { DomainCard } from "@/components/slo/DomainCard";
 import { SLOListTable } from "@/components/slo/SLOListTable";
 import type { DomainSLOV2, SLOSummary } from "@/types/slo";
 
-// 与 Agent 的窗口集一一对应（slo_collector.go 的 sloWindowConfigs）。
-// 传一个后端没有的 key 会静默 fallback 到 5 分钟数据，标签却写着「1 天」——
-// 这里必须跟后端同步改。
-type TimeRange = "1h" | "6h" | "24h" | "3d" | "7d";
+
 
 const REFRESH_INTERVAL = 30000;
 
@@ -47,7 +46,15 @@ function SLOPageContent() {
   const [summary, setSummary] = useState<SLOSummary | null>(null);
   const [clusterId, setClusterId] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>("24h");
+  // 全局时间轴 + 贴合到 SLO 的五个预聚合窗口。
+  // SLO 查不了任意范围（窗口是 Agent 预先算好缓存的），贴合后必须告诉用户实际用了哪个窗口。
+  const {
+    selection: timeSelection,
+    setSelection: setTimeSelection,
+    sloWindow: timeRange,
+    degraded,
+    degradeTo,
+  } = useObserveTimeRange("sloWindows");
 
   const isMountedRef = useRef(true);
   const isFirstLoadRef = useRef(true);
@@ -199,24 +206,13 @@ function SLOPageContent() {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
-              <div className="flex items-center gap-0.5 sm:gap-1 p-1 rounded-lg bg-[var(--hover-bg)]">
-                {([
-                  { value: "1h", label: "1h" },
-                  { value: "6h", label: "6h" },
-                  { value: "24h", label: "24h" },
-                  { value: "3d", label: "3d" },
-                  { value: "7d", label: "7d" },
-                ] as const).map((range) => (
-                  <button
-                    key={range.value}
-                    onClick={() => setTimeRange(range.value)}
-                    className={`px-2.5 sm:px-3 py-1.5 sm:py-1 text-xs rounded-md transition-colors ${
-                      timeRange === range.value ? "bg-card text-default shadow-sm" : "text-muted hover:text-default"
-                    }`}
-                  >
-                    {range.label}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                <TimeRangePicker value={timeSelection} onChange={setTimeSelection} t={sloT} />
+                {degraded && (
+                  <span className="text-[10px] text-amber-500 whitespace-nowrap" title={sloT.windowDegradedHint}>
+                    {sloT.windowDegraded.replace("{window}", degradeTo ?? "")}
+                  </span>
+                )}
               </div>
               <button onClick={handleRefresh} disabled={refreshing}
                 className="p-2.5 sm:p-2 rounded-lg hover:bg-[var(--hover-bg)] text-muted hover:text-default transition-colors disabled:opacity-50">

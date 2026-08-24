@@ -38,6 +38,9 @@ import type { Summary } from "@/datasource/metrics";
 
 import type { NodeMetrics, Point } from "@/types/node-metrics";
 import type { HardwareHealth, NodeComparison } from "@/types/hardware";
+import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
+import { TimeRangePicker } from "@/components/common";
+import { toSpanMs } from "@/lib/time-range";
 
 // ==================== 主页面 ====================
 export default function MetricsPage() {
@@ -69,6 +72,11 @@ function MetricsPageContent() {
   // 历史数据缓存（每个节点，按 metric 分组）
   const [historyCache, setHistoryCache] = useState<Record<string, Record<string, Point[]>>>({});
 
+  // 全局时间轴只作用于展开后的趋势图 —— 卡片与硬件矩阵永远是当前快照，
+  // 「最近 6 小时的 CPU 温度」对硬件保护没有意义，那是趋势图的事。
+  const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("trendOnly");
+  const historyHours = Math.max(1, Math.round(toSpanMs(timeSelection) / 3_600_000));
+
   // 加载数据
   const loadData = useCallback(async (showLoading = true) => {
     if (!currentClusterId) return;
@@ -99,6 +107,11 @@ function MetricsPageContent() {
     loadData();
   }, [loadData]);
 
+  // 时间范围变了，已缓存的趋势数据作废
+  useEffect(() => {
+    setHistoryCache({});
+  }, [historyHours]);
+
   // 自动刷新 (10秒)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -119,14 +132,14 @@ function MetricsPageContent() {
 
     // 展开时加载历史数据（如果尚未缓存）
     if (isExpanding && !historyCache[nodeName] && currentClusterId) {
-      getNodeMetricsHistory(currentClusterId, nodeName, 24).then(historyResult => {
+      getNodeMetricsHistory(currentClusterId, nodeName, historyHours).then(historyResult => {
         setHistoryCache(prev => ({
           ...prev,
           [nodeName]: historyResult.data,
         }));
       });
     }
-  }, [expandedNode, historyCache, currentClusterId]);
+  }, [expandedNode, historyCache, currentClusterId, historyHours]);
 
   // 计算告警节点数
   const warningNodes = useMemo(() => {
@@ -196,6 +209,10 @@ function MetricsPageContent() {
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <span className="text-[10px] sm:text-xs text-muted hidden lg:block" title={nm.rangeAffectsTrendOnly}>
+              {nm.rangeAffectsTrendOnly}
+            </span>
+            <TimeRangePicker value={timeSelection} onChange={setTimeSelection} t={nm} />
             <span className="text-[10px] sm:text-xs text-muted hidden sm:block">
               {nm.lastUpdate}: {lastUpdate.toLocaleTimeString()}
             </span>

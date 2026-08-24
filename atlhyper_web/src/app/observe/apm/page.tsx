@@ -6,7 +6,7 @@ import { Layout } from "@/components/layout/Layout";
 import { useI18n } from "@/i18n/context";
 import { useClusterStore } from "@/store/clusterStore";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import type { TimeRangeSelection } from "@/types/time-range";
+import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
 import { toSince, toAbsoluteParams } from "@/lib/time-range";
 import { Loader2, WifiOff, AlertTriangle } from "lucide-react";
 import { OTelGuard } from "@/components/observe/OTelGuard";
@@ -53,7 +53,8 @@ function ApmPageContent() {
   const [topology, setTopology] = useState<Topology | null>(null);
   const [operations, setOperations] = useState<OperationStats[]>([]);
   const [operationTraces, setOperationTraces] = useState<TraceSummary[]>([]);
-  const [timeSelection, setTimeSelection] = useState<TimeRangeSelection>({ mode: "preset", preset: "15min" });
+  // 时间轴是全局的 —— 切到 Logs 查同一时刻的日志时不用重选
+  const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("full");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

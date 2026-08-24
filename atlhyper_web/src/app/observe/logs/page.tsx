@@ -16,7 +16,7 @@ import { OTelGuard } from "@/components/observe/OTelGuard";
 import { queryLogs, queryLogHistogram } from "@/datasource/logs";
 import { TimeRangePicker } from "@/components/common";
 import { toSince, toAbsoluteParams, toSpanMs } from "@/lib/time-range";
-import type { TimeRangeSelection } from "@/types/time-range";
+import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
 
 import type { LogEntry, LogQueryResult, LogHistogramBucket } from "@/types/model/log";
 
@@ -78,7 +78,8 @@ function LogsPageContent() {
   };
 
   // Time range selection
-  const [timeSelection, setTimeSelection] = useState<TimeRangeSelection>({ mode: "preset", preset: "15min" });
+  // 时间轴是全局的 —— 从 APM 切过来时保持同一段时间，不用重选
+  const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("full");
 
   // Reset page when any filter changes (including brush)
   useEffect(() => {

@@ -4,6 +4,9 @@
 
 import type { PresetKey, RelativeUnit, TimeRangeSelection } from "@/types/time-range";
 
+/** 全部预设 key，顺序即选择器展示顺序 */
+export const PRESET_KEYS = ["15min", "1h", "24h", "7d", "15d", "30d"] as const;
+
 /** 预设 key → Go duration string (用于 API since 参数) */
 const PRESET_SINCE: Record<PresetKey, string> = {
   "15min": "15m",
@@ -109,4 +112,99 @@ export function toDisplayLabel(
       return `${fmt(sel.start)} — ${fmt(sel.end)}`;
     }
   }
+}
+
+// ──────────────────────────────────────────────────────────────
+// SLO 窗口贴合
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * SLO 可用的预聚合窗口，与 Agent 的 sloWindowConfigs 一一对应
+ * （atlhyper_agent_v2/service/snapshot/slo_collector.go）。
+ *
+ * SLO 不能按任意时间范围查询 —— 这些窗口是 Agent 预先算好缓存的，
+ * 传一个不在列表里的 key 会让后端静默 fallback 到 5 分钟数据。
+ * 两边必须同步改。
+ */
+export const SLO_WINDOWS = ["1h", "6h", "24h", "3d", "7d"] as const;
+export type SLOWindow = (typeof SLO_WINDOWS)[number];
+
+const SLO_WINDOW_MS: Record<SLOWindow, number> = {
+  "1h": 3_600_000,
+  "6h": 6 * 3_600_000,
+  "24h": 86_400_000,
+  "3d": 3 * 86_400_000,
+  "7d": 7 * 86_400_000,
+};
+
+export interface SLOWindowResult {
+  window: SLOWindow;
+  /** 是否发生了贴合。降级必须让用户看见，不能默默换掉窗口 */
+  degraded: boolean;
+}
+
+/**
+ * 把任意时间范围贴合到最近的 SLO 预聚合窗口。
+ *
+ * 向上取而非向下取：向下取会让统计窗口比用户要求的短，可用率与预算都会失真；
+ * 向上取只是范围更宽，语义上是安全的。
+ * 超过最大窗口时钳到 7d —— ClickHouse 只保留 7 天数据。
+ */
+export function toSLOWindow(sel: TimeRangeSelection): SLOWindowResult {
+  const spanMs = toSpanMs(sel);
+  for (const w of SLO_WINDOWS) {
+    if (spanMs <= SLO_WINDOW_MS[w]) {
+      return { window: w, degraded: spanMs !== SLO_WINDOW_MS[w] };
+    }
+  }
+  const largest = SLO_WINDOWS[SLO_WINDOWS.length - 1];
+  return { window: largest, degraded: spanMs !== SLO_WINDOW_MS[largest] };
+}
+
+// ──────────────────────────────────────────────────────────────
+// URL 参数编解码 —— 让时间轴可分享、刷新不丢
+// ──────────────────────────────────────────────────────────────
+
+const CUSTOM_PATTERN = /^(\d+)([mhd])$/;
+
+/** 序列化为 URL query 片段（不含 ?）。preset 与 custom 都用可读形式，人能看懂 */
+export function formatRangeParam(sel: TimeRangeSelection): string {
+  switch (sel.mode) {
+    case "preset":
+      return `range=${sel.preset}`;
+    case "custom":
+      return `range=${sel.value}${sel.unit}`;
+    case "absolute":
+      return `from=${sel.start}&to=${sel.end}`;
+  }
+}
+
+/**
+ * 从 URL 参数解析时间范围。
+ *
+ * 返回 null 表示「URL 里没有或不合法」，由调用方决定回退到 localStorage 还是默认值。
+ * URL 是用户可以随手编辑的，任何非法输入都返回 null 而不是抛异常。
+ */
+export function parseRangeParam(params: URLSearchParams): TimeRangeSelection | null {
+  const from = params.get("from");
+  const to = params.get("to");
+  if (from !== null && to !== null) {
+    const start = Number(from);
+    const end = Number(to);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+    return { mode: "absolute", start, end };
+  }
+
+  const range = params.get("range");
+  if (!range) return null;
+
+  if ((PRESET_KEYS as readonly string[]).includes(range)) {
+    return { mode: "preset", preset: range as PresetKey };
+  }
+
+  const m = CUSTOM_PATTERN.exec(range);
+  if (!m) return null;
+  const value = Number(m[1]);
+  if (value <= 0) return null;
+  return { mode: "custom", value, unit: m[2] as RelativeUnit };
 }

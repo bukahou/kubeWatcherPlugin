@@ -1149,7 +1149,9 @@ export interface PolicyTranslations {
 }
 
 // SLO 页面翻译
-export interface SLOTranslations {
+export interface SLOTranslations extends TimeRangePickerTranslations {
+  windowDegraded: string;
+  windowDegradedHint: string;
   // 页面标题
   pageTitle: string;
   pageDescription: string;
@@ -1700,7 +1702,8 @@ export interface AboutTranslations {
 }
 
 // 节点指标翻译
-interface NodeMetricsTranslations {
+interface NodeMetricsTranslations extends TimeRangePickerTranslations {
+  rangeAffectsTrendOnly: string;
   // 页面级
   pageDescription: string;
   lastUpdate: string;
