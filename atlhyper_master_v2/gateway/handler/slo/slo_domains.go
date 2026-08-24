@@ -178,6 +178,18 @@ func buildBudget(otel *cluster.OTelSnapshot, serviceKey string, cur *model.SLOMe
 	return out
 }
 
+// ingressForLookup 选反查用的服务列表：优先当前查询窗口，其次 5 分钟列表。
+//
+// SLOIngress 固定是 5 分钟窗口，低流量服务随时会从里面消失 —— 实测凌晨时段
+// 它只剩正在被访问的那一个服务，导致其余域名反查失败、历史图与延迟分布全空。
+// 查 24h 窗口就该用 24h 窗口的服务列表。
+func ingressForLookup(windowed, recent []slomodel.IngressSLO) []slomodel.IngressSLO {
+	if len(windowed) > 0 {
+		return windowed
+	}
+	return recent
+}
+
 // serviceKeysForDomain 域名 → serviceKey 集合。
 //
 // 与 fallbackDomainName 是一对：那个把 serviceKey 变成展示用的真实域名，
@@ -688,11 +700,16 @@ func (h *SLOHandler) DomainHistory(w http.ResponseWriter, r *http.Request) {
 
 	// 域名 → ServiceKey 映射（与 LatencyDistribution 一致）
 	mappings, _ := h.querySvc.GetSLORouteMappingsByDomain(ctx, clusterID, host)
-	var ingressForLookup []slomodel.IngressSLO
+	var windowed, recent []slomodel.IngressSLO
 	if snap, _ := h.querySvc.GetOTelSnapshot(ctx, clusterID); snap != nil {
-		ingressForLookup = snap.SLOIngress
+		recent = snap.SLOIngress
+		if snap.SLOWindows != nil {
+			if w, ok := snap.SLOWindows[timeRange]; ok && w != nil {
+				windowed = w.Current
+			}
+		}
 	}
-	serviceKeys := serviceKeysForDomain(host, ingressForLookup, mappings)
+	serviceKeys := serviceKeysForDomain(host, ingressForLookup(windowed, recent), mappings)
 
 	// 优先从 SLOWindows[timeRange].History 获取历史数据
 	var history []model.SLODomainHistoryItem

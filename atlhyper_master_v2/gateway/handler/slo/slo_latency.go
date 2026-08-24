@@ -55,11 +55,17 @@ func (h *SLOHandler) LatencyDistribution(w http.ResponseWriter, r *http.Request)
 
 	// 域名 → serviceKey。路由映射表为空时按 DisplayName 从快照反查 ——
 	// 直接拿域名当 serviceKey 会查不到任何数据（见 serviceKeysForDomain 的注释）
-	var ingressForLookup []slomodel.IngressSLO
-	if otel != nil {
-		ingressForLookup = otel.SLOIngress
+	var windowed []slomodel.IngressSLO
+	if otel != nil && otel.SLOWindows != nil {
+		if w, ok := otel.SLOWindows[timeRange]; ok && w != nil {
+			windowed = w.Current
+		}
 	}
-	serviceKeys := serviceKeysForDomain(domain, ingressForLookup, mappings)
+	var recent []slomodel.IngressSLO
+	if otel != nil {
+		recent = otel.SLOIngress
+	}
+	serviceKeys := serviceKeysForDomain(domain, ingressForLookup(windowed, recent), mappings)
 
 	// 优先从 SLOWindows[timeRange] 获取 IngressSLO（含 LatencyBuckets + Methods）
 	var ingressList []slomodel.IngressSLO

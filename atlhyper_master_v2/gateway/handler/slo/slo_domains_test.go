@@ -98,3 +98,43 @@ func TestServiceKeysForDomain(t *testing.T) {
 		}
 	})
 }
+
+// 反查的数据源必须跟随查询窗口。
+//
+// SLOIngress 是固定 5 分钟窗口，低流量服务随时会从里面消失 ——
+// 2026-08-24 实测凌晨时段它只剩 1 个服务（我正在访问的面板本身），
+// 另外四个域名的历史图与延迟分布因此全部查不到数据。
+// 查 24h 窗口就该用 24h 窗口的服务列表。
+func TestIngressForLookup_PrefersWindow(t *testing.T) {
+	windowed := []slomodel.IngressSLO{
+		{ServiceKey: "geass-v3/geass-gateway", DisplayName: "geass-api.bukahou.com"},
+		{ServiceKey: "akasha/akasha", DisplayName: "akasha.bukahou.com"},
+	}
+	recent := []slomodel.IngressSLO{
+		{ServiceKey: "atlhyper/atlhyper-web", DisplayName: "bukahou.com"},
+	}
+
+	t.Run("窗口有数据时用窗口的", func(t *testing.T) {
+		got := ingressForLookup(windowed, recent)
+		if len(got) != 2 {
+			t.Fatalf("= %d 条，期望用窗口里的 2 条", len(got))
+		}
+		keys := serviceKeysForDomain("geass-api.bukahou.com", got, nil)
+		if !keys["geass-v3/geass-gateway"] {
+			t.Errorf("低流量服务应能反查到: %v", keys)
+		}
+	})
+
+	t.Run("窗口为空时退回 5 分钟列表", func(t *testing.T) {
+		got := ingressForLookup(nil, recent)
+		if len(got) != 1 || got[0].ServiceKey != "atlhyper/atlhyper-web" {
+			t.Errorf("= %v", got)
+		}
+	})
+
+	t.Run("都为空时返回空而非 panic", func(t *testing.T) {
+		if got := ingressForLookup(nil, nil); len(got) != 0 {
+			t.Errorf("= %v", got)
+		}
+	})
+}
