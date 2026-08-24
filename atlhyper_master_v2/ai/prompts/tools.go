@@ -181,7 +181,7 @@ const toolsJSON = `[
         },
         "window": {
           "type": "string",
-          "enum": ["1d", "7d", "30d"],
+          "enum": ["1h", "6h", "24h", "3d", "7d"],
           "description": "时间窗口，默认 7d",
           "default": "7d"
         }

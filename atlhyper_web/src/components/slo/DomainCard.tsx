@@ -16,7 +16,8 @@ import { LatencyTab } from "./LatencyTab";
 import { getSLODomainHistory, getSLOLatencyDistribution } from "@/datasource/slo";
 import type { DomainSLOV2, LatencyDistributionResponse, SLOHistoryPoint } from "@/types/slo";
 
-type TimeRange = "1d" | "7d" | "30d";
+// 与 app/observe/slo/page.tsx 及 Agent 的 sloWindowConfigs 保持一致
+type TimeRange = "1h" | "6h" | "24h" | "3d" | "7d";
 
 export interface DomainCardTranslations {
   services: string;

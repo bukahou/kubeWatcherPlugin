@@ -22,7 +22,10 @@ import { DomainCard } from "@/components/slo/DomainCard";
 import { SLOListTable } from "@/components/slo/SLOListTable";
 import type { DomainSLOV2, SLOSummary } from "@/types/slo";
 
-type TimeRange = "1d" | "7d" | "30d";
+// 与 Agent 的窗口集一一对应（slo_collector.go 的 sloWindowConfigs）。
+// 传一个后端没有的 key 会静默 fallback 到 5 分钟数据，标签却写着「1 天」——
+// 这里必须跟后端同步改。
+type TimeRange = "1h" | "6h" | "24h" | "3d" | "7d";
 
 const REFRESH_INTERVAL = 30000;
 
@@ -44,7 +47,7 @@ function SLOPageContent() {
   const [summary, setSummary] = useState<SLOSummary | null>(null);
   const [clusterId, setClusterId] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>("1d");
+  const [timeRange, setTimeRange] = useState<TimeRange>("24h");
 
   const isMountedRef = useRef(true);
   const isFirstLoadRef = useRef(true);
@@ -198,9 +201,11 @@ function SLOPageContent() {
             <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
               <div className="flex items-center gap-0.5 sm:gap-1 p-1 rounded-lg bg-[var(--hover-bg)]">
                 {([
-                  { value: "1d", label: sloT.day },
-                  { value: "7d", label: sloT.week },
-                  { value: "30d", label: sloT.month },
+                  { value: "1h", label: "1h" },
+                  { value: "6h", label: "6h" },
+                  { value: "24h", label: "24h" },
+                  { value: "3d", label: "3d" },
+                  { value: "7d", label: "7d" },
                 ] as const).map((range) => (
                   <button
                     key={range.value}

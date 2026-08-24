@@ -13,13 +13,9 @@ export interface LatencyTabTranslations {
   noData: string;
 }
 
+// 窗口 key 本身就是可读标签（1h / 6h / 24h / 3d / 7d），不需要再映射一层
 function timeRangeLabel(tr: string): string {
-  switch (tr) {
-    case "1d": return "24h";
-    case "7d": return "7d";
-    case "30d": return "30d";
-    default: return tr;
-  }
+  return tr;
 }
 
 export function LatencyTab({ data, timeRange, t }: {
