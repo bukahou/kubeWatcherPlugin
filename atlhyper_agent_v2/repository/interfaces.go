@@ -202,6 +202,14 @@ type LogQueryRepository interface {
 	ListRecentEntries(ctx context.Context, limit int) ([]log.Entry, error)
 }
 
+// FreshnessQueryRepository 信号新鲜度查询仓库
+//
+// 供页面区分「没有流量」和「采集挂了」—— 两者都表现为空白，
+// 但一个不用管，一个要救火。
+type FreshnessQueryRepository interface {
+	GetSignalFreshness(ctx context.Context) (*cluster.SignalFreshness, error)
+}
+
 // MetricsQueryRepository Metrics 查询仓库（按需查询）
 type MetricsQueryRepository interface {
 	ListAllNodeMetrics(ctx context.Context) ([]metrics.NodeMetrics, error)
@@ -256,6 +264,7 @@ type OTelDashboardRepository interface {
 	APMDashboardRepository
 	SLODashboardRepository
 	LogsDashboardRepository
+	FreshnessQueryRepository
 }
 
 // RouteRepository 路由映射仓库 —— 后端服务 → 对外域名

@@ -35,6 +35,13 @@ export async function getHardwareHealth(clusterId: string) {
   return res.data.data;
 }
 
+export async function getSignalFreshness(clusterId: string) {
+  // 新鲜度没有 mock —— mock 模式下数据是编的，谈新鲜度没有意义，返回 null 让徽章显示「未知」
+  if (getDataSourceMode("metrics") === "mock") return null;
+  const res = await observe.getSignalFreshness(clusterId);
+  return res.data.data;
+}
+
 export async function getNodeComparison(clusterId: string) {
   if (getDataSourceMode("metrics") === "mock") return mock.mockGetNodeComparison();
   const res = await observe.getMetricsCompare(clusterId);

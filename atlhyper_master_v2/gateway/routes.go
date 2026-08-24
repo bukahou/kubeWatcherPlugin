@@ -235,6 +235,7 @@ func (r *Router) registerRoutes() {
 		register("/api/v2/node-metrics/", nodeMetricsH.Route)
 
 		// ---------- 可观测性查询（ClickHouse 按需） ----------
+		register("/api/v2/observe/freshness", observeH.Freshness)
 		register("/api/v2/observe/metrics/summary", observeH.MetricsSummary)
 		register("/api/v2/observe/metrics/nodes", observeH.MetricsNodes)
 		register("/api/v2/observe/metrics/nodes/", observeH.MetricsNodeRoute)

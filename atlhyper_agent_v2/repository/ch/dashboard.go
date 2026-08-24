@@ -7,6 +7,7 @@ import (
 
 	"AtlHyper/atlhyper_agent_v2/repository"
 	"AtlHyper/model_v3/apm"
+	"AtlHyper/model_v3/cluster"
 	"AtlHyper/model_v3/log"
 	"AtlHyper/model_v3/metrics"
 	"AtlHyper/model_v3/slo"
@@ -14,10 +15,21 @@ import (
 
 // dashboardRepository Dashboard 数据采集（组合委托现有 repos）
 type dashboardRepository struct {
-	metrics repository.MetricsQueryRepository
-	trace   repository.TraceQueryRepository
-	slo     repository.SLOQueryRepository
-	log     repository.LogQueryRepository
+	metrics   repository.MetricsQueryRepository
+	trace     repository.TraceQueryRepository
+	slo       repository.SLOQueryRepository
+	log       repository.LogQueryRepository
+	freshness repository.FreshnessQueryRepository
+}
+
+// GetSignalFreshness 委托给新鲜度仓库。
+// 挂在 Dashboard 门面上而不是单独注入 —— 这个门面的职责就是「快照需要的 OTel 数据」，
+// 新鲜度属于同一职责，另开一个构造参数只会让 20 多个参数的签名更难读。
+func (r *dashboardRepository) GetSignalFreshness(ctx context.Context) (*cluster.SignalFreshness, error) {
+	if r.freshness == nil {
+		return nil, nil
+	}
+	return r.freshness.GetSignalFreshness(ctx)
 }
 
 // NewDashboardRepository 创建 Dashboard 仓库
@@ -26,8 +38,9 @@ func NewDashboardRepository(
 	t repository.TraceQueryRepository,
 	s repository.SLOQueryRepository,
 	l repository.LogQueryRepository,
+	f repository.FreshnessQueryRepository,
 ) repository.OTelDashboardRepository {
-	return &dashboardRepository{metrics: m, trace: t, slo: s, log: l}
+	return &dashboardRepository{metrics: m, trace: t, slo: s, log: l, freshness: f}
 }
 
 func (r *dashboardRepository) GetMetricsSummary(ctx context.Context) (*metrics.Summary, error) {

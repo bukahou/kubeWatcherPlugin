@@ -39,6 +39,8 @@ import type { Summary } from "@/datasource/metrics";
 import type { NodeMetrics, Point } from "@/types/node-metrics";
 import type { HardwareHealth, NodeComparison } from "@/types/hardware";
 import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
+import { useSignalFreshness } from "@/hooks/useSignalFreshness";
+import { SignalFreshnessBadge } from "@/components/observe/SignalFreshnessBadge";
 import { TimeRangePicker } from "@/components/common";
 import { toSpanMs } from "@/lib/time-range";
 
@@ -75,6 +77,7 @@ function MetricsPageContent() {
   // 全局时间轴只作用于展开后的趋势图 —— 卡片与硬件矩阵永远是当前快照，
   // 「最近 6 小时的 CPU 温度」对硬件保护没有意义，那是趋势图的事。
   const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("trendOnly");
+  const freshness = useSignalFreshness("metrics");
   const historyHours = Math.max(1, Math.round(toSpanMs(timeSelection) / 3_600_000));
 
   // 加载数据
@@ -212,6 +215,7 @@ function MetricsPageContent() {
             <span className="text-[10px] sm:text-xs text-muted hidden lg:block" title={nm.rangeAffectsTrendOnly}>
               {nm.rangeAffectsTrendOnly}
             </span>
+            <SignalFreshnessBadge item={freshness} />
             <TimeRangePicker value={timeSelection} onChange={setTimeSelection} t={nm} />
             <span className="text-[10px] sm:text-xs text-muted hidden sm:block">
               {nm.lastUpdate}: {lastUpdate.toLocaleTimeString()}

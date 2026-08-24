@@ -1691,6 +1691,20 @@ Deployment 已更新，新的 Pod 正在启动中
       failed: "失败",
     },
   },
+  observe: {
+    freshness: {
+      live: "数据正常",
+      idle: "无流量",
+      stale: "采集异常",
+      absent: "无数据",
+      unknown: "未知",
+      idleHint: "采集链路正常，只是这段时间没有请求 —— 不需要处理",
+      staleHint: "连节点指标都停了，采集链路可能出了问题",
+      justNow: "刚刚",
+      minutesAgo: "{n} 分钟前",
+      hoursAgo: "{n} 小时前",
+    },
+  },
   nodeMetrics: {
     last15min: "最近 15 分钟",
     last1h: "最近 1 小时",

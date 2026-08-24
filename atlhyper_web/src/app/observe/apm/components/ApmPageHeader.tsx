@@ -1,5 +1,7 @@
 import { RefreshCw, ChevronRight } from "lucide-react";
 import { TimeRangePicker } from "@/components/common";
+import { SignalFreshnessBadge } from "@/components/observe/SignalFreshnessBadge";
+import type { SignalFreshnessItem } from "@/types/observe";
 import type { TimeRangeSelection } from "@/types/time-range";
 import type { ApmTranslations, CommonTranslations } from "@/types/i18n";
 
@@ -13,6 +15,8 @@ interface ApmPageHeaderProps {
   tc: CommonTranslations;
   view: ViewState;
   timeSelection: TimeRangeSelection;
+  /** 信号新鲜度；null 时徽章显示「未知」，不隐藏 */
+  freshness: SignalFreshnessItem | null;
   isRefreshing: boolean;
   onTimeChange: (v: TimeRangeSelection) => void;
   onRefresh: () => void;
@@ -25,6 +29,7 @@ export function ApmPageHeader({
   tc,
   view,
   timeSelection,
+  freshness,
   isRefreshing,
   onTimeChange,
   onRefresh,
@@ -80,6 +85,7 @@ export function ApmPageHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <SignalFreshnessBadge item={freshness} />
         <TimeRangePicker
           value={timeSelection}
           onChange={onTimeChange}

@@ -2113,6 +2113,22 @@ export interface AIOpsTranslations {
 }
 
 // 时间范围选择器翻译（TimeRangePicker 复用）
+// 观测模块跨信号翻译
+export interface ObserveTranslations {
+  freshness: {
+    live: string;
+    idle: string;
+    stale: string;
+    absent: string;
+    unknown: string;
+    idleHint: string;
+    staleHint: string;
+    justNow: string;
+    minutesAgo: string;
+    hoursAgo: string;
+  };
+}
+
 export interface TimeRangePickerTranslations {
   last15min: string;
   last1h: string;
@@ -2519,6 +2535,7 @@ export interface Translations {
   storagePage: StorageTranslations;
   policyPage: PolicyTranslations;
   nodeMetrics: NodeMetricsTranslations;
+  observe: ObserveTranslations;
   aiops: AIOpsTranslations;
   apm: ApmTranslations;
   logs: LogTranslations;

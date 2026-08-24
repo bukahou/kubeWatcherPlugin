@@ -7,6 +7,8 @@ import { useI18n } from "@/i18n/context";
 import { OTelGuard } from "@/components/observe/OTelGuard";
 import { getSLODomainsV2 } from "@/datasource/slo";
 import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
+import { useSignalFreshness } from "@/hooks/useSignalFreshness";
+import { SignalFreshnessBadge } from "@/components/observe/SignalFreshnessBadge";
 import { TimeRangePicker } from "@/components/common";
 import { getClusterList } from "@/api/cluster";
 import { getDataSourceMode } from "@/config/data-source";
@@ -55,6 +57,8 @@ function SLOPageContent() {
     degraded,
     degradeTo,
   } = useObserveTimeRange("sloWindows");
+  // SLO 的数据源是 ingress 指标，跟着 metrics 的新鲜度走
+  const freshness = useSignalFreshness("metrics");
 
   const isMountedRef = useRef(true);
   const isFirstLoadRef = useRef(true);
@@ -207,6 +211,7 @@ function SLOPageContent() {
             </div>
             <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
               <div className="flex items-center gap-2">
+                <SignalFreshnessBadge item={freshness} />
                 <TimeRangePicker value={timeSelection} onChange={setTimeSelection} t={sloT} />
                 {degraded && (
                   <span className="text-[10px] text-amber-500 whitespace-nowrap" title={sloT.windowDegradedHint}>

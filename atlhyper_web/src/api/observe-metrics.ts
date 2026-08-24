@@ -6,6 +6,7 @@ import { get } from "./request";
 import type { ObserveResponse } from "./observe-common";
 import type { NodeMetrics, Summary, Point } from "@/types/node-metrics";
 import type { HardwareHealth, NodeComparison } from "@/types/hardware";
+import type { FreshnessResponse } from "@/types/observe";
 
 /** 获取指标汇总 */
 export function getMetricsSummary(clusterId: string) {
@@ -47,6 +48,13 @@ export function getMetricsHardware(clusterId: string) {
 /** 获取节点横向对比表 */
 export function getMetricsCompare(clusterId: string) {
   return get<ObserveResponse<NodeComparison>>("/api/v2/observe/metrics/compare", {
+    cluster_id: clusterId,
+  });
+}
+
+/** 获取各信号的数据新鲜度（用于区分「没有流量」和「采集异常」） */
+export function getSignalFreshness(clusterId: string) {
+  return get<ObserveResponse<FreshnessResponse>>("/api/v2/observe/freshness", {
     cluster_id: clusterId,
   });
 }

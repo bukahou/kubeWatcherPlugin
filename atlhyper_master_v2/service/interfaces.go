@@ -52,6 +52,8 @@ type QueryOTel interface {
 	GetHardwareHealth(ctx context.Context, clusterID string) (*model.HardwareHealthResponse, error)
 	// GetNodeComparison 节点横向对比表（硬件列复用 GetHardwareHealth 的判定）
 	GetNodeComparison(ctx context.Context, clusterID string) (*model.NodeComparisonResponse, error)
+	// GetSignalFreshness 各信号的数据新鲜度，用于区分「没有流量」和「采集挂了」
+	GetSignalFreshness(ctx context.Context, clusterID string) (*model.FreshnessResponse, error)
 }
 
 // QuerySLO SLO 服务网格查询 + SLO 目标/路由映射查询

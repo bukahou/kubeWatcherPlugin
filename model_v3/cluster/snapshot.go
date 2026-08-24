@@ -198,6 +198,22 @@ type OTelSnapshot struct {
 	SLOTimeSeries []SLOServiceTimeSeries `json:"sloTimeSeries,omitempty"`
 	// APM 服务时序（每个服务最近 1h）
 	APMTimeSeries []APMServiceTimeSeries `json:"apmTimeSeries,omitempty"`
+
+	// Freshness 各信号最近一条数据的时间。
+	// 用来在页面上区分「没有流量」和「采集挂了」—— 两者在页面上都是空白，
+	// 但一个不用管，一个要救火。nil 表示上报方（旧版 Agent）不采集。
+	Freshness *SignalFreshness `json:"freshness,omitempty"`
+}
+
+// SignalFreshness 各信号最近一条数据的时间戳。
+//
+// 之所以三个信号都要：metrics 是 Collector 主动拉取的，只要节点活着就一定有数据；
+// traces / logs 由请求触发，安静一段时间很正常。两者的非对称正好能区分
+// 「没人访问」和「采集链路断了」—— 单看某一个信号是分不出来的。
+type SignalFreshness struct {
+	MetricsAt time.Time `json:"metricsAt"`
+	TracesAt  time.Time `json:"tracesAt"`
+	LogsAt    time.Time `json:"logsAt"`
 }
 
 // NodeMetricsTimeSeries 单节点预聚合时序

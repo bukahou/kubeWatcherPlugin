@@ -1691,6 +1691,20 @@ Deployment が更新され、新しい Pod が起動中です
       failed: "失敗",
     },
   },
+  observe: {
+    freshness: {
+      live: "正常",
+      idle: "トラフィックなし",
+      stale: "収集異常",
+      absent: "データなし",
+      unknown: "不明",
+      idleHint: "収集経路は正常。この時間帯にリクエストがなかっただけで、対応不要です",
+      staleHint: "ノードメトリクスまで停止しています。収集経路に問題がある可能性があります",
+      justNow: "たった今",
+      minutesAgo: "{n} 分前",
+      hoursAgo: "{n} 時間前",
+    },
+  },
   nodeMetrics: {
     last15min: "直近 15 分",
     last1h: "直近 1 時間",

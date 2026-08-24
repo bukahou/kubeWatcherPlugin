@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n/context";
 import { useClusterStore } from "@/store/clusterStore";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
+import { useSignalFreshness } from "@/hooks/useSignalFreshness";
 import { toSince, toAbsoluteParams } from "@/lib/time-range";
 import { Loader2, WifiOff, AlertTriangle } from "lucide-react";
 import { OTelGuard } from "@/components/observe/OTelGuard";
@@ -55,6 +56,7 @@ function ApmPageContent() {
   const [operationTraces, setOperationTraces] = useState<TraceSummary[]>([]);
   // 时间轴是全局的 —— 切到 Logs 查同一时刻的日志时不用重选
   const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("full");
+  const freshness = useSignalFreshness("traces");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -224,6 +226,7 @@ function ApmPageContent() {
           tc={t.common}
           view={view}
           timeSelection={timeSelection}
+          freshness={freshness}
           isRefreshing={isRefreshing}
           onTimeChange={setTimeSelection}
           onRefresh={() => loadData(true)}

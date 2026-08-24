@@ -17,6 +17,8 @@ import { queryLogs, queryLogHistogram } from "@/datasource/logs";
 import { TimeRangePicker } from "@/components/common";
 import { toSince, toAbsoluteParams, toSpanMs } from "@/lib/time-range";
 import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
+import { useSignalFreshness } from "@/hooks/useSignalFreshness";
+import { SignalFreshnessBadge } from "@/components/observe/SignalFreshnessBadge";
 
 import type { LogEntry, LogQueryResult, LogHistogramBucket } from "@/types/model/log";
 
@@ -80,6 +82,7 @@ function LogsPageContent() {
   // Time range selection
   // 时间轴是全局的 —— 从 APM 切过来时保持同一段时间，不用重选
   const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("full");
+  const freshness = useSignalFreshness("logs");
 
   // Reset page when any filter changes (including brush)
   useEffect(() => {
@@ -198,6 +201,7 @@ function LogsPageContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            <SignalFreshnessBadge item={freshness} />
             <TimeRangePicker
               value={timeSelection}
               onChange={setTimeSelection}

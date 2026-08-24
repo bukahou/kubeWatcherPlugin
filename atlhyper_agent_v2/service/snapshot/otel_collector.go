@@ -272,6 +272,12 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 	// 多窗口 SLO 数据采集（带独立 TTL 缓存）
 	if s.dashboardRepo != nil {
 		snapshot.SLOWindows = s.collectSLOWindows(ctx, now)
+
+		// 各信号最新数据时间：让页面能区分「没有流量」和「采集挂了」。
+		// 查询失败时保持 nil —— Master 会判为 absent，比编个假时间戳诚实。
+		if f, err := s.dashboardRepo.GetSignalFreshness(ctx); err == nil {
+			snapshot.Freshness = f
+		}
 	}
 
 	return snapshot
