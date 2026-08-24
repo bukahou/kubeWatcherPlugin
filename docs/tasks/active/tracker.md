@@ -7,6 +7,21 @@
 
 ---
 
+## 指标采集查询预算 — 🔄 收尾
+
+> 故障档案: config 仓 `clusters/incidents/2026-08-24-atlhyper-metrics-blank-page.md`
+>
+> 每节点 27 个查询 × 7 节点串行共享 30 秒 ctx，后半段节点被 context 取消，数据静默缺失。
+
+- 采集不全时打日志（detectMissingParts）— ✅ 完成（e160ad8）
+- 标量 gauge 六合一，每节点 27 → 18 — ✅ 完成，agent v0.6.5 已上线
+  - 实测 7 节点数据全部完整（此前 raspi5-one / raspi5-zero 长期缺 disks/networks/sensors）
+  - 待观察：ClickHouse Broken pipe 计数是否同步下降
+- 进一步压缩（fillCPU 4 个 / fillNetworks 2 个 / fillDisks 2 个）— 待议，收益递减
+- 跨节点批量查询（一个查询取全部节点的标量）— 待议，需重构 buildNodeMetrics 结构
+
+---
+
 ## 观测模块统一时间轴与信号联动 — 🔄 进行中
 
 > 原设计文档: [observe-unified-timerange.md](../../design/active/observe-unified-timerange.md)
