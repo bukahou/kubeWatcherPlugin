@@ -40,7 +40,7 @@ SLO 契约改造（`ingress_*` 归一化）完成后，面板恢复了数据流�
 ## 核心架构
 
 ```
-cilium-envoy (2 实例: 192.168.0.10:9964 / .12:9964)
+cilium-envoy (DaemonSet，多实例，各自维护独立计数器)
    │ Prometheus scrape 15s
    ▼
 Collector transform/ingress_normalize → ingress_request_total{namespace,service,status_class}
@@ -68,7 +68,7 @@ Web /observe/slo   SLO 清单表（含燃烧率）→ 展开详情
 
 | 约束 | 影响 |
 |------|------|
-| **两个 envoy 实例** | 所有 counter/histogram 聚合必须先按实例分区，否则数据失真数万倍 |
+| **envoy 是多实例** | 所有 counter/histogram 聚合必须先按实例分区，否则数据失真数万倍 |
 | **ClickHouse TTL 7 天** | 30 天窗口没有数据。窗口档位应对齐真实能力 |
 | **ClickHouse + SQLite 均为 emptyDir** | Pod 重启数据归零。任何"长期 SLO"在当前存储下都是幻觉，见「存储决策」 |
 
