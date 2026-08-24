@@ -22,7 +22,6 @@ import {
   Server,
 } from "lucide-react";
 import { SummaryCard, formatNumber } from "@/components/slo/common";
-import { DomainCard } from "@/components/slo/DomainCard";
 import { SLOListTable } from "@/components/slo/SLOListTable";
 import type { DomainSLOV2, SLOSummary } from "@/types/slo";
 
@@ -132,41 +131,43 @@ function SLOPageContent() {
     return { totalServices, totalDomains, healthyCount, warningCount, criticalCount, totalRPS, avgAvailability, avgP95 };
   }, [domains, summary]);
 
-  // Build domain card translations
-  const domainCardT = useMemo(() => ({
-    services: sloT.services,
-    availability: sloT.availability,
-    p95Latency: sloT.p95Latency,
-    p99Latency: sloT.p99Latency,
-    errorRate: sloT.errorRate,
-    errorBudget: sloT.errorBudget,
-    throughput: sloT.throughput,
-    tabOverview: sloT.tabOverview,
-    tabCompare: sloT.tabCompare,
+  // DomainDetail 及其子组件的翻译。清单表那一行已经承载了域名/目标/SLI/预算/燃烧率概要，
+  // 这里只需要详情独有的部分。
+  const domainDetailT = useMemo(() => ({
+    tabBudget: sloT.tabOverview,
     tabLatency: sloT.tabLatency,
     configTarget: sloT.configTarget,
-    totalRequests: sloT.totalRequests,
+    // 燃烧率表
+    burnRate: sloT.burnRate,
+    burnRateHint: sloT.burnRateHint,
+    window: sloT.window,
+    rate: sloT.rate,
+    threshold: sloT.threshold,
+    status: sloT.sloStatus,
+    good: sloT.healthy,
+    warn: sloT.warning,
+    crit: sloT.critical,
+    // Good/Bad 计数
+    eventCount: sloT.eventCount,
+    bad: sloT.badEvents,
+    allowed: sloT.allowedEvents,
+    overspent: sloT.overspent,
+    // 图表
+    p95Latency: sloT.p95Latency,
+    errorRate: sloT.errorRate,
     target: sloT.target,
     sloTrend: sloT.sloTrend,
     errorBudgetBurn: sloT.errorBudgetBurn,
     current: sloT.current,
-    serviceTopology: sloT.serviceTopology,
-    service: sloT.services,
-    rps: sloT.rps,
-    mtls: sloT.mtls,
-    status: sloT.sloStatus,
-    healthy: sloT.healthy,
-    warning: sloT.warning,
-    critical: sloT.critical,
-    unknown: sloT.unknown,
-    inbound: sloT.inbound,
-    outbound: sloT.outbound,
-    noCallData: sloT.noCallData,
-    callRelation: sloT.callRelation,
-    p50Latency: sloT.p50Latency,
-    avgLatency: sloT.avgLatency,
-    currentVsPrevious: sloT.currentVsPrevious,
-    previousPeriod: sloT.previousPeriod,
+    estimatedExhaust: sloT.estimatedExhaust,
+    noData: sloT.noData,
+    // 延迟 tab
+    latencyDistribution: sloT.latencyDistribution,
+    methodBreakdown: sloT.methodBreakdown,
+    statusCodeBreakdown: sloT.statusCodeBreakdown,
+    clearSelection: sloT.clearSelection,
+    requests: sloT.requests,
+    // 目标配置
     configSloTarget: sloT.configSloTarget,
     targetDomain: sloT.targetDomain,
     sloWindow: sloT.sloWindow,
@@ -181,13 +182,6 @@ function SLOPageContent() {
     cancel: sloT.cancel,
     save: sloT.save,
     saving: sloT.saving,
-    estimatedExhaust: sloT.estimatedExhaust,
-    latencyDistribution: sloT.latencyDistribution,
-    methodBreakdown: sloT.methodBreakdown,
-    statusCodeBreakdown: sloT.statusCodeBreakdown,
-    clearSelection: sloT.clearSelection,
-    requests: sloT.requests,
-    loading: sloT.loading,
   }), [sloT]);
 
   if (loading) {
@@ -276,6 +270,10 @@ function SLOPageContent() {
                   domains={domains}
                   expandedId={expandedId}
                   onSelect={(d) => setExpandedId(expandedId === d ? null : d)}
+                  timeRange={timeRange}
+                  clusterId={clusterId}
+                  onRefresh={handleRefresh}
+                  detailT={domainDetailT}
                   t={{
                     domain: sloT.monitoredDomains,
                     viewTraces: sloT.viewTraces,
@@ -296,29 +294,6 @@ function SLOPageContent() {
                     hours: sloT.hours,
                   }}
                 />
-              </div>
-
-              {/* 展开的域名详情 */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-default">
-                    {sloT.domainSloStatus}
-                  </h2>
-                </div>
-                <div className="space-y-3">
-                  {domains.map((domain) => (
-                    <DomainCard
-                      key={domain.domain}
-                      domain={domain}
-                      expanded={expandedId === domain.domain}
-                      onToggle={() => setExpandedId(expandedId === domain.domain ? null : domain.domain)}
-                      timeRange={timeRange}
-                      clusterId={clusterId}
-                      onRefresh={handleRefresh}
-                      t={domainCardT}
-                    />
-                  ))}
-                </div>
               </div>
 
               {/* Data Source Note */}

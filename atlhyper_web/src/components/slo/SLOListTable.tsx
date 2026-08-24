@@ -1,10 +1,12 @@
 "use client";
 
-import { memo } from "react";
+import { Fragment, memo } from "react";
 import { Flame, ChevronRight, Activity, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { apmLinkForService, logsLinkForService } from "@/lib/signal-link";
 import type { DomainSLOV2, BurnRateWindow } from "@/types/slo";
+import { DomainDetail } from "./DomainDetail";
+import type { DomainDetailTranslations } from "./detail-translations";
 
 export interface SLOListTableTranslations {
   domain: string;
@@ -79,12 +81,20 @@ export const SLOListTable = memo(function SLOListTable({
   domains,
   expandedId,
   onSelect,
+  timeRange,
+  clusterId,
+  onRefresh,
   t,
+  detailT,
 }: {
   domains: DomainSLOV2[];
   expandedId: string | null;
   onSelect: (domain: string) => void;
+  timeRange: string;
+  clusterId: string;
+  onRefresh: () => void;
   t: SLOListTableTranslations;
+  detailT: DomainDetailTranslations;
 }) {
   const statusLabel = (s: string) =>
     s === "healthy" ? t.healthy : s === "warning" ? t.warning : s === "critical" ? t.critical : t.unknown;
@@ -122,8 +132,8 @@ export const SLOListTable = memo(function SLOListTable({
               const budget = d.budget;
               const isOpen = expandedId === d.domain;
               return (
+                <Fragment key={d.domain}>
                 <tr
-                  key={d.domain}
                   onClick={() => onSelect(d.domain)}
                   className={`border-b border-[var(--border-color)] last:border-0 cursor-pointer transition-colors ${
                     isOpen ? "bg-[var(--hover-bg)]" : "hover:bg-[var(--hover-bg)]"
@@ -195,6 +205,21 @@ export const SLOListTable = memo(function SLOListTable({
                     />
                   </td>
                 </tr>
+                {/* 详情就地展开：域名与它的细节在同一处，不用在页面上找第二遍 */}
+                {isOpen && (
+                  <tr>
+                    <td colSpan={9} className="p-0">
+                      <DomainDetail
+                        domain={d}
+                        timeRange={timeRange}
+                        clusterId={clusterId}
+                        onRefresh={onRefresh}
+                        t={detailT}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

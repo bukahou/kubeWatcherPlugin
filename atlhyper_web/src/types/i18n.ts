@@ -1180,6 +1180,13 @@ export interface SLOTranslations extends TimeRangePickerTranslations {
   selectPeriod: string;
   sloWindow: string;
   burnRate: string;
+  burnRateHint: string;
+  window: string;
+  rate: string;
+  eventCount: string;
+  badEvents: string;
+  allowedEvents: string;
+  overspent: string;
   currentSli: string;
   goodBad: string;
   exhaustIn: string;
