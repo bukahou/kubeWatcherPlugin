@@ -246,9 +246,27 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 
 	wg.Wait()
 
-	// 全部失败时不更新缓存，继续使用旧数据
+	// 各信号最新数据时间：让页面能区分「没有流量」和「采集挂了」。
+	//
+	// 必须在下面的 early return 之前采集：它是元信息，与其他查询的成败无关，
+	// 而且查询失败时更需要它 —— 那种情况下上报的是旧缓存，用户必须知道数据有多旧。
+	if s.dashboardRepo != nil {
+		if f, err := s.dashboardRepo.GetSignalFreshness(ctx); err != nil {
+			log.Warn("采集信号新鲜度失败", "err", err)
+		} else if f == nil {
+			log.Warn("信号新鲜度为空 —— 检查 ClickHouse 客户端是否注入")
+		} else {
+			snapshot.Freshness = f
+		}
+	}
+
+	// 全部失败时不更新缓存，继续使用旧数据。
+	// 但新鲜度要用刚采到的 —— 否则页面拿着几分钟前的数据，却显示「数据正常」，自相矛盾。
 	if hasError && s.otelCache != nil {
-		return s.otelCache
+		log.Warn("OTel 查询有失败，回退到上一份快照", "freshnessAttached", snapshot.Freshness != nil)
+		stale := *s.otelCache
+		stale.Freshness = snapshot.Freshness
+		return &stale
 	}
 
 	// 更新缓存
@@ -272,16 +290,6 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 	// 多窗口 SLO 数据采集（带独立 TTL 缓存）
 	if s.dashboardRepo != nil {
 		snapshot.SLOWindows = s.collectSLOWindows(ctx, now)
-
-		// 各信号最新数据时间：让页面能区分「没有流量」和「采集挂了」。
-		// 查询失败时保持 nil —— Master 会判为 absent，比编个假时间戳诚实。
-		if f, err := s.dashboardRepo.GetSignalFreshness(ctx); err != nil {
-			log.Warn("采集信号新鲜度失败", "err", err)
-		} else if f == nil {
-			log.Warn("信号新鲜度为空 —— 检查 ClickHouse 客户端是否注入")
-		} else {
-			snapshot.Freshness = f
-		}
 	}
 
 	return snapshot
