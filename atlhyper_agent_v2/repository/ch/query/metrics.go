@@ -325,7 +325,41 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	nm.HardwareProfile = metrics.DetectHardwareProfile(machine, chipNames)
 	ensureNodeMetricsSlices(nm)
 
+	// 采集不全时留一条痕迹。各 fill* 的查询失败一律静默 return，
+	// 缺的字段在页面上只表现为某张卡空着 —— 2026-08-24 事故里两个节点的数据
+	// 缺了很久都没人发现，直到 nil 切片炸掉前端才暴露。
+	// 详见 config 仓 clusters/incidents/2026-08-24-atlhyper-metrics-blank-page.md
+	if missing := detectMissingParts(nm); len(missing) > 0 {
+		logger.Warn("节点指标采集不全",
+			"node", nodeName,
+			"缺失", strings.Join(missing, ","),
+			"提示", "多为 ClickHouse 查询被 context 取消，检查 system.query_log 里的 Broken pipe")
+	}
+
 	return nm, firstErr
+}
+
+// detectMissingParts 找出没采到的部件。
+//
+// 只检测「每个节点都该有」的四项：温度传感器、风扇、盘温这些本来就因机型而异
+// （raspi4 没有盘温、desk 没有风扇转速），报出来是噪声不是信号。
+//
+// 检测结果而不是包装每一处查询错误：零侵入，且更贴近用户实际看到的现象。
+func detectMissingParts(nm *metrics.NodeMetrics) []string {
+	var missing []string
+	if nm.CPU.Cores == 0 && nm.CPU.UsagePct == 0 {
+		missing = append(missing, "cpu")
+	}
+	if nm.Memory.TotalBytes == 0 {
+		missing = append(missing, "memory")
+	}
+	if len(nm.Disks) == 0 {
+		missing = append(missing, "disks")
+	}
+	if len(nm.Networks) == 0 {
+		missing = append(missing, "networks")
+	}
+	return missing
 }
 
 // ensureNodeMetricsSlices 把 nil 切片补成空切片。
