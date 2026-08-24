@@ -251,7 +251,13 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 	// 必须在下面的 early return 之前采集：它是元信息，与其他查询的成败无关，
 	// 而且查询失败时更需要它 —— 那种情况下上报的是旧缓存，用户必须知道数据有多旧。
 	if s.dashboardRepo != nil {
-		if f, err := s.dashboardRepo.GetSignalFreshness(ctx); err != nil {
+		// 独立超时：走到这里时主 ctx 已被前面十几个 OTel 查询耗掉，
+		// 实测三张表的 max() 合计约 2 秒，但继承来的 ctx 往往只剩不到 1 秒 ——
+		// 结果就是新鲜度永远 deadline exceeded。collectSLOWindows 早先也是这么解决的。
+		freshCtx, cancelFresh := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelFresh()
+
+		if f, err := s.dashboardRepo.GetSignalFreshness(freshCtx); err != nil {
 			log.Warn("采集信号新鲜度失败", "err", err)
 		} else if f == nil {
 			log.Warn("信号新鲜度为空 —— 检查 ClickHouse 客户端是否注入")
