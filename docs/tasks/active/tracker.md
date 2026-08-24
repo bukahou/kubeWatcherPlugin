@@ -12,18 +12,23 @@
 
 ---
 
-## SLO 面板重构 — 🔄 Phase 1–2 已上线，剩余两项
+## SLO 面板重构 — 🔄 只剩存储决策
 
 > 原设计文档: [slo-panel-redesign.md](../../design/active/slo-panel-redesign.md)
 >
-> Phase 1（多实例聚合修复 + 真实域名）与 Phase 2（燃烧率 + 事件计数预算 + 目标模型）
-> 已完成并上线验证，详见设计文档。线上：agent v0.6.5 / controller v0.5.0 / web v0.6.1。
+> Phase 1（多实例聚合修复 + 真实域名）、Phase 2（燃烧率 + 事件计数预算 + 目标模型）、
+> Phase 3（详情区收敛）均已上线验证。线上：agent v0.6.5 / controller v0.5.0 / web v0.6.2。
+>
+> Phase 3 实际做法与原方案有出入：原计划的「状态码构成 + 详情页跳 APM」已撤回 ——
+> 状态码是算可用率的同一份数据换个形状，不产生新信息；跳转清单表每行已有。
+> 当前 1 域名 = 1 服务的规模下，接口级下钻省的只是「去 APM 选一下服务」。
+> 真正需要结构化下钻的时机是 AIOps 要自动推理「为什么超支」的时候。
 
-- Phase 3: 详情页补四窗口燃烧率全表 + Good/Bad 计数 — 待办
-  （清单表已含 1h/6h 两列与「已错/允许」，够日常用；详情页 OverviewTab 尚未补全表）
 - Phase 4: 长窗口存储 — 待决策
   ClickHouse 与 Master SQLite 均为 emptyDir，Pod 重启数据归零 ——
-  30 天窗口不成立，SLO 目标配置也存不住。三个选项见设计文档「存储决策」章节
+  30 天窗口不成立，SLO 目标配置也存不住。
+  选项：A 维持现状（7 天窗口）/ B 只给 Master SQLite 一块小持久卷 /
+  C 加 ClickHouse rollup 表（须与 B 配合，否则重启即失效）
 
 ---
 
