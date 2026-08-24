@@ -250,7 +250,7 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 		}
 	}
 
-	wg.Add(11)
+	wg.Add(9) // TCP / System 已并入 fillScalarGauges
 
 	// CPU
 	go func() {
@@ -258,10 +258,11 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 		r.fillCPU(ctx, ip, nm)
 	}()
 
-	// Memory
+	// 标量 gauge：内存 / TCP / 系统资源 / OOM / 欠压 / 开机时间
+	// 六类合并为一个查询（见 fillScalarGauges 的注释）
 	go func() {
 		defer wg.Done()
-		r.fillMemory(ctx, ip, nm)
+		r.fillScalarGauges(ctx, ip, nm)
 	}()
 
 	// Disk
@@ -292,18 +293,6 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	go func() {
 		defer wg.Done()
 		r.fillPSI(ctx, ip, nm)
-	}()
-
-	// TCP
-	go func() {
-		defer wg.Done()
-		r.fillTCP(ctx, ip, nm)
-	}()
-
-	// System
-	go func() {
-		defer wg.Done()
-		r.fillSystem(ctx, ip, nm)
 	}()
 
 	// VMStat + Softnet
@@ -514,16 +503,35 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 	}
 }
 
-// fillMemory 填充内存指标
-func (r *metricsRepository) fillMemory(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+// fillScalarGauges 一次查回该节点全部「标量 gauge」指标。
+//
+// 内存 / TCP / 系统资源 / OOM / 欠压 / 开机时间原本是 6 个独立查询，
+// 但它们形状完全一样（gauge 表 + argMax + GROUP BY MetricName），
+// 唯一差别只是 IN 列表 —— 合成一个查询后每个节点少 5 次往返。
+//
+// 为什么值得合：实测每节点 27 个查询、7 个节点串行共享一个 30 秒 ctx，
+// ClickHouse 单实例平均 440ms/查询，后半段节点的查询会被 context 取消。
+// 减少往返次数比调大超时更治本。
+// 详见 config 仓 clusters/incidents/2026-08-24-atlhyper-metrics-blank-page.md
+//
+// 一并取 count()：欠压位需要用它区分「没有这个传感器」和「传感器读数为 0」。
+func (r *metricsRepository) fillScalarGauges(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
 	query := `
-		SELECT MetricName, argMax(Value, TimeUnix)
+		SELECT MetricName, argMax(Value, TimeUnix) AS v, count() AS n
 		FROM otel_metrics_gauge
 		WHERE MetricName IN (
 			'node_memory_MemTotal_bytes', 'node_memory_MemAvailable_bytes',
 			'node_memory_MemFree_bytes', 'node_memory_Cached_bytes',
 			'node_memory_Buffers_bytes', 'node_memory_SwapTotal_bytes',
-			'node_memory_SwapFree_bytes'
+			'node_memory_SwapFree_bytes',
+			'node_netstat_Tcp_CurrEstab', 'node_sockstat_TCP_alloc',
+			'node_sockstat_TCP_inuse', 'node_sockstat_TCP_tw', 'node_sockstat_sockets_used',
+			'node_nf_conntrack_entries', 'node_nf_conntrack_entries_limit',
+			'node_filefd_allocated', 'node_filefd_maximum', 'node_entropy_available_bits',
+			'node_procs_running', 'node_procs_blocked', 'node_arp_entries',
+			'node_timex_offset_seconds', 'node_timex_sync_status',
+			'node_vmstat_oom_kill', 'node_boot_time_seconds',
+			'node_hwmon_in_lcrit_alarm_volts'
 		)
 		AND ResourceAttributes['net.host.name'] = ?
 		AND TimeUnix >= now() - INTERVAL 2 MINUTE
@@ -531,6 +539,7 @@ func (r *metricsRepository) fillMemory(ctx context.Context, ip string, nm *metri
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
+		logger.Warn("标量指标查询失败", "ip", ip, "err", err)
 		return
 	}
 	defer rows.Close()
@@ -538,25 +547,11 @@ func (r *metricsRepository) fillMemory(ctx context.Context, ip string, nm *metri
 	for rows.Next() {
 		var name string
 		var val float64
-		if err := rows.Scan(&name, &val); err != nil {
+		var cnt uint64
+		if err := rows.Scan(&name, &val, &cnt); err != nil {
 			continue
 		}
-		switch name {
-		case "node_memory_MemTotal_bytes":
-			nm.Memory.TotalBytes = int64(val)
-		case "node_memory_MemAvailable_bytes":
-			nm.Memory.AvailableBytes = int64(val)
-		case "node_memory_MemFree_bytes":
-			nm.Memory.FreeBytes = int64(val)
-		case "node_memory_Cached_bytes":
-			nm.Memory.CachedBytes = int64(val)
-		case "node_memory_Buffers_bytes":
-			nm.Memory.BuffersBytes = int64(val)
-		case "node_memory_SwapTotal_bytes":
-			nm.Memory.SwapTotalBytes = int64(val)
-		case "node_memory_SwapFree_bytes":
-			nm.Memory.SwapFreeBytes = int64(val)
-		}
+		applyScalarGauge(nm, name, val, cnt)
 	}
 
 	if nm.Memory.TotalBytes > 0 {
@@ -566,6 +561,87 @@ func (r *metricsRepository) fillMemory(ctx context.Context, ip string, nm *metri
 	if nm.Memory.SwapTotalBytes > 0 {
 		nm.Memory.SwapUsagePct = roundTo(clamp(
 			(1-float64(nm.Memory.SwapFreeBytes)/float64(nm.Memory.SwapTotalBytes))*100, 0, 100), 2)
+	}
+}
+
+// applyScalarGauge 把一个标量指标写进对应字段。
+// 抽出来是为了能单测这张映射表 —— 合并查询最大的风险就是映射写错。
+func applyScalarGauge(nm *metrics.NodeMetrics, name string, val float64, cnt uint64) {
+	switch name {
+	// ── 内存 ──
+	case "node_memory_MemTotal_bytes":
+		nm.Memory.TotalBytes = int64(val)
+	case "node_memory_MemAvailable_bytes":
+		nm.Memory.AvailableBytes = int64(val)
+	case "node_memory_MemFree_bytes":
+		nm.Memory.FreeBytes = int64(val)
+	case "node_memory_Cached_bytes":
+		nm.Memory.CachedBytes = int64(val)
+	case "node_memory_Buffers_bytes":
+		nm.Memory.BuffersBytes = int64(val)
+	case "node_memory_SwapTotal_bytes":
+		nm.Memory.SwapTotalBytes = int64(val)
+	case "node_memory_SwapFree_bytes":
+		nm.Memory.SwapFreeBytes = int64(val)
+
+	// ── TCP / socket ──
+	case "node_netstat_Tcp_CurrEstab":
+		nm.TCP.CurrEstab = int64(val)
+	case "node_sockstat_TCP_alloc":
+		nm.TCP.Alloc = int64(val)
+	case "node_sockstat_TCP_inuse":
+		nm.TCP.InUse = int64(val)
+	case "node_sockstat_TCP_tw":
+		nm.TCP.TimeWait = int64(val)
+	case "node_sockstat_sockets_used":
+		nm.TCP.SocketsUsed = int64(val)
+
+	// ── 系统资源 ──
+	case "node_nf_conntrack_entries":
+		nm.System.ConntrackEntries = int64(val)
+	case "node_nf_conntrack_entries_limit":
+		nm.System.ConntrackLimit = int64(val)
+	case "node_filefd_allocated":
+		nm.System.FilefdAllocated = int64(val)
+	case "node_filefd_maximum":
+		nm.System.FilefdMax = int64(val)
+	case "node_entropy_available_bits":
+		nm.System.EntropyBits = int64(val)
+	case "node_procs_running":
+		nm.System.ProcsRunning = int64(val)
+	case "node_procs_blocked":
+		nm.System.ProcsBlocked = int64(val)
+	case "node_arp_entries":
+		// 按网卡上报，多网卡时 argMax 只留一条；家庭集群每台只有一块业务网卡
+		nm.System.ArpEntries = int64(val)
+	case "node_timex_offset_seconds":
+		nm.System.TimeOffsetMs = roundTo(val*1000, 3)
+	case "node_timex_sync_status":
+		nm.System.TimeSynced = val > 0
+
+	// ── 内存错误：用累计值而非速率，一次 OOM 后速率立刻归零，
+	//    但「这台机器杀过进程」必须一直看得见 ──
+	case "node_vmstat_oom_kill":
+		nm.Memory.OOMKillTotal = int64(val)
+
+	// ── 开机时间 ──
+	case "node_boot_time_seconds":
+		if val > 0 {
+			nm.Uptime = time.Now().Unix() - int64(val)
+		}
+
+	// ── 欠压（只有树莓派有这个传感器）──
+	case "node_hwmon_in_lcrit_alarm_volts":
+		if cnt > 0 {
+			alarm := val > 0
+			if nm.Hardware == nil {
+				nm.Hardware = &metrics.NodeHardware{
+					Fans:    []metrics.FanSensor{},
+					Cooling: []metrics.CoolingDevice{},
+				}
+			}
+			nm.Hardware.UndervoltAlarm = &alarm
+		}
 	}
 }
 
@@ -917,21 +993,6 @@ func (r *metricsRepository) fillHardware(ctx context.Context, ip string, nm *met
 		coolRows.Close()
 	}
 
-	// 欠压位：只有树莓派 rpi_volt 有；用 count 区分「无传感器」与「值为 0」
-	var alarmCount uint64
-	var alarm float64
-	err = r.client.QueryRow(ctx, `
-		SELECT count(), argMax(Value, TimeUnix)
-		FROM otel_metrics_gauge
-		WHERE MetricName = 'node_hwmon_in_lcrit_alarm_volts'
-		  AND ResourceAttributes['net.host.name'] = ?
-		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
-	`, ip).Scan(&alarmCount, &alarm)
-	if err == nil && alarmCount > 0 {
-		v := alarm > 0
-		hw.UndervoltAlarm = &v
-	}
-
 	nm.Hardware = hw
 }
 
@@ -1039,104 +1100,6 @@ func (r *metricsRepository) fillPSI(ctx context.Context, ip string, nm *metrics.
 	}
 }
 
-// fillTCP 填充 TCP 连接状态
-func (r *metricsRepository) fillTCP(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
-	query := `
-		SELECT MetricName, argMax(Value, TimeUnix)
-		FROM otel_metrics_gauge
-		WHERE MetricName IN (
-			'node_netstat_Tcp_CurrEstab',
-			'node_sockstat_TCP_alloc',
-			'node_sockstat_TCP_inuse',
-			'node_sockstat_TCP_tw',
-			'node_sockstat_sockets_used'
-		)
-		AND ResourceAttributes['net.host.name'] = ?
-		AND TimeUnix >= now() - INTERVAL 2 MINUTE
-		GROUP BY MetricName
-	`
-	rows, err := r.client.Query(ctx, query, ip)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var name string
-		var val float64
-		if err := rows.Scan(&name, &val); err != nil {
-			continue
-		}
-		switch name {
-		case "node_netstat_Tcp_CurrEstab":
-			nm.TCP.CurrEstab = int64(val)
-		case "node_sockstat_TCP_alloc":
-			nm.TCP.Alloc = int64(val)
-		case "node_sockstat_TCP_inuse":
-			nm.TCP.InUse = int64(val)
-		case "node_sockstat_TCP_tw":
-			nm.TCP.TimeWait = int64(val)
-		case "node_sockstat_sockets_used":
-			nm.TCP.SocketsUsed = int64(val)
-		}
-	}
-}
-
-// fillSystem 填充系统指标
-func (r *metricsRepository) fillSystem(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
-	query := `
-		SELECT MetricName, argMax(Value, TimeUnix)
-		FROM otel_metrics_gauge
-		WHERE MetricName IN (
-			'node_nf_conntrack_entries', 'node_nf_conntrack_entries_limit',
-			'node_filefd_allocated', 'node_filefd_maximum',
-			'node_entropy_available_bits',
-			'node_procs_running', 'node_procs_blocked',
-			'node_arp_entries',
-			'node_timex_offset_seconds', 'node_timex_sync_status'
-		)
-		AND ResourceAttributes['net.host.name'] = ?
-		AND TimeUnix >= now() - INTERVAL 2 MINUTE
-		GROUP BY MetricName
-	`
-	rows, err := r.client.Query(ctx, query, ip)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var name string
-		var val float64
-		if err := rows.Scan(&name, &val); err != nil {
-			continue
-		}
-		switch name {
-		case "node_nf_conntrack_entries":
-			nm.System.ConntrackEntries = int64(val)
-		case "node_nf_conntrack_entries_limit":
-			nm.System.ConntrackLimit = int64(val)
-		case "node_filefd_allocated":
-			nm.System.FilefdAllocated = int64(val)
-		case "node_filefd_maximum":
-			nm.System.FilefdMax = int64(val)
-		case "node_entropy_available_bits":
-			nm.System.EntropyBits = int64(val)
-		case "node_procs_running":
-			nm.System.ProcsRunning = int64(val)
-		case "node_procs_blocked":
-			nm.System.ProcsBlocked = int64(val)
-		case "node_arp_entries":
-			// 按网卡上报，多网卡时 argMax 只会留一条；家庭集群每台只有一块业务网卡
-			nm.System.ArpEntries = int64(val)
-		case "node_timex_offset_seconds":
-			nm.System.TimeOffsetMs = roundTo(val*1000, 3)
-		case "node_timex_sync_status":
-			nm.System.TimeSynced = val > 0
-		}
-	}
-}
-
 // fillVMStat 填充 VMStat + Softnet
 // vmstat 指标在 gauge 表（OTel collector 将其归类为 gauge），softnet 在 sum 表
 func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
@@ -1186,38 +1149,15 @@ func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metri
 		rows.Close()
 	}
 
-	// OOM kill 用累计值而非速率：一次 OOM 之后速率立刻归零，
-	// 但「这台机器杀过进程」这件事必须一直看得见
-	var oomKill float64
-	if err := r.client.QueryRow(ctx, `
-		SELECT argMax(Value, TimeUnix)
-		FROM otel_metrics_gauge
-		WHERE MetricName = 'node_vmstat_oom_kill'
-		  AND ResourceAttributes['net.host.name'] = ?
-		  AND TimeUnix >= now() - INTERVAL 5 MINUTE
-	`, ip).Scan(&oomKill); err == nil {
-		nm.Memory.OOMKillTotal = int64(oomKill)
-	}
 }
 
-// fillSystemInfo 填充 Uptime + Kernel，并返回 uname machine（x86_64 / aarch64，画像识别用）
+// fillSystemInfo 填充 Kernel，并返回 uname machine（x86_64 / aarch64，画像识别用）。
+// Uptime 由 fillScalarGauges 从 node_boot_time_seconds 换算。
 func (r *metricsRepository) fillSystemInfo(ctx context.Context, ip string, nm *metrics.NodeMetrics) (string, error) {
-	// Boot time
-	var bootTime float64
-	err := r.client.QueryRow(ctx, `
-		SELECT argMax(Value, TimeUnix)
-		FROM otel_metrics_gauge
-		WHERE MetricName = 'node_boot_time_seconds'
-		  AND ResourceAttributes['net.host.name'] = ?
-		  AND TimeUnix >= now() - INTERVAL 2 MINUTE
-	`, ip).Scan(&bootTime)
-	if err == nil && bootTime > 0 {
-		nm.Uptime = time.Now().Unix() - int64(bootTime)
-	}
-
-	// Kernel + machine from uname info labels
+	// Kernel + machine from uname info labels。
+	// 开机时间已并入 fillScalarGauges，这里只剩 uname。
 	var kernel, machine string
-	err = r.client.QueryRow(ctx, `
+	err := r.client.QueryRow(ctx, `
 		SELECT Attributes['release'], Attributes['machine']
 		FROM otel_metrics_gauge
 		WHERE MetricName = 'node_uname_info'
