@@ -178,6 +178,40 @@ func buildBudget(otel *cluster.OTelSnapshot, serviceKey string, cur *model.SLOMe
 	return out
 }
 
+// serviceKeysForDomain 域名 → serviceKey 集合。
+//
+// 与 fallbackDomainName 是一对：那个把 serviceKey 变成展示用的真实域名，
+// 这个把域名变回查询用的 serviceKey。
+//
+// 三级回退：
+//  1. 路由映射表（一个域名可能挂多个后端，路径分流时才有多条）
+//  2. 表为空时从快照的 SLOIngress 按 DisplayName 反查 —— 当前集群走 Gateway API，
+//     RouteUpdater 还在读 Ingress 所以表一直是空的（见 slo-panel-redesign.md 功能二）
+//  3. 都查不到就原样返回，宁可查出空数据也不要因为查不到而报错
+//
+// 少了第 2 级，改用真实域名展示之后历史图与延迟分布就全都查不到数据。
+func serviceKeysForDomain(host string, ingress []slomodel.IngressSLO, mappings []*model.SLORouteMapping) map[string]bool {
+	keys := make(map[string]bool)
+	for _, m := range mappings {
+		if m != nil && m.ServiceKey != "" {
+			keys[m.ServiceKey] = true
+		}
+	}
+	if len(keys) > 0 {
+		return keys
+	}
+
+	for _, ing := range ingress {
+		if ing.DisplayName == host || ing.ServiceKey == host {
+			keys[ing.ServiceKey] = true
+		}
+	}
+	if len(keys) == 0 {
+		keys[host] = true
+	}
+	return keys
+}
+
 // buildDomainFromIngress 从 IngressSLO 构建 DomainSLO
 func (h *SLOHandler) buildDomainFromIngress(ctx context.Context, clusterID string, ing slomodel.IngressSLO, timeRange string, targetMap map[string]model.SLOTargetResponse) model.DomainSLO {
 	domain := model.DomainSLO{
@@ -654,13 +688,11 @@ func (h *SLOHandler) DomainHistory(w http.ResponseWriter, r *http.Request) {
 
 	// 域名 → ServiceKey 映射（与 LatencyDistribution 一致）
 	mappings, _ := h.querySvc.GetSLORouteMappingsByDomain(ctx, clusterID, host)
-	serviceKeys := make(map[string]bool)
-	for _, m := range mappings {
-		serviceKeys[m.ServiceKey] = true
+	var ingressForLookup []slomodel.IngressSLO
+	if snap, _ := h.querySvc.GetOTelSnapshot(ctx, clusterID); snap != nil {
+		ingressForLookup = snap.SLOIngress
 	}
-	if len(serviceKeys) == 0 {
-		serviceKeys[host] = true
-	}
+	serviceKeys := serviceKeysForDomain(host, ingressForLookup, mappings)
 
 	// 优先从 SLOWindows[timeRange].History 获取历史数据
 	var history []model.SLODomainHistoryItem

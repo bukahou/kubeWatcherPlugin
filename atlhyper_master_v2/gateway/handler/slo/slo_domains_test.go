@@ -3,6 +3,8 @@ package slo
 import (
 	"testing"
 
+	"AtlHyper/atlhyper_master_v2/model"
+
 	slomodel "AtlHyper/model_v3/slo"
 )
 
@@ -38,4 +40,61 @@ func TestFallbackDomainName(t *testing.T) {
 			}
 		})
 	}
+}
+
+// 域名 → serviceKey 反查。
+//
+// 与 fallbackDomainName 是一对：那个把 serviceKey 变成展示用的域名，
+// 这个把域名变回查询用的 serviceKey。少了它，Phase 1 改域名显示之后
+// 历史图与延迟分布就查不到数据了（2026-08-24 实测：清单表数字全对，
+// 但 SLO 趋势 / 错误预算消耗 / 延迟分布三处都是「暂无数据」）。
+func TestServiceKeysForDomain(t *testing.T) {
+	ingress := []slomodel.IngressSLO{
+		{ServiceKey: "geass-v3/geass-gateway", DisplayName: "geass-api.bukahou.com"},
+		{ServiceKey: "atlhyper/atlhyper-web", DisplayName: "bukahou.com"},
+		{ServiceKey: "akasha/akasha", DisplayName: "akasha.bukahou.com"},
+	}
+
+	t.Run("按真实域名反查到 serviceKey", func(t *testing.T) {
+		got := serviceKeysForDomain("geass-api.bukahou.com", ingress, nil)
+		if len(got) != 1 || !got["geass-v3/geass-gateway"] {
+			t.Errorf("= %v，期望 {geass-v3/geass-gateway}", got)
+		}
+	})
+
+	t.Run("路由映射表有数据时优先用它", func(t *testing.T) {
+		mappings := []*model.SLORouteMapping{
+			{ServiceKey: "ns-a/svc-a"}, {ServiceKey: "ns-b/svc-b"},
+		}
+		got := serviceKeysForDomain("geass-api.bukahou.com", ingress, mappings)
+		if len(got) != 2 || !got["ns-a/svc-a"] || !got["ns-b/svc-b"] {
+			t.Errorf("= %v，期望映射表里的两个", got)
+		}
+	})
+
+	t.Run("传的本来就是 serviceKey 时原样返回", func(t *testing.T) {
+		// V1 端点与旧链接仍可能直接传 serviceKey
+		got := serviceKeysForDomain("geass-v3/geass-gateway", ingress, nil)
+		if len(got) != 1 || !got["geass-v3/geass-gateway"] {
+			t.Errorf("= %v", got)
+		}
+	})
+
+	t.Run("完全查不到时退回原值 —— 宁可查空也不要 panic", func(t *testing.T) {
+		got := serviceKeysForDomain("unknown.example.com", ingress, nil)
+		if len(got) != 1 || !got["unknown.example.com"] {
+			t.Errorf("= %v", got)
+		}
+	})
+
+	t.Run("一个域名挂多个后端时全部返回", func(t *testing.T) {
+		multi := []slomodel.IngressSLO{
+			{ServiceKey: "ns/svc-1", DisplayName: "shared.example.com"},
+			{ServiceKey: "ns/svc-2", DisplayName: "shared.example.com"},
+		}
+		got := serviceKeysForDomain("shared.example.com", multi, nil)
+		if len(got) != 2 {
+			t.Errorf("= %v，期望两个后端都在", got)
+		}
+	})
 }

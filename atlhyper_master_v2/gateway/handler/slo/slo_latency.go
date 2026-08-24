@@ -53,15 +53,13 @@ func (h *SLOHandler) LatencyDistribution(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	serviceKeys := make(map[string]bool)
-	for _, m := range mappings {
-		serviceKeys[m.ServiceKey] = true
+	// 域名 → serviceKey。路由映射表为空时按 DisplayName 从快照反查 ——
+	// 直接拿域名当 serviceKey 会查不到任何数据（见 serviceKeysForDomain 的注释）
+	var ingressForLookup []slomodel.IngressSLO
+	if otel != nil {
+		ingressForLookup = otel.SLOIngress
 	}
-
-	// 路由映射为空时，直接以 domain 参数作为 ServiceKey 匹配
-	if len(serviceKeys) == 0 {
-		serviceKeys[domain] = true
-	}
+	serviceKeys := serviceKeysForDomain(domain, ingressForLookup, mappings)
 
 	// 优先从 SLOWindows[timeRange] 获取 IngressSLO（含 LatencyBuckets + Methods）
 	var ingressList []slomodel.IngressSLO
