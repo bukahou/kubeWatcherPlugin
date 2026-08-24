@@ -1136,6 +1136,8 @@ export const zh: Translations = {
     goodBad: "已错/允许",
     exhaustIn: "预计耗尽",
     hours: "h",
+    viewTraces: "查看调用链",
+    viewErrorLogs: "查看错误日志",
     sloListTitle: "SLO 状态",
     sloListHint: "燃烧率 = 实际错误率 ÷ 允许错误率。1× 表示正好在窗口结束时用完预算，超过阈值即上色。",
     sloWindowHint: "SLO 的滚动统计窗口，与上方的查看范围无关。上限 7 天 —— 数据只保留 7 天。",
@@ -2090,6 +2092,7 @@ Deployment 已更新，新的 Pod 正在启动中
     },
   },
   apm: {
+    viewLogs: "查看日志",
     pageTitle: "APM 链路追踪",
     pageDescription: "分布式链路追踪分析，查看服务间调用关系与性能瓶颈",
     services: "服务列表",

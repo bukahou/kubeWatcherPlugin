@@ -1184,6 +1184,8 @@ export interface SLOTranslations extends TimeRangePickerTranslations {
   goodBad: string;
   exhaustIn: string;
   hours: string;
+  viewTraces: string;
+  viewErrorLogs: string;
   sloListTitle: string;
   sloListHint: string;
   sloWindowHint: string;
@@ -2185,6 +2187,8 @@ export interface LogTranslations extends TimeRangePickerTranslations {
 
 // APM 翻译
 export interface ApmTranslations extends TimeRangePickerTranslations {
+  /** 从 trace 跳到该链路的日志 */
+  viewLogs: string;
   pageTitle: string;
   pageDescription: string;
   // services

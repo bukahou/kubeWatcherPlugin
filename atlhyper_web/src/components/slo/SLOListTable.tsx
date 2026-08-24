@@ -1,11 +1,15 @@
 "use client";
 
 import { memo } from "react";
-import { Flame, ChevronRight } from "lucide-react";
+import { Flame, ChevronRight, Activity, ScrollText } from "lucide-react";
+import Link from "next/link";
+import { apmLinkForService, logsLinkForService } from "@/lib/signal-link";
 import type { DomainSLOV2, BurnRateWindow } from "@/types/slo";
 
 export interface SLOListTableTranslations {
   domain: string;
+  viewTraces: string;
+  viewErrorLogs: string;
   target: string;
   currentSli: string;
   errorBudget: string;
@@ -132,6 +136,30 @@ export const SLOListTable = memo(function SLOListTable({
                         {t.goodBad}: {budget.consumedEvents} / {budget.allowedEvents}
                       </div>
                     )}
+                    {/* 跨信号入口：SLO 说这里超支了，下一步必然是「哪些请求错了」。
+                        stopPropagation 是因为整行点击会展开详情，这两个链接要各走各的 */}
+                    <div className="flex items-center gap-2 mt-1">
+                      {(d.services ?? []).slice(0, 1).map((svc) => (
+                        <span key={svc.serviceKey} className="flex items-center gap-2">
+                          <Link
+                            href={apmLinkForService(svc.serviceKey)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-0.5 text-[10px] text-blue-500 hover:underline"
+                          >
+                            <Activity className="w-2.5 h-2.5" />
+                            {t.viewTraces}
+                          </Link>
+                          <Link
+                            href={logsLinkForService(svc.serviceKey)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-0.5 text-[10px] text-blue-500 hover:underline"
+                          >
+                            <ScrollText className="w-2.5 h-2.5" />
+                            {t.viewErrorLogs}
+                          </Link>
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="py-2.5 px-3 text-xs text-muted tabular-nums whitespace-nowrap">
                     {d.target ? `${d.target.availability}% · ${d.target.windowDays}d` : t.noData}

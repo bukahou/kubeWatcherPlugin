@@ -10,6 +10,9 @@ import {
   Check,
 } from "lucide-react";
 import type { TraceDetail, TraceSummary, Span } from "@/types/model/apm";
+import Link from "next/link";
+import { ScrollText } from "lucide-react";
+import { logsLinkForTrace } from "@/lib/signal-link";
 import type { ApmTranslations } from "@/types/i18n";
 import { formatDurationMs, formatTimeAgo } from "@/lib/format";
 import { getLatencyDistribution } from "@/datasource/apm";
@@ -153,6 +156,15 @@ export function TraceWaterfall({
             <button onClick={copyTraceId} className="p-1 rounded hover:bg-[var(--hover-bg)] transition-colors">
               {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted" />}
             </button>
+            {/* 反向链路：Logs 早就能跳到 APM，反过来一直缺 —— 看瀑布图时想确认
+                某一段到底打了什么日志，只能自己去 Logs 页粘 traceId */}
+            <Link
+              href={logsLinkForTrace(trace.traceId)}
+              className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline"
+            >
+              <ScrollText className="w-3 h-3" />
+              {t.viewLogs}
+            </Link>
           </div>
           <span className="text-xs text-muted">
             {trace.spanCount} {t.spans} | {trace.serviceCount} {t.serviceCount} | {formatDurationMs(trace.durationMs)}

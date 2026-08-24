@@ -1174,6 +1174,8 @@ export const ja: Translations = {
     goodBad: "エラー/許容",
     exhaustIn: "枯渇予測",
     hours: "h",
+    viewTraces: "トレースを見る",
+    viewErrorLogs: "エラーログを見る",
     sloListTitle: "SLO ステータス",
     sloListHint: "バーンレート = 実エラー率 ÷ 許容エラー率。1× はウィンドウ終了時にちょうど使い切る速度。",
     sloWindowHint: "SLO のローリング集計期間。上部の表示範囲とは無関係。上限 7 日 —— データ保持が 7 日のため。",
@@ -2090,6 +2092,7 @@ Deployment が更新され、新しい Pod が起動中です
     },
   },
   apm: {
+    viewLogs: "ログを見る",
     pageTitle: "APM トレース",
     pageDescription: "分散トレーシング分析、サービス間の呼び出し関係とパフォーマンスボトルネックを確認",
     services: "サービス一覧",

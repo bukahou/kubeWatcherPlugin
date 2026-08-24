@@ -278,6 +278,8 @@ function SLOPageContent() {
                   onSelect={(d) => setExpandedId(expandedId === d ? null : d)}
                   t={{
                     domain: sloT.monitoredDomains,
+                    viewTraces: sloT.viewTraces,
+                    viewErrorLogs: sloT.viewErrorLogs,
                     target: sloT.target,
                     currentSli: sloT.currentSli,
                     errorBudget: sloT.errorBudget,

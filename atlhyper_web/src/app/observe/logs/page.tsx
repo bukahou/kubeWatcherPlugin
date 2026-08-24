@@ -44,13 +44,18 @@ function LogsPageContent() {
 
   // URL ?traceId= / ?spanId= params
   const searchParams = useSearchParams();
-  const urlTraceId = searchParams.get("traceId") || undefined;
+  // 参数名统一为 trace —— APM 页与 LogDetail 的跳转链接一直用它，
+  // 这里此前读的是 traceId，等于三个地方两套叫法。保留旧名兼容已有链接。
+  const urlTraceId = searchParams.get("trace") || searchParams.get("traceId") || undefined;
   const urlSpanId = searchParams.get("spanId") || undefined;
 
   // Filter state
   const [search, setSearch] = useState("");
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]);
+  // 从其他信号跳转过来时预填过滤条件（如 SLO → 某服务的 ERROR 日志）
+  const urlService = searchParams.get("service") || "";
+  const urlSeverity = searchParams.get("severity") || "";
+  const [selectedServices, setSelectedServices] = useState<string[]>(urlService ? [urlService] : []);
+  const [selectedSeverities, setSelectedSeverities] = useState<string[]>(urlSeverity ? [urlSeverity] : []);
   const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(1);
