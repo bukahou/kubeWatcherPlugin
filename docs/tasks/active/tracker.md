@@ -7,6 +7,19 @@
 
 ---
 
+## 观测模块统一时间轴与信号联动 — 🔄 进行中
+
+> 原设计文档: [observe-unified-timerange.md](../../design/active/observe-unified-timerange.md)
+>
+> 四页各写各的：三套时间机制、两套刷新机制；空数据分不清「没流量」还是「采集挂了」；
+> 跨信号跳转只有 Logs→APM 一条单向链路。
+
+- Phase 1: 全局时间轴（store + 能力降级 hook + 四页接入 + URL 同步）— 🔄 进行中
+- Phase 2: 数据新鲜度（Agent 采集 → Master 判定 → 四页徽章）— 待办
+- Phase 3: 信号联动（SLO → APM/Logs，APM → Logs）— 待办
+
+---
+
 ## SLO 面板重构 — 🔄 进行中
 
 > 原设计文档: [slo-panel-redesign.md](../../design/active/slo-panel-redesign.md)
