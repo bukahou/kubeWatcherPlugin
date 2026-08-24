@@ -12,6 +12,7 @@ import (
 
 	"AtlHyper/atlhyper_agent_v2/repository"
 	"AtlHyper/atlhyper_agent_v2/sdk"
+	"AtlHyper/common/logger"
 	"AtlHyper/model_v3/cluster"
 )
 
@@ -49,6 +50,8 @@ func (r *freshnessRepository) GetSignalFreshness(ctx context.Context) (*cluster.
 			" WHERE " + src.column + " > now() - INTERVAL 24 HOUR"
 		var ts time.Time
 		if err := r.client.QueryRow(ctx, query).Scan(&ts); err != nil {
+			// 静默失败会让页面显示「无数据」却查不出原因 —— 这正是新鲜度要解决的问题本身
+			logger.Warn("信号新鲜度查询失败", "table", src.table, "err", err)
 			continue
 		}
 		*targets[i] = ts

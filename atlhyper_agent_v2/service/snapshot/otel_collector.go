@@ -275,7 +275,11 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 
 		// 各信号最新数据时间：让页面能区分「没有流量」和「采集挂了」。
 		// 查询失败时保持 nil —— Master 会判为 absent，比编个假时间戳诚实。
-		if f, err := s.dashboardRepo.GetSignalFreshness(ctx); err == nil {
+		if f, err := s.dashboardRepo.GetSignalFreshness(ctx); err != nil {
+			log.Warn("采集信号新鲜度失败", "err", err)
+		} else if f == nil {
+			log.Warn("信号新鲜度为空 —— 检查 ClickHouse 客户端是否注入")
+		} else {
 			snapshot.Freshness = f
 		}
 	}
