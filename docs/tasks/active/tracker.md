@@ -14,9 +14,20 @@
 > 四页各写各的：三套时间机制、两套刷新机制；空数据分不清「没流量」还是「采集挂了」；
 > 跨信号跳转只有 Logs→APM 一条单向链路。
 
-- Phase 1: 全局时间轴（store + 能力降级 hook + 四页接入 + URL 同步）— 🔄 进行中
-- Phase 2: 数据新鲜度（Agent 采集 → Master 判定 → 四页徽章）— 待办
-- Phase 3: 信号联动（SLO → APM/Logs，APM → Logs）— 待办
+- Phase 1: 全局时间轴 — ✅ 代码完成（da26567）
+  - timeRangeStore + useObserveTimeRange（能力声明 full/sloWindows/trendOnly）
+  - SLO 贴合到五个预聚合窗口并显式提示；Metrics 范围只作用趋势图
+  - URL 同步（router.replace），持久化 URL > localStorage > 默认 1h
+  - 引入 vitest（项目此前无前端测试框架），21 例
+- Phase 2: 数据新鲜度 — ✅ 代码完成（bed117d）
+  - model_v3.SignalFreshness；Agent 三张表各查 max(时间列)，挂 Dashboard 门面
+  - Master 判定 live/idle/stale/absent —— 靠 metrics（拉取式）与 traces/logs（请求触发）
+    的非对称区分「没流量」与「采集挂了」
+  - 四页头部统一挂 SignalFreshnessBadge
+- Phase 3: 信号联动 — ✅ 代码完成（本次提交）
+  - SLO → APM / SLO → Logs(ERROR) / APM trace → Logs
+  - 顺带统一 trace 参数名（Logs 页此前读 traceId，与另两处不一致）
+- 待部署验证：agent v0.6.1 / controller v0.5.0 / web v0.6.0 构建中
 
 ---
 
