@@ -3,6 +3,8 @@ package query
 import (
 	"math"
 	"testing"
+
+	"AtlHyper/model_v3/metrics"
 )
 
 // awaitMs: 平均 IO 延迟 = 累计耗时速率 ÷ 完成次数速率，换算毫秒。
@@ -152,5 +154,45 @@ func TestIsWholeBlockDevice(t *testing.T) {
 		if isWholeBlockDevice(d) {
 			t.Errorf("%s 是分区，不该视为整盘", d)
 		}
+	}
+}
+
+// nil 切片会序列化成 JSON null，而前端类型声明的是数组 —— n.disks.find() 直接崩，整页白屏。
+// 2026-08-24 线上事故：两个节点查询超时导致 disks/networks/sensors 全为 nil，
+// 其余五个节点正常，页面却整个挂掉。单个查询失败只该让那一格空着。
+func TestEnsureNodeMetricsSlices(t *testing.T) {
+	nm := &metrics.NodeMetrics{} // 所有 fill* 都失败的极端情况
+	ensureNodeMetricsSlices(nm)
+
+	if nm.Disks == nil {
+		t.Error("Disks 仍为 nil —— 会序列化成 null")
+	}
+	if nm.Networks == nil {
+		t.Error("Networks 仍为 nil")
+	}
+	if nm.Temperature.Sensors == nil {
+		t.Error("Temperature.Sensors 仍为 nil")
+	}
+	if nm.CPU.FreqHz == nil {
+		t.Error("CPU.FreqHz 仍为 nil")
+	}
+
+	// 已有数据的不能被清掉
+	withData := &metrics.NodeMetrics{
+		Disks:    []metrics.NodeDisk{{Device: "sda"}},
+		Networks: []metrics.NodeNetwork{{Interface: "eth0"}},
+	}
+	ensureNodeMetricsSlices(withData)
+	if len(withData.Disks) != 1 || len(withData.Networks) != 1 {
+		t.Error("已有数据被覆盖了")
+	}
+
+	// Hardware 为 nil 时不应 panic（旧版本上报或无传感器）
+	ensureNodeMetricsSlices(&metrics.NodeMetrics{Hardware: nil})
+
+	hw := &metrics.NodeMetrics{Hardware: &metrics.NodeHardware{}}
+	ensureNodeMetricsSlices(hw)
+	if hw.Hardware.Fans == nil || hw.Hardware.Cooling == nil {
+		t.Error("Hardware 内的切片仍为 nil")
 	}
 }

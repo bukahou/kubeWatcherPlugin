@@ -309,7 +309,7 @@ function MetricsPageContent() {
                 key={node.nodeName}
                 metrics={node}
                 historyData={historyCache[node.nodeName] || {}}
-                hardware={hardware?.rows.find((r) => r.nodeName === node.nodeName) ?? null}
+                hardware={hardware?.rows?.find((r) => r.nodeName === node.nodeName) ?? null}
                 expanded={expandedNode === node.nodeName}
                 onToggle={() => handleNodeToggle(node.nodeName)}
               />

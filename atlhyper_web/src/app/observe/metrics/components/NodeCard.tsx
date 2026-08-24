@@ -59,7 +59,7 @@ export function NodeCard({
   const cpuUsage = metrics.cpu.usagePct;
   const memUsage = metrics.memory.usagePct;
   const temp = metrics.temperature.cpuTempC;
-  const rootDisk = metrics.disks.find(d => d.mountPoint === "/") || metrics.disks[0];
+  const rootDisk = metrics.disks?.find(d => d.mountPoint === "/") ?? metrics.disks?.[0];
   const diskPct = rootDisk?.usagePct || 0;
 
   return (

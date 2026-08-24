@@ -23,7 +23,7 @@ export function useSignalFreshness(signal: SignalFreshnessItem["signal"]) {
     if (!currentClusterId) return;
     try {
       const res = await getSignalFreshness(currentClusterId);
-      setItem(res?.signals.find((s) => s.signal === signal) ?? null);
+      setItem(res?.signals?.find((s) => s.signal === signal) ?? null);
     } catch {
       // 取不到就显示「未知」，不影响主体数据 —— 新鲜度是辅助信息，不该让页面报错
       setItem(null);

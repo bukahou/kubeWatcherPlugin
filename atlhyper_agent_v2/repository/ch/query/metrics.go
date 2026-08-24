@@ -323,8 +323,41 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	wg.Wait()
 
 	nm.HardwareProfile = metrics.DetectHardwareProfile(machine, chipNames)
+	ensureNodeMetricsSlices(nm)
 
 	return nm, firstErr
+}
+
+// ensureNodeMetricsSlices 把 nil 切片补成空切片。
+//
+// 前端类型声明的是数组（disks: NodeDisk[]），而 Go 的 nil 切片会序列化成 null 而不是 []，
+// 于是 n.disks.find(...) 直接抛 TypeError，整页白屏 ——
+// 2026-08-24 线上就是这么崩的：两个节点的 fill* 全部没拿到数据（ClickHouse 查询超时），
+// 其余五个节点正常，页面却整个挂掉。
+//
+// 单个查询失败只该让那一格显示「无数据」，不该炸掉整个页面。
+// 这是后端的责任：契约说是数组，就必须给数组。
+func ensureNodeMetricsSlices(nm *metrics.NodeMetrics) {
+	if nm.Disks == nil {
+		nm.Disks = []metrics.NodeDisk{}
+	}
+	if nm.Networks == nil {
+		nm.Networks = []metrics.NodeNetwork{}
+	}
+	if nm.Temperature.Sensors == nil {
+		nm.Temperature.Sensors = []metrics.TempSensor{}
+	}
+	if nm.CPU.FreqHz == nil {
+		nm.CPU.FreqHz = []float64{}
+	}
+	if nm.Hardware != nil {
+		if nm.Hardware.Fans == nil {
+			nm.Hardware.Fans = []metrics.FanSensor{}
+		}
+		if nm.Hardware.Cooling == nil {
+			nm.Hardware.Cooling = []metrics.CoolingDevice{}
+		}
+	}
 }
 
 // fillCPU 填充 CPU 指标
