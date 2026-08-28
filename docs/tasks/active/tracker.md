@@ -12,6 +12,25 @@
 
 ---
 
+## APM 面板重构（对齐 Elastic APM）— 待用户确认设计
+
+> 原设计文档: [apm-panel-redesign.md](../../design/active/apm-panel-redesign.md)
+> UI 设计稿: https://claude.ai/code/artifact/af7edbfb-7d18-46fd-a31e-5c8352e4f5e5
+>
+> 起因：2026-08-28 排查 geass 注册 500，暴露四个问题——focus 裁剪丢上游、
+> 日志按服务过滤挡住根因、ListTraces 聚合 bug（过滤先于 GROUP BY）、
+> error 红色覆盖服务色。根因 `Data truncated for column 'auth_type'`
+> 一直在 ClickHouse 里，UI 一个字没显示。
+
+- Phase 1: Waterfall 视觉重构（颜色=服务、error 独立通道、focus 高亮替代裁剪、
+  self-time 分段、跨服务标签）+ ListTraces 两段式聚合修正 — 待办
+- Phase 2: 错误证据链（Span 详情回填日志异常 + 日志 tab 全量跨服务 + LogAttributes 渲染）— 待办
+- Phase 3: 延迟分布 brush 下钻（ListTraces 加 max_duration_ms）— 待办
+- Phase 4: Correlations 相关性分析（ClickHouse 条件聚合实现 significant terms）— 待办
+- Future: Dependencies 独立视图（不进本期）
+
+---
+
 ## QueryService 拆分重构 — 待办
 
 > 原设计文档: [master-v2-query-service-split-design.md](../../design/active/master-v2-query-service-split-design.md)
