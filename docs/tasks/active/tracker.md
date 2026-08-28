@@ -107,6 +107,22 @@
 
 ---
 
+## 构建提速：消灭 QEMU 模拟 — 待办（低优先级）
+
+> 现状：buildx 多架构构建中 arm64 一半走 QEMU 用户态模拟 —— 单线程
+> 吃满一个核（5.3GHz boost，Tctl 贴 95°C 温度墙），Go 编译慢 5-10 倍。
+> 2026-08-29 凌晨构建实测：agent 一个镜像 10+ 分钟，多数耗在 QEMU。
+
+- Dockerfile.agent / Dockerfile.controller：改 `FROM --platform=$BUILDPLATFORM golang`
+  + `GOARCH=$TARGETARCH` 交叉编译，编译全程原生，QEMU 只剩最终层 COPY
+- Dockerfile.web：builder 阶段固定 `--platform=$BUILDPLATFORM`（next build
+  产物是架构无关的 JS，只跑一次），运行阶段按 TARGETPLATFORM 双架构打包
+  - ⚠️ 前置检查：`npm ls` 确认无 native addon（sharp 等 .node 二进制
+    是架构相关的，会破坏产物同构假设）
+- 验证：两架构镜像 `docker manifest inspect` 齐全 + 树莓派节点实际拉起
+
+---
+
 ## 代码整洁（低优先级）
 
 - **SLO 组件目录不一致**：`components/slo/` 与其他三个观测页的
