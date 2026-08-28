@@ -289,6 +289,10 @@ func (r *traceRepository) GetTraceDetail(ctx context.Context, traceID string) (*
 		return nil, fmt.Errorf("trace not found: %s", traceID)
 	}
 
+	// 错误证据链：用同 trace 的 ERROR 日志为缺少错误详情的 Error span
+	// 回填证据（见 trace_errors.go）。查询失败只损失增强信息，不影响详情。
+	attachLogErrors(spans, r.queryTraceErrorLogs(ctx, traceID))
+
 	// 计算整体 duration
 	var maxDuration float64
 	for _, s := range spans {

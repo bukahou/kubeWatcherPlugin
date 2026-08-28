@@ -18,7 +18,23 @@ type SpanError struct {
 	Type       string `json:"type"`
 	Message    string `json:"message"`
 	Stacktrace string `json:"stacktrace,omitempty"`
+	// Source 错误证据的来源，排查者需要知道证据是从哪一层拿到的：
+	//   span_event     — span 自带的 exception 事件（最强）
+	//   status_message — span 的 StatusMessage 字段
+	//   trace_log      — 同 trace 的 ERROR 日志回填（gRPC/connect 场景
+	//                    span 常常两者皆空，异常详情只存在于日志属性里）
+	Source string `json:"source,omitempty"`
+	// SourceService 证据来源日志所属的服务（仅 trace_log）。
+	// 可能不同于 span 自身的服务 —— 下游 span 的错误详情往往在上游手里。
+	SourceService string `json:"sourceService,omitempty"`
 }
+
+// SpanError.Source 取值
+const (
+	ErrorSourceSpanEvent     = "span_event"
+	ErrorSourceStatusMessage = "status_message"
+	ErrorSourceTraceLog      = "trace_log"
+)
 
 // Span 分布式追踪中的单个操作
 type Span struct {

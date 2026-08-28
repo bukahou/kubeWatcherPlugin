@@ -42,10 +42,16 @@ export interface SpanEvent {
   attributes?: Record<string, string>;
 }
 
+export type SpanErrorSource = "span_event" | "status_message" | "trace_log";
+
 export interface SpanError {
   type: string;
   message: string;
   stacktrace?: string;
+  /** 证据来源：span 自带事件 / StatusMessage / 同 trace 的 ERROR 日志回填 */
+  source?: SpanErrorSource;
+  /** source=trace_log 时证据日志所属服务（可能是上游，不同于 span 自身） */
+  sourceService?: string;
 }
 
 export interface Span {

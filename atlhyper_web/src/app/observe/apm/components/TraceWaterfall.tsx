@@ -211,7 +211,7 @@ export function TraceWaterfall({
 
         {/* Logs tab content */}
         {activeTab === 2 && (
-          <SpanLogs t={t} traceId={trace.traceId} serviceName={selectedSpan?.serviceName} />
+          <SpanLogs t={t} traceId={trace.traceId} serviceColorMap={serviceColorMap} />
         )}
 
         {/* Timeline tab content */}

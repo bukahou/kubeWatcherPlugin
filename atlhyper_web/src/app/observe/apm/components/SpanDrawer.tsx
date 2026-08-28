@@ -94,13 +94,28 @@ export function SpanDrawer({
             </div>
           </section>
 
-          {/* Error Info */}
+          {/* Error Info —— 证据链：标注证据从哪一层拿到（span 事件 / 状态消息 / trace 日志） */}
           {span.error && (
             <section>
               <SectionHeader title={t.errorInfo} />
               <div className="border border-red-500/30 rounded-lg p-3 bg-red-500/5">
-                <div className="text-sm font-semibold text-red-400">{span.error.type}</div>
-                <div className="text-sm text-default mt-1">{span.error.message}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-red-400 truncate">{span.error.type || "Error"}</div>
+                  {span.error.source && (
+                    <span className="flex-shrink-0 text-[10px] text-muted border border-[var(--border-color)] rounded-full px-2 py-0.5">
+                      {t.errorSource}:{" "}
+                      {span.error.source === "span_event" ? t.errorSourceSpanEvent
+                        : span.error.source === "status_message" ? t.errorSourceStatusMessage
+                        : t.errorSourceTraceLog}
+                      {span.error.sourceService && span.error.sourceService !== span.serviceName && (
+                        <span className="ml-1" style={{ color: serviceColorMap.get(span.error.sourceService) ?? "inherit" }}>
+                          · {span.error.sourceService}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm text-default mt-1 font-mono break-all">{span.error.message}</div>
                 {span.error.stacktrace && (
                   <details className="mt-2">
                     <summary className="text-xs text-muted cursor-pointer hover:text-default transition-colors">{t.showStacktrace}</summary>
@@ -213,11 +228,11 @@ export function SpanDrawer({
             </div>
           </section>
 
-          {/* Correlated Logs */}
+          {/* Correlated Logs —— 整条 trace 全量：根因日志往往在上游服务手里 */}
           <section>
-            <SectionHeader title={`${t.correlatedLogs} — ${span.serviceName}`} />
+            <SectionHeader title={t.correlatedLogs} />
             <div className="border border-[var(--border-color)] rounded-lg overflow-hidden">
-              <SpanLogs t={t} traceId={trace.traceId} serviceName={span.serviceName} compact />
+              <SpanLogs t={t} traceId={trace.traceId} serviceColorMap={serviceColorMap} compact />
             </div>
           </section>
         </div>
