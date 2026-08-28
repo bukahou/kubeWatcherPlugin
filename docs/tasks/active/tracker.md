@@ -5,36 +5,10 @@
 >
 > 状态标记：`✅` 完成 / `🔄` 进行中 / 无标记 = 待办
 
-> **线上版本**（2026-08-25）：agent v0.6.5 / controller v0.5.2 / web v0.6.2
+> **线上版本**（2026-08-29）：agent v0.7.0 / controller v0.6.0 / web v0.7.0
 >
-> 近期完成并已归档：节点指标硬件健康+USE 改版、观测统一时间轴与信号联动、
-> 指标采集查询预算优化、**SLO 面板重构（Phase 1–4 全完成）** —— 见 `docs/tasks/archive/`
-
----
-
-## APM 面板重构（对齐 Elastic APM）— 待用户确认设计
-
-> 原设计文档: [apm-panel-redesign.md](../../design/active/apm-panel-redesign.md)
-> UI 设计稿: https://claude.ai/code/artifact/af7edbfb-7d18-46fd-a31e-5c8352e4f5e5
->
-> 起因：2026-08-28 排查 geass 注册 500，暴露四个问题——focus 裁剪丢上游、
-> 日志按服务过滤挡住根因、ListTraces 聚合 bug（过滤先于 GROUP BY）、
-> error 红色覆盖服务色。根因 `Data truncated for column 'auth_type'`
-> 一直在 ClickHouse 里，UI 一个字没显示。
-
-- Phase 1: Waterfall 视觉重构 + ListTraces 两段式聚合修正 — ✅ 开发完成（ef59e08）
-- Phase 2: 错误证据链 — ✅ 开发完成（7369095）
-- Phase 3: 延迟分布 brush 下钻 — ✅ 开发完成（b509e3c）
-  实现偏差：纯前端（ECharts brush + 已加载样本即时过滤），
-  设计文档中的 max_duration_ms 后端参数不再需要 —— 直方图数据本就来自
-  已加载的 200 条样本
-- Phase 4: Correlations — ✅ 开发完成（bb20d9a）
-  实现偏差：打分与 impact 分级在 Agent 而非 Master —— APM 域 Master 是
-  纯透传 + 缓存（无 convert 层），Agent 直出前端形态是该域既定架构
-- **部署 + 真实 trace 验收 — 待办**（需构建 agent / controller / web 三镜像；
-  验收用 register 500 的 trace：3 span 双色、错误卡显示 Data truncated、
-  correlations 报出 iPhone）
-- Future: Dependencies 独立视图（不进本期）
+> 近期完成并已归档：观测统一时间轴与信号联动、指标采集查询预算优化、
+> SLO 面板重构、**APM 面板重构（对齐 ES APM，Phase 1–4 + 部署验收）** —— 见 `docs/tasks/archive/`
 
 ---
 
@@ -47,6 +21,11 @@
 > 任务：系统扫描 Agent 查询层 / model_v3 / Master 端点 / 前端 datasource，
 > 列出「数据已采集但无查询」「有查询但无端点」「有端点但无 UI」「有 UI 但
 > 只用了部分字段」四类清单，按接线成本 × 用户价值排序后给方案。
+>
+> 已知素材：① LogAttributes 曾端到端透传但 UI 未渲染（已修）
+> ② self-time 已算但没上瀑布图（已修）③ correlations 验收发现
+> geass 服务 OTel resource 缺 K8s 元数据（node/pod/version 全 (none)），
+> 反向问题——UI 有位置、数据没注入。
 
 ---
 
