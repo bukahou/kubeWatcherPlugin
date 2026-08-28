@@ -10,10 +10,11 @@ import { isErrorSpan } from "@/lib/otel";
 // SpanRow — 瀑布图单行
 //
 // 视觉通道分工（硬约束，见 apm-panel-redesign.md 功能一）：
-//   颜色     = 服务身份（error 不覆盖 —— 全 error 的 trace 也要能分服务）
-//   红描边+⚠ = 错误
-//   缩进     = 调用层级；跨服务边界另加服务色标签（不靠颜色对比脑补）
-//   长度/偏移 = 时间；bar 内深色段 = self time，浅色段 = 等待子调用
+//   颜色     = 服务身份（error 不覆盖也不描边 —— 全 error 的 trace 也要能分服务）
+//   红端帽+⚠ = 错误（只标在 bar 右端，不侵占 bar 本身）
+//   树线+缩进 = 调用层级；跨服务边界另加服务色标签（不靠颜色对比脑补）
+//   长度/偏移 = 时间；【容器】= 总跨度，【实色段】= self time 的真实时间位置，
+//              留空处 = 被子调用占走（那段时间在子行着色）
 //   透明度   = focus（非 focus 服务淡化但可见 —— 高亮而非裁剪）
 // ============================================================
 
@@ -160,7 +161,6 @@ export function SpanRow({
             border: `1px solid ${color}66`,
             borderLeft: `3px solid ${color}`,
             background: `${color}14`,
-            outline: isError ? "1.5px solid #ef4444" : undefined,
           }}
         />
         {/* self 段：按真实时间位置填实色 */}
@@ -178,13 +178,29 @@ export function SpanRow({
             }}
           />
         ))}
+        {/* 错误标识：bar 右端的红色端帽（标记「在此结束时出错」）+ 角标。
+            不用整条描边 —— 全 error 的 trace 里描边会主导画面，
+            服务色反而次要，与「颜色只编码服务」的分工冲突。 */}
         {isError && (
-          <span
-            className="absolute flex items-center justify-center"
-            style={{ left: `calc(${offset + width}% - 4px)`, top: -3 }}
-          >
-            <AlertCircle className="w-3.5 h-3.5 text-red-500 bg-[var(--card-bg)] rounded-full" />
-          </span>
+          <>
+            <div
+              className="absolute"
+              style={{
+                top: 4,
+                left: `calc(${offset + width}% - 2px)`,
+                width: 2,
+                height: barH,
+                background: "#ef4444",
+                borderRadius: "0 2px 2px 0",
+              }}
+            />
+            <span
+              className="absolute flex items-center justify-center"
+              style={{ left: `calc(${offset + width}% - 4px)`, top: -3 }}
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-red-500 bg-[var(--card-bg)] rounded-full" />
+            </span>
+          </>
         )}
       </div>
 
