@@ -22,11 +22,18 @@
 > error 红色覆盖服务色。根因 `Data truncated for column 'auth_type'`
 > 一直在 ClickHouse 里，UI 一个字没显示。
 
-- Phase 1: Waterfall 视觉重构（颜色=服务、error 独立通道、focus 高亮替代裁剪、
-  self-time 分段、跨服务标签）+ ListTraces 两段式聚合修正 — 待办
-- Phase 2: 错误证据链（Span 详情回填日志异常 + 日志 tab 全量跨服务 + LogAttributes 渲染）— 待办
-- Phase 3: 延迟分布 brush 下钻（ListTraces 加 max_duration_ms）— 待办
-- Phase 4: Correlations 相关性分析（ClickHouse 条件聚合实现 significant terms）— 待办
+- Phase 1: Waterfall 视觉重构 + ListTraces 两段式聚合修正 — ✅ 开发完成（ef59e08）
+- Phase 2: 错误证据链 — ✅ 开发完成（7369095）
+- Phase 3: 延迟分布 brush 下钻 — ✅ 开发完成（b509e3c）
+  实现偏差：纯前端（ECharts brush + 已加载样本即时过滤），
+  设计文档中的 max_duration_ms 后端参数不再需要 —— 直方图数据本就来自
+  已加载的 200 条样本
+- Phase 4: Correlations — ✅ 开发完成（bb20d9a）
+  实现偏差：打分与 impact 分级在 Agent 而非 Master —— APM 域 Master 是
+  纯透传 + 缓存（无 convert 层），Agent 直出前端形态是该域既定架构
+- **部署 + 真实 trace 验收 — 待办**（需构建 agent / controller / web 三镜像；
+  验收用 register 500 的 trace：3 span 双色、错误卡显示 Data truncated、
+  correlations 报出 iPhone）
 - Future: Dependencies 独立视图（不进本期）
 
 ---
