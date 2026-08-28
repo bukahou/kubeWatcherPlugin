@@ -53,6 +53,57 @@ func traceTimeSec(since time.Duration, startTime, endTime string) int64 {
 	return sinceSeconds(since)
 }
 
+// entrySpanRootExpr 生成「入口 span」字段取值表达式（≈ Elastic APM 的 Transaction）。
+//
+// 规则：优先 SpanKind = Server 的最早 span；trace 没有 Server span 时
+// 退化到无父 span 的最早 span。所有需要「trace 的根是谁」的查询必须
+// 用本函数，禁止各自内联变体 —— 2026-08-28 曾因该逻辑作用在被过滤的
+// 残缺集合上，把叶子服务错判成根服务。
+func entrySpanRootExpr(column string) string {
+	server := "argMinIf(" + column + ", Timestamp, SpanKind = " + apm.SQLSpanKindServer + ")"
+	orphan := "argMinIf(" + column + ", Timestamp, ParentSpanId = '')"
+	return "if(" + server + " != '', " + server + ", " + orphan + ")"
+}
+
+// buildListTracesQuery 构造 trace 列表聚合查询。
+//
+// ⚠️ 两段式结构是硬约束（有测试守护）：过滤条件（service / operation /
+// status_code …）只用于内层子查询**定位 TraceId 集合**，外层对完整 trace
+// 聚合。条件若直接写进聚合层，spanCount / serviceCount / rootService
+// 都会基于残缺 span 集合计算（实测失真：1 span/1 服务 vs 真实 3/2）。
+//
+// 外层不带时间窗：otel_traces 走 7 天 TTL（当前万级行数），全表按
+// TraceId IN 过滤的代价可忽略；若未来量级上升，再给外层加放宽的时间窗
+// （必须比内层宽出单条 trace 的最大时长，否则边缘 span 会被截掉）。
+func buildListTracesQuery(where, orderBy string, limit int) string {
+	return fmt.Sprintf(`
+		SELECT TraceId,
+		       min(Timestamp) AS ts,
+		       %s AS rootSvc,
+		       %s AS rootOp,
+		       max(Duration) / 1e6 AS durationMs,
+		       count() AS spanCount,
+		       count(DISTINCT ServiceName) AS serviceCount,
+		       groupArray(DISTINCT ServiceName) AS services,
+		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) > 0 AS hasError,
+		       anyIf(
+		           Events.Attributes[indexOf(Events.Name, 'exception')]['exception.type'],
+		           indexOf(Events.Name, 'exception') > 0
+		       ) AS errorType,
+		       anyIf(
+		           Events.Attributes[indexOf(Events.Name, 'exception')]['exception.message'],
+		           indexOf(Events.Name, 'exception') > 0
+		       ) AS errorMessage
+		FROM otel_traces
+		WHERE TraceId IN (
+		    SELECT DISTINCT TraceId FROM otel_traces WHERE %s
+		)
+		GROUP BY TraceId
+		ORDER BY %s
+		LIMIT %d
+	`, entrySpanRootExpr("ServiceName"), entrySpanRootExpr("SpanName"), where, orderBy, limit)
+}
+
 // ListTraces 查询 Trace 列表（按 TraceId 聚合）
 func (r *traceRepository) ListTraces(ctx context.Context, service, operation string, minDurationMs float64, limit int, since time.Duration, sortBy string, startTime, endTime string, statusCode, method string) ([]apm.TraceSummary, error) {
 	if limit <= 0 {
@@ -95,34 +146,7 @@ func (r *traceRepository) ListTraces(ctx context.Context, service, operation str
 		orderBy = "durationMs DESC"
 	}
 
-	query := fmt.Sprintf(`
-		SELECT TraceId,
-		       min(Timestamp) AS ts,
-		       if(argMinIf(ServiceName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`) != '',
-		          argMinIf(ServiceName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`),
-		          argMinIf(ServiceName, Timestamp, ParentSpanId = '')) AS rootSvc,
-		       if(argMinIf(SpanName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`) != '',
-		          argMinIf(SpanName, Timestamp, SpanKind = `+apm.SQLSpanKindServer+`),
-		          argMinIf(SpanName, Timestamp, ParentSpanId = '')) AS rootOp,
-		       max(Duration) / 1e6 AS durationMs,
-		       count() AS spanCount,
-		       count(DISTINCT ServiceName) AS serviceCount,
-		       groupArray(DISTINCT ServiceName) AS services,
-		       countIf(StatusCode = `+apm.SQLStatusCodeError+`) > 0 AS hasError,
-		       anyIf(
-		           Events.Attributes[indexOf(Events.Name, 'exception')]['exception.type'],
-		           indexOf(Events.Name, 'exception') > 0
-		       ) AS errorType,
-		       anyIf(
-		           Events.Attributes[indexOf(Events.Name, 'exception')]['exception.message'],
-		           indexOf(Events.Name, 'exception') > 0
-		       ) AS errorMessage
-		FROM otel_traces
-		WHERE %s
-		GROUP BY TraceId
-		ORDER BY %s
-		LIMIT %d
-	`, where, orderBy, limit)
+	query := buildListTracesQuery(where, orderBy, limit)
 
 	rows, err := r.client.Query(ctx, query, args...)
 	if err != nil {

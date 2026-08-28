@@ -27,7 +27,6 @@ import { ServiceList } from "./components/ServiceList";
 import { ServiceOverview } from "./components/ServiceOverview";
 import { TraceWaterfall } from "./components/TraceWaterfall";
 import { ServiceTopology } from "./components/ServiceTopology";
-import { filterTraceForService } from "./components/trace-utils";
 import { isErrorSpan } from "@/lib/otel";
 
 type ViewState =
@@ -173,11 +172,6 @@ function ApmPageContent() {
     }
   };
 
-  // 从子服务进入追踪详情时，裁剪 Span 树：只保留该服务的入口 Span 及其所有后代
-  const focusedTrace = useMemo(() => {
-    if (!traceDetail || view.level !== "trace-detail") return null;
-    return filterTraceForService(traceDetail, view.serviceName);
-  }, [traceDetail, view]);
 
   if (!currentClusterId) {
     return (
@@ -269,12 +263,14 @@ function ApmPageContent() {
           />
         )}
 
-        {view.level === "trace-detail" && focusedTrace && (
+        {view.level === "trace-detail" && traceDetail && (
           <TraceWaterfall
+            key={view.traceId}
             t={ta}
-            trace={focusedTrace}
+            trace={traceDetail}
             allTraces={operationTraces}
             currentTraceIndex={view.traceIndex}
+            initialFocusService={view.serviceName}
             onNavigateTrace={navigateTrace}
           />
         )}

@@ -2243,6 +2243,8 @@ Deployment 已更新，新的 Pod 正在启动中
     httpStatus: "HTTP 状态",
     showStacktrace: "展开堆栈",
     correlatedLogs: "关联日志",
+    viewFullTrace: "查看完整链路",
+    focusLegendHint: "点击图例聚焦服务",
     noCorrelatedLogs: "该 Span 无关联日志",
     viewCorrelatedLogs: "查看关联日志",
     us: "μs",

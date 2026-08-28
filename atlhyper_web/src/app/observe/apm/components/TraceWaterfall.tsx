@@ -17,7 +17,7 @@ import type { ApmTranslations } from "@/types/i18n";
 import { formatDurationMs, formatTimeAgo } from "@/lib/format";
 import { getLatencyDistribution } from "@/datasource/apm";
 import { LatencyDistribution } from "./LatencyDistribution";
-import { SERVICE_COLORS, buildSpanTree, flattenTree } from "./waterfall-utils";
+import { SERVICE_COLORS, buildSpanTree, flattenTree, focusSpanIds } from "./waterfall-utils";
 import { SpanRow } from "./SpanRow";
 import { SpanDrawer } from "./SpanDrawer";
 import { SpanLogs } from "./SpanLogs";
@@ -28,6 +28,8 @@ interface TraceWaterfallProps {
   trace: TraceDetail;
   allTraces: TraceSummary[];
   currentTraceIndex: number;
+  /** 进入路径的服务：作为初始 focus（高亮该服务的入口 span 及后代，其余淡化） */
+  initialFocusService?: string;
   onNavigateTrace: (index: number) => void;
 }
 
@@ -36,12 +38,16 @@ export function TraceWaterfall({
   trace,
   allTraces,
   currentTraceIndex,
+  initialFocusService,
   onNavigateTrace,
 }: TraceWaterfallProps) {
   const [selectedSpan, setSelectedSpan] = useState<Span | null>(null);
   const [collapsedSpans, setCollapsedSpans] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  // focus = 高亮而非裁剪：完整树永远渲染，非 focus 服务淡化。
+  // 初始值来自进入路径（从哪个服务点进来就聚焦谁），图例可切换/清除。
+  const [focusService, setFocusService] = useState<string | null>(initialFocusService ?? null);
 
   const serviceColorMap = useMemo(() => {
     const services = [...new Set(trace.spans.map((s) => s.serviceName))];
@@ -57,6 +63,18 @@ export function TraceWaterfall({
     () => flattenTree(tree, collapsedSpans),
     [tree, collapsedSpans]
   );
+
+  const focusedIds = useMemo(() => {
+    if (!focusService) return null;
+    const ids = focusSpanIds(trace, focusService);
+    return ids.size > 0 ? ids : null; // 无匹配 = 不淡化任何行
+  }, [trace, focusService]);
+
+  const spanCountByService = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of trace.spans) m.set(s.serviceName, (m.get(s.serviceName) ?? 0) + 1);
+    return m;
+  }, [trace.spans]);
 
   // Convert ISO timestamps to ms for relative positioning
   const spanTimesMs = useMemo(() => {
@@ -198,25 +216,48 @@ export function TraceWaterfall({
 
         {/* Timeline tab content */}
         {activeTab === 0 && <>
-        {/* Service legend */}
-        <div className="flex flex-wrap gap-3 px-4 py-2 border-b border-[var(--border-color)]">
-          {[...serviceColorMap.entries()].map(([svc, color]) => (
-            <div key={svc} className="flex items-center gap-1.5 text-xs">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-              <span className="text-muted">{svc}</span>
-            </div>
-          ))}
+        {/* Service legend —— 可点击控件：toggle 服务 focus */}
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-[var(--border-color)]">
+          {[...serviceColorMap.entries()].map(([svc, color]) => {
+            const isFocused = focusService === svc;
+            const isDimmed = focusService !== null && !isFocused;
+            return (
+              <button
+                key={svc}
+                onClick={() => setFocusService(isFocused ? null : svc)}
+                title={t.focusLegendHint}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
+                  isFocused
+                    ? "border-primary shadow-[inset_0_0_0_1px_var(--primary)]"
+                    : "border-[var(--border-color)] hover:border-[var(--text-muted)]"
+                } ${isDimmed ? "opacity-40" : ""}`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-default">{svc}</span>
+                <span className="text-[10px] text-muted font-mono">{spanCountByService.get(svc) ?? 0}</span>
+              </button>
+            );
+          })}
+          {focusService && (
+            <button
+              onClick={() => setFocusService(null)}
+              className="ml-auto text-xs text-primary hover:underline"
+            >
+              {t.viewFullTrace}
+            </button>
+          )}
         </div>
 
         {/* Timeline header */}
-        <div className="px-4 py-2 border-b border-[var(--border-color)]">
+        <div className="py-2 border-b border-[var(--border-color)]">
           <div className="flex">
-            <div className="w-[80px] flex-shrink-0" />
-            <div className="flex-1 flex justify-between text-[10px] text-muted">
+            <div className="w-[240px] flex-shrink-0" />
+            <div className="flex-1 flex justify-between text-[10px] text-muted font-mono">
               {ticks.map((tick, i) => (
                 <span key={i}>{formatDurationMs(tick)}</span>
               ))}
             </div>
+            <div className="w-[110px] flex-shrink-0" />
           </div>
         </div>
 
@@ -231,6 +272,7 @@ export function TraceWaterfall({
               traceDurationMs={traceDurationMs}
               isSelected={selectedSpan?.spanId === node.span.spanId}
               isCollapsed={collapsedSpans.has(node.span.spanId)}
+              focusedIds={focusedIds}
               onSelect={setSelectedSpan}
               onToggleCollapse={toggleCollapse}
             />

@@ -2243,6 +2243,8 @@ Deployment が更新され、新しい Pod が起動中です
     httpStatus: "HTTPステータス",
     showStacktrace: "スタックを展開",
     correlatedLogs: "関連ログ",
+    viewFullTrace: "全体トレースを表示",
+    focusLegendHint: "凡例をクリックしてサービスにフォーカス",
     noCorrelatedLogs: "このSpanに関連ログがありません",
     viewCorrelatedLogs: "関連ログを表示",
     us: "μs",
