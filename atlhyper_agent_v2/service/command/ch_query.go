@@ -40,6 +40,16 @@ func (s *commandService) handleQueryTraces(ctx context.Context, cmd *command.Com
 		since := getDurationParam(cmd.Params, "since", 15*time.Minute)
 		return s.traceQueryRepo.ListServices(ctx, since, startTime, endTime)
 
+	case "get_correlations":
+		service := getStringParam(cmd.Params, "service")
+		operation := getStringParam(cmd.Params, "operation")
+		mode := getStringParam(cmd.Params, "mode")
+		if mode == "" {
+			mode = "failure"
+		}
+		since := getDurationParam(cmd.Params, "since", 60*time.Minute)
+		return s.traceQueryRepo.GetTraceCorrelations(ctx, service, operation, mode, since, startTime, endTime)
+
 	case "get_topology":
 		since := getDurationParam(cmd.Params, "since", 15*time.Minute)
 		return s.traceQueryRepo.GetTopology(ctx, since, startTime, endTime)

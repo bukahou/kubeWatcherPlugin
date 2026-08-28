@@ -6,7 +6,7 @@ import {
   mockGetLatencyDistribution,
 } from "@/mock/apm";
 import type { MockTraceQueryParams } from "@/mock/apm";
-import type { APMService, TraceSummary, TraceDetail, Topology, OperationStats, Dependency, APMTimePoint, HTTPStats, DBOperationStats } from "@/types/model/apm";
+import type { APMService, TraceSummary, TraceDetail, Topology, OperationStats, Dependency, APMTimePoint, HTTPStats, DBOperationStats, CorrelationResult, CorrelationMode } from "@/types/model/apm";
 import * as observeApi from "@/api/observe-apm";
 
 export type { MockTraceQueryParams } from "@/mock/apm";
@@ -132,6 +132,29 @@ export async function getDBStats(clusterId?: string, serviceName?: string, time?
     return response.data.data || [];
   } catch {
     return [];
+  }
+}
+
+export async function getCorrelations(
+  clusterId: string | undefined,
+  serviceName: string,
+  mode: CorrelationMode,
+  time?: TimeParams,
+  operation?: string,
+): Promise<CorrelationResult | null> {
+  if (!clusterId) return null;
+  try {
+    const response = await observeApi.getTracesCorrelations(clusterId, {
+      service: serviceName,
+      operation,
+      mode,
+      ...(time?.since ? { time_range: time.since } : {}),
+      ...(time?.startTime ? { start_time: time.startTime } : {}),
+      ...(time?.endTime ? { end_time: time.endTime } : {}),
+    });
+    return response.data.data || null;
+  } catch {
+    return null;
   }
 }
 

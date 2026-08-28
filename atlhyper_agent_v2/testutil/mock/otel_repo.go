@@ -49,6 +49,7 @@ type TraceQueryRepository struct {
 	GetHTTPStatsFn         func(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.HTTPStats, error)
 	GetDBStatsFn           func(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.DBOperationStats, error)
 	GetServiceTimeSeriesFn func(ctx context.Context, service string, since time.Duration) ([]apm.TimePoint, error)
+	GetTraceCorrelationsFn func(ctx context.Context, service, operation, mode string, since time.Duration, startTime, endTime string) (*apm.CorrelationResult, error)
 }
 
 func (m *TraceQueryRepository) ListTraces(ctx context.Context, service, operation string, minDurationMs float64, limit int, since time.Duration, sort string, startTime, endTime string, statusCode, method string) ([]apm.TraceSummary, error) {
@@ -105,6 +106,13 @@ func (m *TraceQueryRepository) GetServiceTimeSeries(ctx context.Context, service
 		return m.GetServiceTimeSeriesFn(ctx, service, since)
 	}
 	return []apm.TimePoint{}, nil
+}
+
+func (m *TraceQueryRepository) GetTraceCorrelations(ctx context.Context, service, operation, mode string, since time.Duration, startTime, endTime string) (*apm.CorrelationResult, error) {
+	if m.GetTraceCorrelationsFn != nil {
+		return m.GetTraceCorrelationsFn(ctx, service, operation, mode, since, startTime, endTime)
+	}
+	return &apm.CorrelationResult{Items: []apm.CorrelationItem{}}, nil
 }
 
 // LogQueryRepository mock

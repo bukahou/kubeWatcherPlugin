@@ -177,6 +177,9 @@ type TraceQueryRepository interface {
 	GetHTTPStats(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.HTTPStats, error)
 	GetDBStats(ctx context.Context, service string, since time.Duration, startTime, endTime string) ([]apm.DBOperationStats, error)
 	GetServiceTimeSeries(ctx context.Context, service string, since time.Duration) ([]apm.TimePoint, error)
+	// GetTraceCorrelations 相关性分析：慢/错的入口 span 相比全量，
+	// 哪些属性值显著超标（mode = latency / failure）
+	GetTraceCorrelations(ctx context.Context, service, operation, mode string, since time.Duration, startTime, endTime string) (*apm.CorrelationResult, error)
 }
 
 // LogQueryOptions 日志查询选项

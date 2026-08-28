@@ -2354,6 +2354,19 @@ export interface ApmTranslations extends TimeRangePickerTranslations {
   latencyFilterActive: string;
   clearFilter: string;
   brushHint: string;
+  correlations: string;
+  correlationsDesc: string;
+  correlationModeFailure: string;
+  correlationModeLatency: string;
+  corrAttrValue: string;
+  corrFgRatioFailure: string;
+  corrFgRatioLatency: string;
+  corrBgRatio: string;
+  corrLift: string;
+  corrImpact: string;
+  corrLowSample: string;
+  corrNoSamples: string;
+  corrThreshold: string;
   noCorrelatedLogs: string;
   viewCorrelatedLogs: string;
   // units

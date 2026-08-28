@@ -192,6 +192,34 @@ export interface SpanTypeBreakdown {
 }
 
 // ============================================================
+// Correlations — 相关性分析（对齐 model_v3/apm/correlation.go）
+// ============================================================
+
+export type CorrelationMode = "latency" | "failure";
+export type CorrelationImpact = "high" | "medium" | "low";
+
+export interface CorrelationItem {
+  field: string;
+  value: string;          // "(none)" = 字段缺失
+  fgCount: number;
+  bgCount: number;
+  fgRatio: number;        // 0-1
+  bgRatio: number;        // 0-1
+  lift: number;
+  score: number;
+  impact: CorrelationImpact;
+}
+
+export interface CorrelationResult {
+  mode: CorrelationMode;
+  foregroundCount: number;
+  backgroundCount: number;
+  lowSample: boolean;     // 前景样本 < 5，仅供参考
+  thresholdMs?: number;   // latency 模式的 P95 阈值
+  items: CorrelationItem[];
+}
+
+// ============================================================
 // APMTimePoint — 服务时序趋势数据点（Concentrator 预聚合）
 // ============================================================
 

@@ -4,7 +4,7 @@
 
 import { get } from "./request";
 import type { ObserveResponse } from "./observe-common";
-import type { TraceSummary, TraceDetail, APMService, Topology, OperationStats, APMServiceSeriesResponse, HTTPStats, DBOperationStats } from "@/types/model/apm";
+import type { TraceSummary, TraceDetail, APMService, Topology, OperationStats, APMServiceSeriesResponse, HTTPStats, DBOperationStats, CorrelationResult } from "@/types/model/apm";
 
 /** 查询 Trace 列表 */
 export function getTracesList(clusterId: string, params?: {
@@ -62,6 +62,21 @@ export function getAPMServiceSeries(clusterId: string, serviceName: string, minu
     `/api/v2/observe/traces/services/${encodeURIComponent(serviceName)}/series`,
     { cluster_id: clusterId, ...(minutes ? { minutes: String(minutes) } : {}) },
   );
+}
+
+/** 相关性分析：慢/错请求中显著超标的属性（对齐 ES APM Correlations） */
+export function getTracesCorrelations(clusterId: string, params: {
+  service: string;
+  operation?: string;
+  mode: "latency" | "failure";
+  time_range?: string;
+  start_time?: string;
+  end_time?: string;
+}) {
+  return get<ObserveResponse<CorrelationResult>>("/api/v2/observe/traces/correlations", {
+    cluster_id: clusterId,
+    ...params,
+  });
 }
 
 /** 获取 HTTP 状态码分布 */

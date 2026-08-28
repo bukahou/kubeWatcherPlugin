@@ -320,6 +320,40 @@ func (h *ObserveHandler) TracesDetail(w http.ResponseWriter, r *http.Request) {
 	h.executeQuery(w, r, clusterID, command.ActionQueryTraceDetail, params, 30*time.Second)
 }
 
+// TracesCorrelations GET /api/v2/observe/traces/correlations
+//
+// 相关性分析（对齐 Elastic APM Correlations）：慢/错的入口 span 相比
+// 全量，哪些属性值显著超标。mode = latency | failure（默认 failure）。
+func (h *ObserveHandler) TracesCorrelations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		handler.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	clusterID, ok := requireClusterID(r)
+	if !ok {
+		handler.WriteError(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+
+	params := map[string]interface{}{
+		"sub_action": "get_correlations",
+		"service":    r.URL.Query().Get("service"),
+		"operation":  r.URL.Query().Get("operation"),
+		"mode":       r.URL.Query().Get("mode"),
+	}
+	if tr := r.URL.Query().Get("time_range"); tr != "" {
+		params["since"] = tr
+	}
+	if st := r.URL.Query().Get("start_time"); st != "" {
+		params["start_time"] = st
+	}
+	if et := r.URL.Query().Get("end_time"); et != "" {
+		params["end_time"] = et
+	}
+	// 统计结果短缓存：相关性分析是重查询，同参数 30 秒内不重算
+	h.executeQuery(w, r, clusterID, command.ActionQueryTraces, params, 30*time.Second)
+}
+
 // TracesStats GET /api/v2/observe/traces/stats
 // 通过 Command/MQ 查询 HTTP 状态码分布和数据库操作统计
 func (h *ObserveHandler) TracesStats(w http.ResponseWriter, r *http.Request) {

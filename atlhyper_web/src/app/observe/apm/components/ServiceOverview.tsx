@@ -9,6 +9,7 @@ import { TransactionsTable } from "./TransactionsTable";
 import { DependenciesTable } from "./DependenciesTable";
 import { ServiceTrendCharts } from "./ServiceTrendCharts";
 import { ErrorTracesList } from "./ErrorTracesList";
+import { CorrelationsPanel } from "./CorrelationsPanel";
 import { StatusCodeChart } from "./StatusCodeChart";
 import { DBStatsTable } from "./DBStatsTable";
 import { SlowTracesList } from "./SlowTracesList";
@@ -247,7 +248,10 @@ export function ServiceOverview({
 
       {/* Errors Tab */}
       {activeTab === "errors" && (
-        <ErrorTracesList t={t} traces={errorTraces} onSelectTrace={onSelectTrace} />
+        <div className="space-y-4">
+          <ErrorTracesList t={t} traces={errorTraces} onSelectTrace={onSelectTrace} />
+          <CorrelationsPanel t={t} clusterId={clusterId} serviceName={serviceName} timeParams={timeParams} />
+        </div>
       )}
     </div>
   );
