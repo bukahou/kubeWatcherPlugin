@@ -48,6 +48,8 @@ export function TraceWaterfall({
   // focus = 高亮而非裁剪：完整树永远渲染，非 focus 服务淡化。
   // 初始值来自进入路径（从哪个服务点进来就聚焦谁），图例可切换/清除。
   const [focusService, setFocusService] = useState<string | null>(initialFocusService ?? null);
+  // 延迟分布 brush 选区：样本导航只在选中区间内的 trace 上移动（ES 同款下钻）
+  const [latencyFilter, setLatencyFilter] = useState<{ startMs: number; endMs: number } | null>(null);
 
   const serviceColorMap = useMemo(() => {
     const services = [...new Set(trace.spans.map((s) => s.serviceName))];
@@ -92,6 +94,27 @@ export function TraceWaterfall({
     [allTraces]
   );
 
+  // 筛选后的样本序列（保留原始 index 供导航回调）
+  const sampleEntries = useMemo(() => {
+    const all = allTraces.map((tr, i) => ({ tr, i }));
+    if (!latencyFilter) return all;
+    return all.filter(({ tr }) => tr.durationMs >= latencyFilter.startMs && tr.durationMs < latencyFilter.endMs);
+  }, [allTraces, latencyFilter]);
+  const samplePos = sampleEntries.findIndex((e) => e.i === currentTraceIndex);
+
+  const handleBrushRange = useCallback((range: { startMs: number; endMs: number } | null) => {
+    setLatencyFilter(range);
+    if (range) {
+      // 当前样本不在选区内时跳到选区内第一条
+      const first = allTraces.findIndex(
+        (tr) => tr.durationMs >= range.startMs && tr.durationMs < range.endMs
+      );
+      const cur = allTraces[currentTraceIndex];
+      const inRange = cur && cur.durationMs >= range.startMs && cur.durationMs < range.endMs;
+      if (!inRange && first >= 0) onNavigateTrace(first);
+    }
+  }, [allTraces, currentTraceIndex, onNavigateTrace]);
+
   const highlightBucket = useMemo(() => {
     if (allTraces.length === 0 || currentTraceIndex < 0) return undefined;
     const currentDuration = allTraces[currentTraceIndex]?.durationMs ?? 0;
@@ -130,7 +153,19 @@ export function TraceWaterfall({
           totalTraces={allTraces.length}
           buckets={latencyBuckets}
           highlightBucket={highlightBucket}
+          onSelectRange={handleBrushRange}
         />
+        {latencyFilter && (
+          <div className="flex items-center gap-2 mt-2 text-xs">
+            <span className="text-primary">
+              {t.latencyFilterActive}: {formatDurationMs(latencyFilter.startMs)} – {latencyFilter.endMs === Number.MAX_VALUE ? "∞" : formatDurationMs(latencyFilter.endMs)}
+              <span className="text-muted ml-1.5">({sampleEntries.length} traces)</span>
+            </span>
+            <button onClick={() => setLatencyFilter(null)} className="text-muted hover:text-default underline">
+              {t.clearFilter}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Trace sample navigation */}
@@ -138,19 +173,19 @@ export function TraceWaterfall({
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-default">{t.traceSample}</span>
           <div className="flex items-center gap-1">
-            <button onClick={() => onNavigateTrace(0)} disabled={currentTraceIndex <= 0} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
+            <button onClick={() => sampleEntries.length > 0 && onNavigateTrace(sampleEntries[0].i)} disabled={samplePos <= 0} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
               <ChevronsLeft className="w-4 h-4 text-muted" />
             </button>
-            <button onClick={() => onNavigateTrace(currentTraceIndex - 1)} disabled={currentTraceIndex <= 0} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
+            <button onClick={() => samplePos > 0 && onNavigateTrace(sampleEntries[samplePos - 1].i)} disabled={samplePos <= 0} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
               <ChevronLeft className="w-4 h-4 text-muted" />
             </button>
             <span className="text-sm text-default px-2 min-w-[60px] text-center">
-              {currentTraceIndex + 1} / {allTraces.length}
+              {samplePos >= 0 ? samplePos + 1 : "–"} / {sampleEntries.length}
             </span>
-            <button onClick={() => onNavigateTrace(currentTraceIndex + 1)} disabled={currentTraceIndex >= allTraces.length - 1} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
+            <button onClick={() => samplePos >= 0 && samplePos < sampleEntries.length - 1 && onNavigateTrace(sampleEntries[samplePos + 1].i)} disabled={samplePos < 0 || samplePos >= sampleEntries.length - 1} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
               <ChevronRight className="w-4 h-4 text-muted" />
             </button>
-            <button onClick={() => onNavigateTrace(allTraces.length - 1)} disabled={currentTraceIndex >= allTraces.length - 1} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
+            <button onClick={() => sampleEntries.length > 0 && onNavigateTrace(sampleEntries[sampleEntries.length - 1].i)} disabled={samplePos < 0 || samplePos >= sampleEntries.length - 1} className="p-1 rounded hover:bg-[var(--hover-bg)] disabled:opacity-30 transition-colors">
               <ChevronsRight className="w-4 h-4 text-muted" />
             </button>
           </div>

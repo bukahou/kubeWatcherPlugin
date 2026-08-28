@@ -33,6 +33,8 @@ interface LatencyDistributionProps {
   totalTraces: number;
   buckets: LatencyBucket[];
   highlightBucket?: number;
+  /** 拖选延迟区间（ES 同款 brush 下钻）；null = 清除选区。不传则只读。 */
+  onSelectRange?: (range: { startMs: number; endMs: number } | null) => void;
 }
 
 export function LatencyDistribution({
@@ -40,15 +42,41 @@ export function LatencyDistribution({
   totalTraces,
   buckets,
   highlightBucket,
+  onSelectRange,
 }: LatencyDistributionProps) {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
+  // brush 回调里要读最新的 buckets/onSelectRange，但不想因此重建图表
+  const bucketsRef = useRef(buckets);
+  bucketsRef.current = buckets;
+  const onSelectRef = useRef(onSelectRange);
+  onSelectRef.current = onSelectRange;
 
   useEffect(() => {
     if (!containerRef.current) return;
     const chart = echarts.init(containerRef.current);
     chartRef.current = chart;
+
+    // 直接拖选（不经过 toolbox 按钮）—— ES 的 click-and-drag 交互
+    chart.dispatchAction({
+      type: "takeGlobalCursor",
+      key: "brush",
+      brushOption: { brushType: "lineX", brushMode: "single" },
+    });
+    chart.on("brushEnd", (raw: unknown) => {
+      const params = raw as { areas?: { coordRange?: [number, number] }[] };
+      const cb = onSelectRef.current;
+      if (!cb) return;
+      const area = params.areas?.[0];
+      if (!area?.coordRange) { cb(null); return; }
+      const bks = bucketsRef.current;
+      const lo = Math.max(0, Math.ceil(area.coordRange[0]));
+      const hi = Math.min(bks.length - 1, Math.floor(area.coordRange[1]));
+      if (lo > hi || !bks[lo]) { cb(null); return; }
+      const end = bks[hi].rangeEnd === Infinity ? Number.MAX_VALUE : bks[hi].rangeEnd;
+      cb({ startMs: bks[lo].rangeStart, endMs: end });
+    });
 
     const handleResize = () => chart.resize();
     window.addEventListener("resize", handleResize);
@@ -107,6 +135,21 @@ export function LatencyDistribution({
 
     chartRef.current.setOption(
       {
+        brush: onSelectRange
+          ? {
+              toolbox: [],
+              xAxisIndex: 0,
+              brushType: "lineX",
+              brushMode: "single",
+              transformable: false,
+              brushStyle: {
+                color: "rgba(45, 212, 191, 0.10)",
+                borderColor: "rgba(45, 212, 191, 0.6)",
+                borderWidth: 1,
+              },
+              outOfBrush: { colorAlpha: 0.35 },
+            }
+          : undefined,
         tooltip: {
           trigger: "axis",
           backgroundColor: c.tooltipBg,
@@ -182,7 +225,14 @@ export function LatencyDistribution({
       },
       true
     );
-  }, [buckets, highlightBucket, title, t.apm.currentSample]);
+    if (onSelectRange) {
+      chartRef.current.dispatchAction({
+        type: "takeGlobalCursor",
+        key: "brush",
+        brushOption: { brushType: "lineX", brushMode: "single" },
+      });
+    }
+  }, [buckets, highlightBucket, title, t.apm.currentSample, onSelectRange]);
 
   return (
     <div>

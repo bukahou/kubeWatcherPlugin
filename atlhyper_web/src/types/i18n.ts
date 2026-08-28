@@ -2351,6 +2351,9 @@ export interface ApmTranslations extends TimeRangePickerTranslations {
   errorSourceStatusMessage: string;
   errorSourceTraceLog: string;
   logAttrExpand: string;
+  latencyFilterActive: string;
+  clearFilter: string;
+  brushHint: string;
   noCorrelatedLogs: string;
   viewCorrelatedLogs: string;
   // units
