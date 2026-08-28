@@ -48,14 +48,19 @@ describe("buildSpanTree", () => {
     expect(tree[0].children[0].children[0].selfDurationMs).toBeCloseTo(367); // 叶子
   });
 
-  it("并行子调用总和超过父时长时 self time 钳 0，不为负", () => {
+  // 2026-08-29 期望值随实现更正：旧算法「父时长 − 子时长之和」在并行重叠时
+  // 把重叠部分扣两次（100−80−80=−60 → 钳 0），得出「父自身零耗时」的假象。
+  // 新算法先合并子区间再取补集：两个 [0,80] 合并后仍是 [0,80]，
+  // 父在 [80,100] 确实是自己在干活 —— 20ms 是事实，0 是旧算法的产物。
+  it("并行子调用重叠时只扣一次，不得出虚假的零 self time", () => {
     const parallel = [
       span({ spanId: "p", serviceName: "a", durationMs: 100 }),
       span({ spanId: "c1", parentSpanId: "p", serviceName: "a", durationMs: 80 }),
       span({ spanId: "c2", parentSpanId: "p", serviceName: "a", durationMs: 80 }),
     ];
     const t = buildSpanTree(parallel);
-    expect(t[0].selfDurationMs).toBe(0);
+    expect(t[0].selfDurationMs).toBe(20);
+    expect(t[0].selfIntervals).toEqual([{ startMs: 80, endMs: 100 }]);
   });
 
   it("服务边界只标在服务切换点", () => {

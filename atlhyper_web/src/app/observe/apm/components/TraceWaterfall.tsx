@@ -72,11 +72,21 @@ export function TraceWaterfall({
     return ids.size > 0 ? ids : null; // 无匹配 = 不淡化任何行
   }, [trace, focusService]);
 
-  const spanCountByService = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of trace.spans) m.set(s.serviceName, (m.get(s.serviceName) ?? 0) + 1);
+  // 各服务的 self time 汇总 —— 直接回答「在网关内花了多久 / 在 user 内花了多久」。
+  // 用 self time 而非 span 总时长：后者层层嵌套会重复计入等待下游的时间，
+  // 三个 span 各 373/372/367ms 加起来 1112ms 远超 trace 的 373ms，无法解读。
+  const serviceStats = useMemo(() => {
+    const m = new Map<string, { spans: number; selfMs: number }>();
+    const walk = (n: (typeof tree)[number]) => {
+      const cur = m.get(n.span.serviceName) ?? { spans: 0, selfMs: 0 };
+      cur.spans += 1;
+      cur.selfMs += n.selfDurationMs;
+      m.set(n.span.serviceName, cur);
+      n.children.forEach(walk);
+    };
+    tree.forEach(walk);
     return m;
-  }, [trace.spans]);
+  }, [tree]);
 
   // Convert ISO timestamps to ms for relative positioning
   const spanTimesMs = useMemo(() => {
@@ -269,7 +279,14 @@ export function TraceWaterfall({
               >
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                 <span className="text-default">{svc}</span>
-                <span className="text-[10px] text-muted font-mono">{spanCountByService.get(svc) ?? 0}</span>
+                <span className="text-[10px] text-muted font-mono tabular-nums">
+                  {formatDurationMs(serviceStats.get(svc)?.selfMs ?? 0)}
+                  {traceDurationMs > 0 && (
+                    <span className="ml-1 opacity-70">
+                      {Math.round(((serviceStats.get(svc)?.selfMs ?? 0) / traceDurationMs) * 100)}%
+                    </span>
+                  )}
+                </span>
               </button>
             );
           })}
@@ -298,10 +315,12 @@ export function TraceWaterfall({
 
         {/* Waterfall rows */}
         <div className="overflow-auto">
-          {flatSpans.map((node) => (
+          {flatSpans.map(({ node, ancestorHasNext, isLastChild }) => (
             <SpanRow
               key={node.span.spanId}
               node={node}
+              ancestorHasNext={ancestorHasNext}
+              isLastChild={isLastChild}
               serviceColorMap={serviceColorMap}
               traceStartMs={traceStartMs}
               traceDurationMs={traceDurationMs}
