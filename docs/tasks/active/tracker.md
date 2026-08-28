@@ -38,6 +38,18 @@
 
 ---
 
+## 底层能力盘点 —— 有基础但未实现/未展示的功能 — 待分析
+
+> 用户假设（2026-08-28）：底层已有不少功能只差继续实现或前端展示。
+> 本次 APM 重构已证实两例：LogAttributes 端到端透传但 UI 从未渲染、
+> SpanDrawer 已算 self-time 但没画到瀑布图上。
+>
+> 任务：系统扫描 Agent 查询层 / model_v3 / Master 端点 / 前端 datasource，
+> 列出「数据已采集但无查询」「有查询但无端点」「有端点但无 UI」「有 UI 但
+> 只用了部分字段」四类清单，按接线成本 × 用户价值排序后给方案。
+
+---
+
 ## QueryService 拆分重构 — 待办
 
 > 原设计文档: [master-v2-query-service-split-design.md](../../design/active/master-v2-query-service-split-design.md)
