@@ -23,9 +23,9 @@
 > 只用了部分字段」四类清单，按接线成本 × 用户价值排序后给方案。
 >
 > 已知素材：① LogAttributes 曾端到端透传但 UI 未渲染（已修）
-> ② self-time 已算但没上瀑布图（已修）③ correlations 验收发现
-> geass 服务 OTel resource 缺 K8s 元数据（node/pod/version 全 (none)），
-> 反向问题——UI 有位置、数据没注入。
+> ② self-time 已算但没上瀑布图（已修）③ ~~geass 服务缺 K8s 元数据~~ ——
+> 已修（2026-08-29，config 仓 collector.yaml：batch 排序 + node filter +
+> image tag 映射，根因诊断来自 geass-v3 自查报告）。
 
 ---
 
