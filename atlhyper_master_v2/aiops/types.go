@@ -281,6 +281,18 @@ const (
 	// 且在 sigmoid 中无意义。取值远超 AnomalyThreshold，sigmoid 饱和为 1.0。
 	// 典型场景：restart_count 长期为 0，首次非零必须告警（零值快速通道）。
 	MaxDeviation = 100.0
+
+	// AbsoluteBreachScore 触碰绝对阈值时的分数下限。
+	//
+	// 光标记 AbsoluteBreach 不够：风险评分按 rLocal += weight × score 加权，
+	// 而硬线场景的统计偏离天然很低（压测实测 CPU 98%、基线被养到 60% 时
+	// 仅 1.9σ → sigmoid 得 0.0998，× 权重 0.20 = 0.02），
+	// 而 incident 触发线是 R_final > 0.5 —— 不给分就只是个红色标签。
+	//
+	// 取 0.6：对应 RiskLevel 的 "high" 档。含义是「触线本身即为高风险」，
+	// 但不直接顶到 critical —— 留出余量让「超得更多」和「多指标同时超」
+	// 能继续往上叠，避免所有硬线告警都是同一个分数。
+	AbsoluteBreachScore = 0.6
 )
 
 // AbsoluteThresholds 绝对阈值兜底：超过即判异常，不看基线。

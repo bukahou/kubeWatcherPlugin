@@ -52,6 +52,23 @@ func ComputeLocalRisks(anomalies []*aiops.AnomalyResult, config *RiskConfig) map
 				mc = MetricConfig{Weight: 0.1, Channel: ChannelStatistical}
 			}
 
+			// 绝对阈值越界一律走确定性通道，不论该指标平时属于哪个通道。
+			//
+			// 理由（2026-08-29）：统计通道是加权和，node 各指标权重合计仅 0.80，
+			// 硬线基准分 0.6 相乘后天花板 0.48 < incident 线 0.5 ——
+			// 即便所有硬线指标同时越界也升不上去，硬线等于永远无法独立成事件。
+			// 确定性通道 max(score)×breadthBoost 才有正确分级：
+			// 单指标越界=warning（该看一眼），两个以上=节点真出事（incident）。
+			// 语义上也吻合：该通道本就是给「确定是坏的」信号用的
+			// （CrashLoopBackOff / OOMKilled），硬线越界属同一类。
+			if r.AbsoluteBreach {
+				detCount++
+				if r.Score > maxScore {
+					maxScore = r.Score
+				}
+				continue
+			}
+
 			// 通道 1: statistical + both 参与
 			if mc.Channel == ChannelStatistical || mc.Channel == ChannelBoth {
 				channel1 += mc.Weight * r.Score

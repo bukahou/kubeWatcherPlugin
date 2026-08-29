@@ -79,6 +79,20 @@ func Detect(state *aiops.BaselineState, value float64, now int64) (*aiops.Baseli
 	absoluteBreach := false
 	if limit, ok := aiops.AbsoluteThresholds[state.MetricName]; ok && value >= limit {
 		absoluteBreach = true
+		// 触线必须给出与严重性匹配的分数，否则加权后够不到 incident 线。
+		// 基准 AbsoluteBreachScore，按超出比例线性升至 1.0（超一倍即满分）；
+		// 与统计分数取较大值 —— 硬线是下限，不是上限。
+		excess := 0.0
+		if limit > 0 {
+			excess = (value - limit) / limit
+		}
+		if excess > 1 {
+			excess = 1
+		}
+		guardScore := aiops.AbsoluteBreachScore + (1-aiops.AbsoluteBreachScore)*excess
+		if guardScore > score {
+			score = guardScore
+		}
 	}
 
 	result := &aiops.AnomalyResult{

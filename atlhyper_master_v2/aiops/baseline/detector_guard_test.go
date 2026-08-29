@@ -125,3 +125,41 @@ func TestDetect_ZeroPriorVariance(t *testing.T) {
 		t.Errorf("零方差且值未变不应告警, deviation=%.2f", res2.Deviation)
 	}
 }
+
+// 绝对阈值不仅要「判异常」，还必须给出与严重性匹配的 Score ——
+// 否则它只是个标签：风险评分用 Score 加权（rLocal += weight × score），
+// 而硬线场景的统计偏离天然很低，压测实测 CPU 98% 只得 0.0998 分，
+// × 权重 0.20 = 0.02，永远够不到 incident 触发线 0.5。
+func TestDetect_AbsoluteGuard_ScoreReflectsSeverity(t *testing.T) {
+	mk := func(metric string, ema, variance, value float64) *aiops.AnomalyResult {
+		st := &aiops.BaselineState{
+			EntityKey: "e", MetricName: metric,
+			EMA: ema, Variance: variance, Count: aiops.ColdStartMinCount + 1,
+		}
+		_, res := Detect(st, value, 0)
+		return res
+	}
+
+	// 压测实况：CPU 98%，基线已被养到 60%，σ=20 → 统计上仅 1.9σ
+	res := mk("cpu_usage", 60, 400, 98)
+	if !res.AbsoluteBreach {
+		t.Fatal("前置条件：应触发硬线")
+	}
+	if res.Score < aiops.AbsoluteBreachScore {
+		t.Errorf("硬线场景 Score=%.4f，应至少为 %.2f —— 否则加权后够不到 incident 线",
+			res.Score, aiops.AbsoluteBreachScore)
+	}
+
+	// 超得越多分越高
+	mild := mk("cpu_usage", 60, 400, 90)   // 恰好触线
+	severe := mk("cpu_usage", 60, 400, 100) // 满载
+	if severe.Score <= mild.Score {
+		t.Errorf("超线越多分应越高：90%%→%.4f, 100%%→%.4f", mild.Score, severe.Score)
+	}
+
+	// 统计分数更高时不得被硬线拉低（取两者较大值）
+	bigDev := mk("cpu_usage", 90, 1, 98) // 8σ，统计分数接近 1
+	if bigDev.Score < 0.9 {
+		t.Errorf("统计上的极端异常不应被硬线基准拉低，Score=%.4f", bigDev.Score)
+	}
+}
