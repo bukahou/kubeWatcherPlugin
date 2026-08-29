@@ -359,7 +359,8 @@ GROUP BY code;
     与 `.env.local`，若有人往 `.env.production` 加后端密钥会直接进公开仓且无拦截。
     选项：加醒目警示注释 / 装 husky 做 pre-commit 扫描 / 改用 `.env.example`
   - `atlhyper_agent_v2/testdata/*.txt` 含**旧集群**内网 IP 2171 处
-    （192.168.0.7/.33/.46/.130/.153/.182，与现集群 .10~.23 不同），
+    （网段与当前集群不同，具体地址见文件本身，此处不复述 —— 本条是安全待办，
+    不该在描述问题时把要脱敏的内容再抄一遍），
     内容是 node-exporter 指标 dump，无凭证。`docs/design/archive/` 数篇同样含旧 IP。
     选项：脱敏当前文件（不动历史）/ 不处理（RFC1918 不可路由，风险低）
   - 已确认干净：无私钥证书、无云厂商密钥、无邮箱、Webhook 仅脱敏示例、
