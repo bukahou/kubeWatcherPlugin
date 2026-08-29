@@ -300,16 +300,17 @@ export function TraceWaterfall({
           )}
         </div>
 
-        {/* Timeline header */}
+        {/* Timeline header —— 与 SpanRow 的轨道共用坐标系。
+            左侧留出与最浅层缩进相同的宽度（折叠控件 22px + padding 8px）；
+            深层行的缩进由其自身 flex 宽度产生，轨道仍按百分比对齐，刻度不失准 */}
         <div className="py-2 border-b border-[var(--border-color)]">
           <div className="flex">
-            <div className="w-[240px] flex-shrink-0" />
-            <div className="flex-1 flex justify-between text-[10px] text-muted font-mono">
+            <div className="flex-shrink-0" style={{ width: 30 }} />
+            <div className="flex-1 flex justify-between text-[10px] text-muted font-mono pr-4">
               {ticks.map((tick, i) => (
                 <span key={i}>{formatDurationMs(tick)}</span>
               ))}
             </div>
-            <div className="w-[110px] flex-shrink-0" />
           </div>
         </div>
 

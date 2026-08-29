@@ -6,7 +6,7 @@ set -e
 # - 留空或注释: 只推送 latest
 # - v1.x.x:    同时推送 latest + v1.x.x
 # ============================================
-VERSION="v0.7.2"
+VERSION="v0.7.3"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/../.."
