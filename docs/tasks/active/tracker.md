@@ -250,15 +250,12 @@ GROUP BY code;
 > 四路交叉扫描（Agent 能力 81 方法 / 快照字段 / Master 端点 104 / 前端调用 84），
 > 差集逐个 curl 实测。结论：**5 个真空缺口，后端全部完整**。
 
-- **G1 `/aiops/baseline`（EMA 基线）— 唯一有真实数据的缺口** ⭐ 待接线
-  实测返回每实体 4 指标的 EMA + 方差（count=53 采样周期），20 个实体在跟踪。
-  数据一直在算、一直在更新，界面上无处可看。属 CLAUDE.md 的 L3 能力，
-  底层就位、展示层缺席
+- G1 基线展示 ✅ / R1 参数统一 ✅ —— 已完成并上线，
+  归档见 [loadtest-2026-08-29-tasks.md](../archive/loadtest-2026-08-29-tasks.md)
 - G2 事件模式 / G3 依赖图追踪 / G4 按资源查事件 / G5 日志摘要 — 后端完整
-  但当前无数据，**不宜为接线而接线**（空面板比没面板更糟）
-- **R1 参数命名不一致**：aiops 系列用 `cluster`，其余用 `cluster_id`。
-  盘点时按惯例调用直接失败且错误信息不提示正确参数名 — 待修
-- R2 缺少能力/展示对账机制：同类问题已发生三次，建议固化对账脚本
+  但当前无数据，**不宜为接线而接线**（空面板比没面板更糟）。
+  等各自有数据的场景出现再接（G3 待 APM 拓扑数据充分）
+- R2 缺少能力/展示对账机制：同类问题已发生三次，三个方案已列，待拍板
 
 ---
 
@@ -316,22 +313,6 @@ GROUP BY code;
     选项：脱敏当前文件（不动历史）/ 不处理（RFC1918 不可路由，风险低）
   - 已确认干净：无私钥证书、无云厂商密钥、无邮箱、Webhook 仅脱敏示例、
     部署脚本无凭证、无 CI 配置
-
----
-
-## 构建提速：消灭 QEMU 模拟 — 待办（低优先级）
-
-> 现状：buildx 多架构构建中 arm64 一半走 QEMU 用户态模拟 —— 单线程
-> 吃满一个核（5.3GHz boost，Tctl 贴 95°C 温度墙），Go 编译慢 5-10 倍。
-> 2026-08-29 凌晨构建实测：agent 一个镜像 10+ 分钟，多数耗在 QEMU。
-
-- Dockerfile.agent / Dockerfile.controller：改 `FROM --platform=$BUILDPLATFORM golang`
-  + `GOARCH=$TARGETARCH` 交叉编译，编译全程原生，QEMU 只剩最终层 COPY
-- Dockerfile.web：builder 阶段固定 `--platform=$BUILDPLATFORM`（next build
-  产物是架构无关的 JS，只跑一次），运行阶段按 TARGETPLATFORM 双架构打包
-  - ⚠️ 前置检查：`npm ls` 确认无 native addon（sharp 等 .node 二进制
-    是架构相关的，会破坏产物同构假设）
-- 验证：两架构镜像 `docker manifest inspect` 齐全 + 树莓派节点实际拉起
 
 ---
 
