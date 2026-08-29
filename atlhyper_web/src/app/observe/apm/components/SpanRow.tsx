@@ -13,8 +13,8 @@ import { isErrorSpan } from "@/lib/otel";
 //   颜色     = 服务身份（error 不覆盖也不描边 —— 全 error 的 trace 也要能分服务）
 //   红端帽+⚠ = 错误（只标在 bar 右端，不侵占 bar 本身）
 //   树线+缩进 = 调用层级；跨服务边界另加服务色标签（不靠颜色对比脑补）
-//   长度/偏移 = 时间；【容器】= 总跨度，【实色段】= self time 的真实时间位置，
-//              留空处 = 被子调用占走（那段时间在子行着色）
+//   长度/偏移 = 时间；bar 实心 = 本层总耗时（对齐 ES APM），
+//              深色叠加段 = self time 的真实时间位置，浅色即「在等下游」
 //   透明度   = focus（非 focus 服务淡化但可见 —— 高亮而非裁剪）
 // ============================================================
 
@@ -143,13 +143,14 @@ export function SpanRow({
         </span>
       </div>
 
-      {/* 时间轨道 —— 包裹形态：
-          · 外层是【容器】（细描边 + 极淡填充），表示这个 span 的总跨度
-          · 实色段只画在 selfIntervals 的【真实时间位置】：这才是它自己在干活
-          · 被子调用占走的区间留空 —— 那段时间在下一行（子 span）着色
-          每一毫秒只在它真正归属的层级上出现一次，嵌套关系由此可读 */}
+      {/* 时间轨道（对齐 Elastic APM 形态）：
+          · bar 是【实心】的完整长度 —— 直接读出这一层的总耗时（父层最想看的就是它）
+          · 层级感来自「缩进 + 时间轴对齐」：子 bar 落在父 bar 的时间范围内，逐层缩进
+          · 深色叠加段 = self time 的真实时间位置（ES 没有这层，是我们的增量）——
+            浅色部分即「在等下游」，深浅对比一眼看出这一层自己干了多少活
+          ⚠️ 不要把父 bar 挖空：那会丢掉「本层总跨度」这个首要信息（2026-08-29 试过，用户指出不对） */}
       <div className="flex-1 relative overflow-visible" style={{ height: barH + 8 }}>
-        {/* 容器：总跨度 */}
+        {/* 实心 bar：本层总时长 */}
         <div
           className="absolute"
           style={{
@@ -158,12 +159,10 @@ export function SpanRow({
             width: `${width}%`,
             height: barH,
             borderRadius: 3,
-            border: `1px solid ${color}66`,
-            borderLeft: `3px solid ${color}`,
-            background: `${color}14`,
+            background: `${color}59`,
           }}
         />
-        {/* self 段：按真实时间位置填实色 */}
+        {/* self time 段：叠加在实心 bar 上，标出真正在干活的时间位置 */}
         {selfSegments.map((seg, i) => (
           <div
             key={i}
@@ -173,14 +172,12 @@ export function SpanRow({
               left: `${seg.left}%`,
               width: `${seg.width}%`,
               height: barH,
-              background: `${color}80`,
+              background: color,
               borderRadius: 2,
             }}
           />
         ))}
-        {/* 错误标识：bar 右端的红色端帽（标记「在此结束时出错」）+ 角标。
-            不用整条描边 —— 全 error 的 trace 里描边会主导画面，
-            服务色反而次要，与「颜色只编码服务」的分工冲突。 */}
+        {/* 错误：右端红色端帽 + 角标，不侵占 bar 本身 */}
         {isError && (
           <>
             <div
