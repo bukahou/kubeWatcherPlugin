@@ -2244,6 +2244,8 @@ Deployment 已更新，新的 Pod 正在启动中
     showStacktrace: "展开堆栈",
     correlatedLogs: "关联日志",
     viewFullTrace: "查看完整链路",
+    legendSelfTime: "自身耗时",
+    legendWaiting: "等待下游",
     focusLegendHint: "点击图例聚焦服务",
     errorSource: "证据来源",
     errorSourceSpanEvent: "Span 事件",

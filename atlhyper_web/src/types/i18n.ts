@@ -2345,6 +2345,8 @@ export interface ApmTranslations extends TimeRangePickerTranslations {
   // cross-signal correlation
   correlatedLogs: string;
   viewFullTrace: string;
+  legendSelfTime: string;
+  legendWaiting: string;
   focusLegendHint: string;
   errorSource: string;
   errorSourceSpanEvent: string;

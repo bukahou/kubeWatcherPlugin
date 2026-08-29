@@ -2244,6 +2244,8 @@ Deployment が更新され、新しい Pod が起動中です
     showStacktrace: "スタックを展開",
     correlatedLogs: "関連ログ",
     viewFullTrace: "全体トレースを表示",
+    legendSelfTime: "自身の処理時間",
+    legendWaiting: "下流の待ち時間",
     focusLegendHint: "凡例をクリックしてサービスにフォーカス",
     errorSource: "エビデンス元",
     errorSourceSpanEvent: "Span イベント",

@@ -88,6 +88,16 @@ export function TraceWaterfall({
     return m;
   }, [tree]);
 
+  // 占比分母 = Σ(各服务 self time)，**不是** trace 墙钟时长。
+  // 并行调用时各服务 self 之和会超过墙钟（实测：19 span / 墙钟 153ms，
+  // media 的 anime+threed+av 等并行调用 self 合计 242ms → 用墙钟做分母
+  // 会显示「158%」，四服务相加 257%）。改用 Σself 后各项相加恒为 100%，
+  // 语义也更有用：「61% 的执行时间花在 media」是可行动结论。
+  const grandSelfMs = useMemo(
+    () => [...serviceStats.values()].reduce((sum, v) => sum + v.selfMs, 0),
+    [serviceStats],
+  );
+
   // Convert ISO timestamps to ms for relative positioning
   const spanTimesMs = useMemo(() => {
     return trace.spans.map((s) => new Date(s.timestamp).getTime());
@@ -281,23 +291,37 @@ export function TraceWaterfall({
                 <span className="text-default">{svc}</span>
                 <span className="text-[10px] text-muted font-mono tabular-nums">
                   {formatDurationMs(serviceStats.get(svc)?.selfMs ?? 0)}
-                  {traceDurationMs > 0 && (
+                  {grandSelfMs > 0 && (
                     <span className="ml-1 opacity-70">
-                      {Math.round(((serviceStats.get(svc)?.selfMs ?? 0) / traceDurationMs) * 100)}%
+                      {Math.round(((serviceStats.get(svc)?.selfMs ?? 0) / grandSelfMs) * 100)}%
                     </span>
                   )}
                 </span>
               </button>
             );
           })}
-          {focusService && (
-            <button
-              onClick={() => setFocusService(null)}
-              className="ml-auto text-xs text-primary hover:underline"
-            >
-              {t.viewFullTrace}
-            </button>
-          )}
+          {/* 明暗编码说明：亮 = 自己在干活，暗 = 在等下游（那段时间的活在子行里） */}
+          <div className="flex items-center gap-3 ml-auto text-[10px] text-muted">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-2.5 rounded-sm" style={{ background: "var(--text-secondary)" }} />
+              {t.legendSelfTime}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="w-3 h-2.5 rounded-sm"
+                style={{ background: "color-mix(in srgb, var(--text-secondary) 35%, transparent)" }}
+              />
+              {t.legendWaiting}
+            </span>
+            {focusService && (
+              <button
+                onClick={() => setFocusService(null)}
+                className="text-xs text-primary hover:underline"
+              >
+                {t.viewFullTrace}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Timeline header —— 与 SpanRow 的轨道共用坐标系。

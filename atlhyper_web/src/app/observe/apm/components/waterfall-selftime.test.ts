@@ -137,3 +137,66 @@ describe("serviceSelfTotals — 图例上的各服务耗时汇总", () => {
     expect(totals.get("user")).toBeCloseTo(367);
   });
 });
+
+// ──────────────────────────────────────────────────────────────
+// 服务耗时占比（图例）—— 分母必须是「各服务 self time 之和」
+// ──────────────────────────────────────────────────────────────
+//
+// 2026-08-29 线上 bug：分母误用 trace 墙钟时长，并行调用时必然超 100%。
+// 实例（19 span / 4 服务 / 墙钟 153ms）：media 有 anime 73ms + threed 29ms
+// + av 18ms… 多个并行调用，self 合计 242ms → 显示「158%」，
+// 四服务相加 257%。数字本身没算错，但作为「占比」纯属误导。
+//
+// 正解：分母 = Σ(所有服务 self time)，语义为「各服务占总执行时间的比例」，
+// 各项相加恒为 100%，且「61% 的时间花在 media」是可行动结论。
+
+describe("serviceSelfShare — 图例占比", () => {
+  it("并行调用：各服务占比之和为 100%，不出现超 100%", () => {
+    // 墙钟 100ms，但两个子调用并行各 80ms → self 合计超过墙钟
+    const spans = [
+      span({ spanId: "gw", serviceName: "gateway", timestamp: at(0), durationMs: 100 }),
+      span({ spanId: "c1", parentSpanId: "gw", serviceName: "media", timestamp: at(10), durationMs: 80 }),
+      span({ spanId: "c2", parentSpanId: "gw", serviceName: "media", timestamp: at(10), durationMs: 80 }),
+    ];
+    const [root] = buildSpanTree(spans);
+
+    const totals = new Map<string, number>();
+    const walk = (n: typeof root) => {
+      totals.set(n.span.serviceName, (totals.get(n.span.serviceName) ?? 0) + n.selfDurationMs);
+      n.children.forEach(walk);
+    };
+    walk(root);
+
+    // gateway self = [0,10] + [90,100] = 20ms；media self = 80 + 80 = 160ms
+    expect(totals.get("gateway")).toBeCloseTo(20);
+    expect(totals.get("media")).toBeCloseTo(160);
+
+    const grand = [...totals.values()].reduce((a, b) => a + b, 0);
+    expect(grand).toBeCloseTo(180); // 超过墙钟 100ms —— 并行的正常结果
+
+    // 错误分母（墙钟）会得出 160%
+    expect(Math.round((160 / 100) * 100)).toBe(160);
+    // 正确分母（self 之和）：各项相加为 100%
+    const shares = [...totals.values()].map((v) => (v / grand) * 100);
+    expect(shares.reduce((a, b) => a + b, 0)).toBeCloseTo(100);
+    expect(Math.round((160 / grand) * 100)).toBe(89);
+  });
+
+  it("串行调用：占比同样归一，不受墙钟影响", () => {
+    const spans = [
+      span({ spanId: "gw", serviceName: "gateway", timestamp: at(0), durationMs: 100 }),
+      span({ spanId: "c", parentSpanId: "gw", serviceName: "user", timestamp: at(10), durationMs: 80 }),
+    ];
+    const [root] = buildSpanTree(spans);
+    const totals = new Map<string, number>();
+    const walk = (n: typeof root) => {
+      totals.set(n.span.serviceName, (totals.get(n.span.serviceName) ?? 0) + n.selfDurationMs);
+      n.children.forEach(walk);
+    };
+    walk(root);
+    const grand = [...totals.values()].reduce((a, b) => a + b, 0);
+    expect(grand).toBeCloseTo(100); // 串行时恰好等于墙钟
+    expect(Math.round((totals.get("gateway")! / grand) * 100)).toBe(20);
+    expect(Math.round((totals.get("user")! / grand) * 100)).toBe(80);
+  });
+});
