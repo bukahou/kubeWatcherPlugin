@@ -63,6 +63,30 @@ export interface EntityRiskDetail extends EntityRisk {
   causalTree?: CausalTreeNode[];
 }
 
+// ── 基线（EMA 学习状态）────────────────────────────────
+// 后端 aiops/baseline 引擎持续学习每个实体的指标常态：
+// EMA 是「平时长什么样」，方差是波动幅度。
+//
+// ready=false 表示采样数未达冷启动阈值 —— 引擎此时只学习、不判异常，
+// 该基线值不可信。阈值（coldStartMinCount）由后端下发而非前端硬编码：
+// 复制后端常量会在阈值调整时静默失效。
+export interface BaselineState {
+  metricName: string;
+  ema: number;
+  variance: number;
+  stdDev: number;
+  count: number;
+  consecutiveZero: number;
+  updatedAt: number;
+  ready: boolean;
+}
+
+export interface EntityBaseline {
+  entityKey: string;
+  states: BaselineState[];
+  coldStartMinCount: number;
+}
+
 export interface AnomalyResult {
   entityKey: string;
   metricName: string;
@@ -244,6 +268,12 @@ export async function getEntityRiskDetail(cluster: string, entityKey: string): P
   detail.propagation = detail.propagation ?? [];
   detail.causalChain = detail.causalChain ?? [];
   return detail;
+}
+
+// 实体基线（EMA 学习状态）
+export async function getEntityBaseline(cluster: string, entityKey: string): Promise<EntityBaseline> {
+  const data = (await get<EntityBaseline>("/api/v2/aiops/baseline", { cluster_id: cluster, entity: entityKey })).data;
+  return { ...data, states: data.states ?? [] };
 }
 
 // 依赖图

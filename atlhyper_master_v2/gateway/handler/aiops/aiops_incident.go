@@ -113,9 +113,9 @@ func (h *AIOpsIncidentHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clusterID := r.URL.Query().Get("cluster")
+	clusterID := handler.ClusterIDFromQuery(r)
 	if clusterID == "" {
-		handler.WriteError(w, http.StatusBadRequest, "missing cluster parameter")
+		handler.WriteError(w, http.StatusBadRequest, "missing cluster_id parameter")
 		return
 	}
 

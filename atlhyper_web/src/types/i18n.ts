@@ -1973,6 +1973,16 @@ export interface AIOpsTranslations {
   metricName: string;
   currentValue: string;
   baseline: string;
+  baselineTitle: string;
+  baselineDesc: string;
+  baselineLearning: string;
+  baselineReady: string;
+  baselineNormal: string;
+  baselineFluctuation: string;
+  baselineSamples: string;
+  baselineStable: string;
+  baselineUnavailable: string;
+  baselineLoadFailed: string;
   deviation: string;
   isAnomaly: string;
 

@@ -5,9 +5,10 @@ import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import { RiskBadge } from "@/components/aiops/RiskBadge";
 import { EntityLink } from "@/components/aiops/EntityLink";
-import { getEntityRiskDetail } from "@/api/aiops";
+import { getEntityRiskDetail, getEntityBaseline } from "@/api/aiops";
+import { BaselineCard } from "@/components/aiops/BaselineCard";
 import { CausalTreeNodeView } from "@/components/aiops/CausalTreeNodeView";
-import type { EntityRisk, EntityRiskDetail } from "@/api/aiops";
+import type { EntityRisk, EntityRiskDetail, EntityBaseline } from "@/api/aiops";
 
 const LIMIT_OPTIONS = [20, 50, 100] as const;
 
@@ -31,6 +32,7 @@ export function TopEntities({ entities, clusterId, limit, onLimitChange }: TopEn
   const { t } = useI18n();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, EntityRiskDetail>>({});
+  const [baselineCache, setBaselineCache] = useState<Record<string, EntityBaseline | null>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
 
   const handleToggle = useCallback(
@@ -43,14 +45,21 @@ export function TopEntities({ entities, clusterId, limit, onLimitChange }: TopEn
 
       if (!detailCache[key]) {
         setLoadingKey(key);
-        try {
-          const detail = await getEntityRiskDetail(clusterId, key);
-          setDetailCache((prev) => ({ ...prev, [key]: detail }));
-        } catch (err) {
-          console.error("Failed to load entity detail:", err);
-        } finally {
-          setLoadingKey(null);
+        // 两者并行：基线失败不应挡住风险详情，反之亦然
+        const [detailRes, baselineRes] = await Promise.allSettled([
+          getEntityRiskDetail(clusterId, key),
+          getEntityBaseline(clusterId, key),
+        ]);
+        if (detailRes.status === "fulfilled") {
+          setDetailCache((prev) => ({ ...prev, [key]: detailRes.value }));
+        } else {
+          console.error("Failed to load entity detail:", detailRes.reason);
         }
+        setBaselineCache((prev) => ({
+          ...prev,
+          [key]: baselineRes.status === "fulfilled" ? baselineRes.value : null,
+        }));
+        setLoadingKey(null);
       }
     },
     [expandedKey, clusterId, detailCache]
@@ -125,8 +134,9 @@ export function TopEntities({ entities, clusterId, limit, onLimitChange }: TopEn
                       <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
                     </div>
                   ) : detail ? (
-                    detail.metrics.length === 0 && detail.causalChain.length === 0 && (!detail.causalTree || detail.causalTree.length === 0) ? (
-                      <div className="py-3 text-center text-xs text-muted">
+                    <div className="space-y-4">
+                    {detail.metrics.length === 0 && detail.causalChain.length === 0 && (!detail.causalTree || detail.causalTree.length === 0) ? (
+                      <div className="py-2 text-xs text-muted">
                         {t.aiops.noAnomalyDetail}
                       </div>
                     ) : (
@@ -183,7 +193,12 @@ export function TopEntities({ entities, clusterId, limit, onLimitChange }: TopEn
                         </div>
                       ) : null}
                     </div>
-                    )
+                    )}
+
+                    {/* 基线：无论是否有异常都展示 —— 健康实体此前展开只有一行
+                        「暂无异常详情」，基线才是这里真正有信息量的内容 */}
+                    <BaselineCard baseline={baselineCache[entity.entityKey] ?? null} />
+                    </div>
                   ) : null}
                 </div>
               )}
