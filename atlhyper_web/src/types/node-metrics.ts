@@ -173,6 +173,11 @@ export interface NodeMetrics {
 
   hardwareProfile?: string;   // desk / raspi5 / raspi4 / unknown
   hardware?: NodeHardware;    // 缺失 = 上报方不采集，按「无数据」处理
+
+  // 本次采集中查询失败的 section（"cpu" / "memory" / "disks" / ...）。
+  // 列出的 section 其数值是未填充的零值，必须渲染为「无数据」占位，
+  // 不得当真实测量显示 —— 0.0% 的谎言曾导致「树莓派宕机了」的误判。
+  unavailable?: string[];
 }
 
 // ============================================================================

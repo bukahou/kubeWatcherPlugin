@@ -38,7 +38,32 @@ type NodeMetrics struct {
 	// Master 判定时按「无数据」处理，不得视为正常。
 	HardwareProfile HardwareProfile `json:"hardwareProfile,omitempty"`
 	Hardware        *NodeHardware   `json:"hardware,omitempty"`
+
+	// Unavailable 列出本次采集中查询失败的 section（取值见 Section* 常量）。
+	//
+	// 背景（2026-08-29 压测缺陷 ①，同类事故 2026-08-24 已发生过）：
+	// 采集查询失败曾被静默吞掉，结构体保持零值，前端把 0 当真实测量
+	// 渲染成「CPU 0.0%」—— 观测系统在自己失效时假装正常。
+	// 消费方（Master convert / 前端）遇到列出的 section 必须按
+	// 「无数据」处理（nil 格子 / 灰色占位），不得当作零值渲染。
+	Unavailable []string `json:"unavailable,omitempty"`
 }
+
+// 采集 section 键 —— Agent 声明失败与 Master 判定共用，禁止散写字符串。
+// （契约层纪律：底层替换致静默失效已发生三次，查询只认统一名）
+const (
+	SectionCPU         = "cpu"         // fillCPU：使用率 / 负载 / 核数 / 频率
+	SectionMemory      = "memory"      // fillScalarGauges：内存
+	SectionTCP         = "tcp"         // fillScalarGauges：TCP 连接
+	SectionSystem      = "system"      // fillScalarGauges：文件句柄 / 熵 / 进程
+	SectionDisks       = "disks"       // fillDisks：磁盘用量与 IO
+	SectionNetworks    = "networks"    // fillNetworks：网卡流量
+	SectionTemperature = "temperature" // fillTemperature：hwmon 温度
+	SectionHardware    = "hardware"    // fillHardware：风扇 / 欠压 / 散热
+	SectionPSI         = "psi"         // fillPSI：压力失速
+	SectionVMStat      = "vmstat"      // fillVMStat：缺页 / 换页 / softnet
+	SectionSystemInfo  = "systeminfo"  // fillSystemInfo：内核 / 开机时间
+)
 
 type NodeCPU struct {
 	UsagePct  float64   `json:"usagePct"`

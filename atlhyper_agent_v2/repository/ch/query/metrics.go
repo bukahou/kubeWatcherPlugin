@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -51,21 +52,37 @@ func (r *metricsRepository) ListAllNodeMetrics(ctx context.Context) ([]metrics.N
 		return nil, fmt.Errorf("list active nodes: %w", err)
 	}
 
-	var result []metrics.NodeMetrics
+	// 节点间并行采集（限并发 4）。
+	// 旧实现串行迭代且共享一个 context 超时：ClickHouse 一慢，
+	// 排在后面的节点全部被 deadline 取消（2026-08-29 压测实况：
+	// 7 节点里前 2 个有数据、后 5 个全零）。并行后所有节点公平
+	// 分享同一个时间窗，慢也是一起慢，不再有位置歧视。
+	sem := make(chan struct{}, 4)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	result := make([]metrics.NodeMetrics, 0, len(ips))
 	for _, ip := range ips {
 		nodeName := ipMap[ip]
 		if nodeName == "" {
 			nodeName = ip
 		}
-		nm, err := r.buildNodeMetrics(ctx, ip, nodeName)
-		if err != nil {
-			continue // 跳过失败的节点
-		}
-		result = append(result, *nm)
+		wg.Add(1)
+		go func(ip, nodeName string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			nm, err := r.buildNodeMetrics(ctx, ip, nodeName)
+			if err != nil || nm == nil {
+				return
+			}
+			mu.Lock()
+			result = append(result, *nm)
+			mu.Unlock()
+		}(ip, nodeName)
 	}
-	if result == nil {
-		result = []metrics.NodeMetrics{}
-	}
+	wg.Wait()
+	// 并发完成顺序不定，按节点名排序保证输出稳定
+	sort.Slice(result, func(i, j int) bool { return result[i].NodeName < result[j].NodeName })
 	return result, nil
 }
 
@@ -235,19 +252,23 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	}
 	var machine string // uname machine，Wait 后与 chipNames 一起推导画像
 
-	// 并行查询各指标类别
+	// 并行查询各指标类别。
+	//
+	// 每路查询失败必须记账到 Unavailable（2026-08-29 压测缺陷 ①：
+	// 此前 8/9 路遇错静默 return，零值被前端当真实测量渲染成 0.0%）。
+	// 一路内部只要有查询失败，整个 section 保守地标为不可用 ——
+	// 「数据不完整，别信」优于「部分是真的但你分不清哪部分」。
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var firstErr error
+	var unavailable []string
 
-	recordErr := func(err error) {
-		if err != nil {
-			mu.Lock()
-			if firstErr == nil {
-				firstErr = err
-			}
-			mu.Unlock()
+	markFailed := func(err error, sections ...string) {
+		if err == nil {
+			return
 		}
+		mu.Lock()
+		unavailable = append(unavailable, sections...)
+		mu.Unlock()
 	}
 
 	wg.Add(9) // TCP / System 已并入 fillScalarGauges
@@ -255,50 +276,51 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	// CPU
 	go func() {
 		defer wg.Done()
-		r.fillCPU(ctx, ip, nm)
+		markFailed(r.fillCPU(ctx, ip, nm), metrics.SectionCPU)
 	}()
 
 	// 标量 gauge：内存 / TCP / 系统资源 / OOM / 欠压 / 开机时间
 	// 六类合并为一个查询（见 fillScalarGauges 的注释）
 	go func() {
 		defer wg.Done()
-		r.fillScalarGauges(ctx, ip, nm)
+		markFailed(r.fillScalarGauges(ctx, ip, nm),
+			metrics.SectionMemory, metrics.SectionTCP, metrics.SectionSystem)
 	}()
 
 	// Disk
 	go func() {
 		defer wg.Done()
-		r.fillDisks(ctx, ip, nm)
+		markFailed(r.fillDisks(ctx, ip, nm), metrics.SectionDisks)
 	}()
 
 	// Network
 	go func() {
 		defer wg.Done()
-		r.fillNetworks(ctx, ip, nm)
+		markFailed(r.fillNetworks(ctx, ip, nm), metrics.SectionNetworks)
 	}()
 
 	// Temperature
 	go func() {
 		defer wg.Done()
-		r.fillTemperature(ctx, ip, nm, chipNameByPath)
+		markFailed(r.fillTemperature(ctx, ip, nm, chipNameByPath), metrics.SectionTemperature)
 	}()
 
 	// Hardware（风扇 / 散热 / 欠压）
 	go func() {
 		defer wg.Done()
-		r.fillHardware(ctx, ip, nm)
+		markFailed(r.fillHardware(ctx, ip, nm), metrics.SectionHardware)
 	}()
 
 	// PSI
 	go func() {
 		defer wg.Done()
-		r.fillPSI(ctx, ip, nm)
+		markFailed(r.fillPSI(ctx, ip, nm), metrics.SectionPSI)
 	}()
 
 	// VMStat + Softnet
 	go func() {
 		defer wg.Done()
-		r.fillVMStat(ctx, ip, nm)
+		markFailed(r.fillVMStat(ctx, ip, nm), metrics.SectionVMStat)
 	}()
 
 	// Uptime + Kernel + machine
@@ -306,7 +328,7 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 		defer wg.Done()
 		m, err := r.fillSystemInfo(ctx, ip, nm)
 		machine = m
-		recordErr(err)
+		markFailed(err, metrics.SectionSystemInfo)
 	}()
 
 	wg.Wait()
@@ -314,18 +336,21 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 	nm.HardwareProfile = metrics.DetectHardwareProfile(machine, chipNames)
 	ensureNodeMetricsSlices(nm)
 
-	// 采集不全时留一条痕迹。各 fill* 的查询失败一律静默 return，
-	// 缺的字段在页面上只表现为某张卡空着 —— 2026-08-24 事故里两个节点的数据
-	// 缺了很久都没人发现，直到 nil 切片炸掉前端才暴露。
-	// 详见 config 仓 clusters/incidents/2026-08-24-atlhyper-metrics-blank-page.md
-	if missing := detectMissingParts(nm); len(missing) > 0 {
+	// 采集失败显式声明（错误驱动，替代旧的零值启发式 detectMissingParts）。
+	// 消费方据此把缺失格渲染为「无数据」而非绿色 0.0%。
+	// 排序保证同一失败集合产出确定的列表（并发写入顺序不定）。
+	if len(unavailable) > 0 {
+		sort.Strings(unavailable)
+		nm.Unavailable = unavailable
 		logger.Warn("节点指标采集不全",
 			"node", nodeName,
-			"缺失", strings.Join(missing, ","),
+			"缺失", strings.Join(unavailable, ","),
 			"提示", "多为 ClickHouse 查询被 context 取消，检查 system.query_log 里的 Broken pipe")
 	}
 
-	return nm, firstErr
+	// 部分失败不是致命错误：节点必须带着 Unavailable 返回，
+	// 返回 error 会让调用方丢弃整个节点（比缺几格更糟）。
+	return nm, nil
 }
 
 // detectMissingParts 找出没采到的部件。
@@ -334,23 +359,6 @@ func (r *metricsRepository) buildNodeMetrics(ctx context.Context, ip, nodeName s
 // （raspi4 没有盘温、desk 没有风扇转速），报出来是噪声不是信号。
 //
 // 检测结果而不是包装每一处查询错误：零侵入，且更贴近用户实际看到的现象。
-func detectMissingParts(nm *metrics.NodeMetrics) []string {
-	var missing []string
-	if nm.CPU.Cores == 0 && nm.CPU.UsagePct == 0 {
-		missing = append(missing, "cpu")
-	}
-	if nm.Memory.TotalBytes == 0 {
-		missing = append(missing, "memory")
-	}
-	if len(nm.Disks) == 0 {
-		missing = append(missing, "disks")
-	}
-	if len(nm.Networks) == 0 {
-		missing = append(missing, "networks")
-	}
-	return missing
-}
-
 // ensureNodeMetricsSlices 把 nil 切片补成空切片。
 //
 // 前端类型声明的是数组（disks: NodeDisk[]），而 Go 的 nil 切片会序列化成 null 而不是 []，
@@ -384,7 +392,7 @@ func ensureNodeMetricsSlices(nm *metrics.NodeMetrics) {
 }
 
 // fillCPU 填充 CPU 指标
-func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	// CPU usage from rate of node_cpu_seconds_total
 	query := `
 		SELECT Attributes['mode'] AS mode, ` + CounterRateExpr + ` AS rate
@@ -397,7 +405,7 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -448,7 +456,7 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 	`
 	loadRows, err := r.client.Query(ctx, loadQuery, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer loadRows.Close()
 
@@ -485,9 +493,7 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 		ORDER BY cpu
 	`, ip)
 	if err != nil {
-		// 静默失败会让页面显示「无数据」却查不出原因
-		logger.Warn("CPU 频率查询失败", "ip", ip, "err", err)
-		return
+		return err
 	}
 	defer freqRows.Close()
 	for freqRows.Next() {
@@ -501,6 +507,7 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 			nm.CPU.FreqMaxHz = maxv
 		}
 	}
+	return nil
 }
 
 // fillScalarGauges 一次查回该节点全部「标量 gauge」指标。
@@ -515,7 +522,7 @@ func (r *metricsRepository) fillCPU(ctx context.Context, ip string, nm *metrics.
 // 详见 config 仓 clusters/incidents/2026-08-24-atlhyper-metrics-blank-page.md
 //
 // 一并取 count()：欠压位需要用它区分「没有这个传感器」和「传感器读数为 0」。
-func (r *metricsRepository) fillScalarGauges(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillScalarGauges(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	query := `
 		SELECT MetricName, argMax(Value, TimeUnix) AS v, count() AS n
 		FROM otel_metrics_gauge
@@ -539,8 +546,7 @@ func (r *metricsRepository) fillScalarGauges(ctx context.Context, ip string, nm 
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
-		logger.Warn("标量指标查询失败", "ip", ip, "err", err)
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -562,6 +568,7 @@ func (r *metricsRepository) fillScalarGauges(ctx context.Context, ip string, nm 
 		nm.Memory.SwapUsagePct = roundTo(clamp(
 			(1-float64(nm.Memory.SwapFreeBytes)/float64(nm.Memory.SwapTotalBytes))*100, 0, 100), 2)
 	}
+	return nil
 }
 
 // applyScalarGauge 把一个标量指标写进对应字段。
@@ -646,7 +653,7 @@ func applyScalarGauge(nm *metrics.NodeMetrics, name string, val float64, cnt uin
 }
 
 // fillDisks 填充磁盘指标
-func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	// 容量 (gauge)
 	query := `
 		SELECT Attributes['device'] AS device,
@@ -670,7 +677,7 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -716,7 +723,7 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	`
 	ioRows, err := r.client.Query(ctx, ioQuery, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer ioRows.Close()
 
@@ -786,10 +793,11 @@ func (r *metricsRepository) fillDisks(ctx context.Context, ip string, nm *metric
 	for _, d := range fsDisks {
 		nm.Disks = append(nm.Disks, *d)
 	}
+	return nil
 }
 
 // fillNetworks 填充网络指标
-func (r *metricsRepository) fillNetworks(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillNetworks(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	// 网络状态 (gauge)
 	query := `
 		SELECT Attributes['device'] AS iface,
@@ -804,7 +812,7 @@ func (r *metricsRepository) fillNetworks(ctx context.Context, ip string, nm *met
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -838,7 +846,7 @@ func (r *metricsRepository) fillNetworks(ctx context.Context, ip string, nm *met
 	`
 	rateRows, err := r.client.Query(ctx, rateQuery, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer rateRows.Close()
 
@@ -876,12 +884,13 @@ func (r *metricsRepository) fillNetworks(ctx context.Context, ip string, nm *met
 	for _, n := range ifMap {
 		nm.Networks = append(nm.Networks, *n)
 	}
+	return nil
 }
 
 // fillTemperature 填充温度指标：所有 hwmon 传感器 + 可读 chip 名。
 // CPU 温度 / 阈值取 CPU 类传感器（coretemp / SoC thermal zone）里最热的一个，
 // 不再取 Sensors[0]（那取决于 ClickHouse 的返回顺序，NVMe 排前面就会把盘温当 CPU 温）。
-func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *metrics.NodeMetrics, chipNameByPath map[string]string) {
+func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *metrics.NodeMetrics, chipNameByPath map[string]string) error {
 	query := `
 		SELECT Attributes['chip'] AS chip, Attributes['sensor'] AS sensor,
 		       argMaxIf(Value, TimeUnix, MetricName='node_hwmon_temp_celsius') AS current,
@@ -896,7 +905,7 @@ func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -921,6 +930,7 @@ func (r *metricsRepository) fillTemperature(ctx context.Context, ip string, nm *
 		nm.Temperature.CPUMaxC = hottestCPU.MaxC
 		nm.Temperature.CPUCritC = hottestCPU.CritC
 	}
+	return nil
 }
 
 // queryChipNames 取 hwmon chip 路径 → 可读名（node_hwmon_chip_names 的 chip / chip_name 标签）。
@@ -949,7 +959,7 @@ func (r *metricsRepository) queryChipNames(ctx context.Context, ip string) map[s
 
 // fillHardware 填充风扇 / 散热设备 / 欠压告警。
 // 任一传感器不存在时对应切片为空 / 指针为 nil，Master 据此显示「无数据」。
-func (r *metricsRepository) fillHardware(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillHardware(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	hw := &metrics.NodeHardware{Fans: []metrics.FanSensor{}, Cooling: []metrics.CoolingDevice{}}
 
 	fanRows, err := r.client.Query(ctx, `
@@ -994,6 +1004,7 @@ func (r *metricsRepository) fillHardware(ctx context.Context, ip string, nm *met
 	}
 
 	nm.Hardware = hw
+	return nil
 }
 
 // 块设备的分区命名有两套规则，不能用一条正则概括：
@@ -1056,7 +1067,7 @@ func awaitMs(timeRate, opsRate float64) float64 {
 }
 
 // fillPSI 填充 Pressure Stall Info
-func (r *metricsRepository) fillPSI(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillPSI(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	query := `
 		SELECT MetricName, ` + CounterRateExpr + ` AS rate
 		FROM otel_metrics_sum
@@ -1074,7 +1085,7 @@ func (r *metricsRepository) fillPSI(ctx context.Context, ip string, nm *metrics.
 	`
 	rows, err := r.client.Query(ctx, query, ip)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -1098,11 +1109,12 @@ func (r *metricsRepository) fillPSI(ctx context.Context, ip string, nm *metrics.
 			nm.PSI.IOFullPct = pct
 		}
 	}
+	return nil
 }
 
 // fillVMStat 填充 VMStat + Softnet
 // vmstat 指标在 gauge 表（OTel collector 将其归类为 gauge），softnet 在 sum 表
-func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metrics.NodeMetrics) {
+func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metrics.NodeMetrics) error {
 	rateQuery := `
 		SELECT MetricName, ` + CounterRateExpr + ` AS rate
 		FROM %s
@@ -1120,9 +1132,13 @@ func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metri
 	softnetQuery := fmt.Sprintf(rateQuery, "otel_metrics_sum",
 		"'node_softnet_dropped_total', 'node_softnet_times_squeezed_total'")
 
+	var firstErr error
 	for _, q := range []string{vmstatQuery, softnetQuery} {
 		rows, err := r.client.Query(ctx, q, ip)
 		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 		for rows.Next() {
@@ -1149,6 +1165,7 @@ func (r *metricsRepository) fillVMStat(ctx context.Context, ip string, nm *metri
 		rows.Close()
 	}
 
+	return firstErr
 }
 
 // fillSystemInfo 填充 Kernel，并返回 uname machine（x86_64 / aarch64，画像识别用）。

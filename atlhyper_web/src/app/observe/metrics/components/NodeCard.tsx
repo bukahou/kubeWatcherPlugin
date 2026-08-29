@@ -61,6 +61,9 @@ export function NodeCard({
   const temp = metrics.temperature.cpuTempC;
   const rootDisk = metrics.disks?.find(d => d.mountPoint === "/") ?? metrics.disks?.[0];
   const diskPct = rootDisk?.usagePct || 0;
+  // 采集失败的 section：零值不是测量结果，渲染占位而非 0.0%
+  const isNA = (sec: string) => metrics.unavailable?.includes(sec) ?? false;
+  const naSpan = <span className="text-muted opacity-60">--</span>;
 
   return (
     <div className="bg-card rounded-xl border border-[var(--border-color)] overflow-hidden">
@@ -78,9 +81,9 @@ export function NodeCard({
           </div>
         </div>
         <div className="flex items-center gap-3 sm:gap-5 text-xs">
-          <span><span className="text-muted">CPU </span><span className={getUsageColor(cpuUsage)}>{cpuUsage.toFixed(1)}%</span></span>
-          <span><span className="text-muted">Mem </span><span className={getUsageColor(memUsage)}>{memUsage.toFixed(1)}%</span></span>
-          <span className="hidden sm:inline"><span className="text-muted">Disk </span><span className={getUsageColor(diskPct)}>{diskPct.toFixed(1)}%</span><span className="text-muted"> ({rootDisk?.mountPoint || "/"})</span></span>
+          <span><span className="text-muted">CPU </span>{isNA("cpu") ? naSpan : <span className={getUsageColor(cpuUsage)}>{cpuUsage.toFixed(1)}%</span>}</span>
+          <span><span className="text-muted">Mem </span>{isNA("memory") ? naSpan : <span className={getUsageColor(memUsage)}>{memUsage.toFixed(1)}%</span>}</span>
+          <span className="hidden sm:inline"><span className="text-muted">Disk </span>{isNA("disks") ? naSpan : <><span className={getUsageColor(diskPct)}>{diskPct.toFixed(1)}%</span><span className="text-muted"> ({rootDisk?.mountPoint || "/"})</span></>}</span>
           <span className="hidden sm:inline"><span className="text-muted">Temp </span><span className={getTempColor(temp)}>{temp > 0 ? `${temp.toFixed(1)}°C` : "N/A"}</span></span>
           {metrics.uptime !== undefined && (
             <span className="hidden lg:inline text-muted">up {uptimeStr(metrics.uptime)}</span>

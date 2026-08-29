@@ -202,48 +202,6 @@ func TestEnsureNodeMetricsSlices(t *testing.T) {
 	}
 }
 
-// fill* 失败一律静默 return，缺失的字段在页面上只表现为某张卡空着 ——
-// 2026-08-24 事故里两个节点的数据缺了很久都没人发现，直到 nil 切片炸掉前端。
-// 这里检测「结果」而不是包装 11 处错误：零侵入，且更贴近用户看到的现象。
-func TestDetectMissingParts(t *testing.T) {
-	full := &metrics.NodeMetrics{
-		CPU:      metrics.NodeCPU{Cores: 4, UsagePct: 12},
-		Memory:   metrics.NodeMemory{TotalBytes: 8 << 30},
-		Disks:    []metrics.NodeDisk{{Device: "nvme0n1"}},
-		Networks: []metrics.NodeNetwork{{Interface: "eth0"}},
-	}
-	if got := detectMissingParts(full); len(got) != 0 {
-		t.Errorf("数据完整时不该报缺失，得到 %v", got)
-	}
-
-	// 2026-08-24 实际发生的形态：cpu/memory 有值，disks/networks 为空
-	partial := &metrics.NodeMetrics{
-		CPU:    metrics.NodeCPU{Cores: 4},
-		Memory: metrics.NodeMemory{TotalBytes: 8 << 30},
-	}
-	got := detectMissingParts(partial)
-	if len(got) != 2 {
-		t.Fatalf("期望报出 disks 与 networks，得到 %v", got)
-	}
-
-	// 全空（该节点整轮都被取消）
-	if got := detectMissingParts(&metrics.NodeMetrics{}); len(got) != 4 {
-		t.Errorf("全空时应报四项，得到 %v", got)
-	}
-
-	// 只检测「每个节点都该有」的部件。温度传感器、硬件传感器不在其中 ——
-	// raspi4 本来就没有盘温，desk 没有风扇，报出来是噪声不是信号。
-	noSensors := &metrics.NodeMetrics{
-		CPU:      metrics.NodeCPU{Cores: 4},
-		Memory:   metrics.NodeMemory{TotalBytes: 8 << 30},
-		Disks:    []metrics.NodeDisk{{Device: "sda"}},
-		Networks: []metrics.NodeNetwork{{Interface: "eth0"}},
-		// Temperature.Sensors 与 Hardware 均为空
-	}
-	if got := detectMissingParts(noSensors); len(got) != 0 {
-		t.Errorf("缺传感器不算故障，得到 %v", got)
-	}
-}
 
 // 合并六个查询为一个，最大的风险是映射表写错 —— 某个指标悄悄写进了错误的字段，
 // 页面照常显示、数字却是别的东西。这张表逐项锁住。

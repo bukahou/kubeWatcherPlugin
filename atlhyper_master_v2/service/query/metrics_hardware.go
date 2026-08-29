@@ -44,22 +44,42 @@ func buildHardwareRow(nm *metrics.NodeMetrics) model.HardwareRow {
 	}
 	th := thresholdsFor(profile)
 
+	// Agent 声明采集失败的 section → 对应格子置 nil，前端渲染灰色占位。
+	// 没有这层判断时零值会被做成绿色的 0.0%（2026-08-29 压测缺陷 ①：
+	// 用户据此误判「树莓派宕机了」，实际数据全在、只是查询超时）。
+	un := make(map[string]bool, len(nm.Unavailable))
+	for _, sec := range nm.Unavailable {
+		un[sec] = true
+	}
+
 	row := model.HardwareRow{
 		NodeName:     nm.NodeName,
 		Profile:      string(profile),
 		ProfileLabel: th.label,
-		CPUUsage:     usageCell(nm.CPU.UsagePct),
-		MemUsage:     usageCell(nm.Memory.UsagePct),
-		DiskUsage:    usageCell(primaryDiskUsagePct(nm.Disks)),
-		CPUTemp:      tempCell(nm.Temperature.Sensors, metrics.TempClassCPU, th.cpu),
-		DiskTemp:     tempCell(nm.Temperature.Sensors, metrics.TempClassDisk, th.disk),
-		OtherTemp:    tempCell(nm.Temperature.Sensors, metrics.TempClassOther, th.other),
-		Undervolt:    undervoltCell(nm.Hardware),
-		CPUFreq:      freqCell(nm.CPU),
-		DiskAwait:    awaitCell(nm.Disks),
 		Sensors:      sensorCells(nm.Temperature.Sensors, th),
 	}
-	row.Fan = fanCell(nm.Hardware, row.CPUTemp)
+	if !un[metrics.SectionCPU] {
+		row.CPUUsage = usageCell(nm.CPU.UsagePct)
+		row.CPUFreq = freqCell(nm.CPU)
+	}
+	if !un[metrics.SectionMemory] {
+		row.MemUsage = usageCell(nm.Memory.UsagePct)
+	}
+	if !un[metrics.SectionDisks] {
+		row.DiskUsage = usageCell(primaryDiskUsagePct(nm.Disks))
+		row.DiskAwait = awaitCell(nm.Disks)
+	}
+	if !un[metrics.SectionTemperature] {
+		row.CPUTemp = tempCell(nm.Temperature.Sensors, metrics.TempClassCPU, th.cpu)
+		row.DiskTemp = tempCell(nm.Temperature.Sensors, metrics.TempClassDisk, th.disk)
+		row.OtherTemp = tempCell(nm.Temperature.Sensors, metrics.TempClassOther, th.other)
+	}
+	if !un[metrics.SectionHardware] {
+		row.Undervolt = undervoltCell(nm.Hardware)
+	}
+	if !un[metrics.SectionHardware] {
+		row.Fan = fanCell(nm.Hardware, row.CPUTemp)
+	}
 	// overall 覆盖矩阵里出现的每一列 —— 表里看得到 CPU 100%，overall 就不能是 good
 	row.Overall = worstStatus(
 		statusOf(row.CPUUsage), statusOf(row.MemUsage), statusOf(row.DiskUsage),
