@@ -32,7 +32,14 @@
 | 并发合并 | 峰值 28 个 |
 | 落库总量 | traces 362 万 + logs 265 万行 |
 
-### ① 查询失败时静默渲染零值 —— 最危险，与性能无关 ⚠️
+### ① 查询失败时静默渲染零值 —— ✅ 已修复（2026-08-29，commit 39763c8）
+>
+> 三层联动落地：model_v3 加 `Unavailable []string` + Section* 契约常量；
+> Agent 8 个 fill* 返回 error、失败 section 记账、节点间并行(限4)、
+> 部分失败不再丢节点；Master 对 Unavailable section 置 nil 格子；
+> 前端 NodeCard 渲染 `--` 占位。TDD 5 例先红后绿。
+> 正常路径线上回归通过（7 节点真实数值）；失败路径由单测覆盖
+> （线上验证需人为制造 ClickHouse 超时，不值得为此伤害生产）。
 
 **现象**：面板 7 节点中 5 个显示 `CPU 0.0% / 内存 0.0% / 磁盘 0.0%` +「未识别硬件」，
 用户据此判断「树莓派宕机了」。**实际七节点数据全部正常到达 ClickHouse。**
@@ -80,7 +87,10 @@ sorting_key: ServiceName, MetricName, Attributes, toUnixTimestamp64Nano(TimeUnix
 
 **修复方向**：时间前移进排序键 / node 标识提升为独立列而非 Map / 预聚合物化视图。
 
-### ③ collector sending_queue 过小 —— 峰值丢 3.6% trace
+### ③ collector sending_queue 过小 —— ✅ 已修复（2026-08-29，config 仓）
+>
+> queue_size 50→1000（峰值速率下缓冲 1.6s→33s）+ num_consumers 20 +
+> memory_limiter 2200MiB + 资源 3核/3Gi（实测 CPU 峰值 879m/1000m=88%）。
 
 ```
 error: "sending queue is full", rejected_items: 512   × 261 次
@@ -114,7 +124,11 @@ collector 自身资源并非瓶颈：峰值仅 431m / 261Mi（限 1 核 / 1Gi）
 **运维含义**：**压测刚结束就查看结果，看到的是最差的观测质量**。
 需等合并积压消化完再取数。这条对任何"事件后立即排查"的场景都成立。
 
-### ⑤ Agent 日志时间戳慢 1 小时
+### ⑤ 日志时间戳慢 1 小时 —— ✅ 已修复（2026-08-29）
+>
+> 根因是三个 Dockerfile 都烤了 `TZ=Asia/Shanghai`(UTC+8)，不只 Agent ——
+> controller 写 SQLite 的审计/事件时间戳也一直偏 1 小时。已改 Asia/Tokyo，
+> 三组件容器时间与宿主机 JST 完全对齐。
 
 ```
 容器真实时间: 2026-08-29T14:42:07.388+09:00
