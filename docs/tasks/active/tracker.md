@@ -12,6 +12,47 @@
 
 ---
 
+## 待处理对线 — geass-v3 电影详情 404（证据已固化，等用户择时发起）
+
+> **状态：仅登记，未发起。** 对线协议只有用户能触发；用户 2026-08-29 指示
+> 「先记下，后续需要对线」，因 geass-v3 侧正在准备压测，不打断其主线。
+>
+> ⚠️ ClickHouse TTL 3 天且压测会改变现场，故证据在此固化，不依赖线上数据留存。
+
+**观测事实**（2026-08-29 14:11–14:31 JST，压测前的空闲状态）：
+
+| 项 | 值 |
+|---|---|
+| 触发端点 | `POST /api/movie/detail`（geass-gateway） |
+| 下游调用 | `POST http://geass-media.geass-v3.svc:9002/media.movie.v1.MovieService/GetByID` |
+| 下游响应 | **404**（`error.type=404`，路由不存在） |
+| 调用比 | **1:1，无重试**（593 次调用 / 593 trace / 593 父 span） |
+| **用户侧结果** | **593 × 404 vs 305 × 200 —— 失败率 66%** |
+| 速率 | 约 30 个失败请求/分钟，形态为脉冲（按分钟 86 / 223 / 76 / 207） |
+
+**复现命令**（ClickHouse，atlhyper ns）：
+
+```sql
+SELECT SpanAttributes['http.response.status_code'] AS code, count()
+FROM atlhyper.otel_traces
+WHERE Timestamp >= now()-INTERVAL 20 MINUTE AND SpanName='POST /api/movie/detail'
+GROUP BY code;
+```
+
+**已知边界（不得越过此线下结论）**：
+
+- 观测层只能证明「gateway 调了这个路由、media 返回 404」，
+  **不能**证明是 gateway 调错了地址、还是 media 少实现了这个 RPC ——
+  两种可能都与证据相容，归因需 geass-v3 侧答辩
+- 无法判断问题起自何时：ClickHouse 数据卷于 2026-08-29 13:43 迁移 PVC 时清空，
+  现有数据不含更早历史
+- 305 个成功请求说明存在另一条不经过该 RPC 的路径，原因未知
+
+**对压测的影响**：空闲态就有 4.37% 的 gateway span 是这个错误，
+压测时会等比放大并污染错误率基线 —— 建议压测前先澄清。
+
+---
+
 ## 底层能力盘点 — ✅ 盘点完成，待决策接线范围
 
 > 结果文档: [capability-inventory.md](../../design/active/capability-inventory.md)
