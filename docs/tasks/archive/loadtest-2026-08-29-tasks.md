@@ -28,3 +28,16 @@
 - ① 静默零值三层联动修复（39763c8）
 - ③ collector 队列 50→1000 + 3核/3Gi（config 仓）
 - ⑤ 三组件时区 Asia/Shanghai → Asia/Tokyo（023edff）
+
+## ✅ 代码整洁三项 + 一处遗漏（commit 7699bc9 / b4de331）
+
+- **SLO 组件目录归位**：`components/slo/`(11 文件) → `app/observe/slo/components/`，
+  仅被 SLO 页面引用、内部全相对路径，改 2 行 import 即可，与 metrics/apm/logs 对齐
+- **ObserveHandler 接口隔离**：此前持完整 `service.Query`(65 方法)，实际只用 6 个，
+  其中 5 个恰是现成的 `service.QueryOTel` —— 项目早已按域拆好接口，只是 handler 没用上。
+  顺带修同包 `NodeMetricsHandler`（同问题，用的是前者子集）
+- **消除 handler 越层直连 database**：新增 `QueryDeploy`/`OpsDeploy`/`QueryUser`/`OpsUser`
+  四个域子接口 + service 实现，deploy / github / user 三个 handler 改依赖包内最小接口。
+  边界：密码哈希与权限校验仍留在 handler，service 只做数据存取
+- 核查确认 gateway 层已无任何 handler 直连 database repository
+- 验证：全量 build+test 通过；登录路径部署后实测返回业务错误而非 500

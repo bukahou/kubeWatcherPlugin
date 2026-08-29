@@ -368,11 +368,13 @@ GROUP BY code;
 
 ---
 
-## 代码整洁（低优先级）
+## 代码整洁 — ✅ 全部完成（2026-08-29，commit 7699bc9 / b4de331）
 
-- **SLO 组件目录不一致**：`components/slo/` 与其他三个观测页的
-  `app/observe/*/components/` 不同。纯移动，与功能无关，建议单独一次提交
-- **三处架构违规**（存量）：
-  - `ObserveHandler` 持完整 `service.Query` 而非最小接口
-  - `gateway/handler/admin/deploy.go` 直接持 `database.DeployConfigRepository` 等三个
-  - `gateway/handler/settings/github.go` 直接持 `database.GitHubInstallationRepository` 等两个
+归档见 [loadtest-2026-08-29-tasks.md](../archive/loadtest-2026-08-29-tasks.md)。
+核查时发现并一并修掉两处同类遗漏（NodeMetricsHandler、UserHandler）。
+
+**遗留（本次刻意不做）**：`gateway/handler/k8s/` 下 **18 个 handler** 仍持完整
+`service.Query`，各自只用 1 个方法。给每个定单方法接口是形式主义；
+若要收拾，整包换成现成的 `service.QueryK8s` 即可（一次 sed 改 18 个文件）。
+
+---
