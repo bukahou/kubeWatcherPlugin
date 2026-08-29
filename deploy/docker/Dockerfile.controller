@@ -45,7 +45,9 @@ LABEL description="AtlHyper Controller - Kubernetes Monitoring Platform API"
 RUN apk add --no-cache sqlite-libs ca-certificates tzdata kubectl
 
 # 设置时区
-ENV TZ=Asia/Shanghai
+# 集群与运维均在 JST；此前误设 Asia/Shanghai(UTC+8) 导致全栈日志与
+# SQLite 时间戳比真实时间慢 1 小时，2026-08-29 压测排查时实际造成误判。
+ENV TZ=Asia/Tokyo
 
 WORKDIR /app
 
