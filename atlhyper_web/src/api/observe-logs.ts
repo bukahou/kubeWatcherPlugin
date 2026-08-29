@@ -44,3 +44,21 @@ export function getLogsHistogram(params: {
 }) {
   return get<ObserveResponse<LogHistogramResult>>("/api/v2/observe/logs/histogram", params);
 }
+
+// ── G5 接线（2026-08-29 能力盘点）────────────────────────────
+// 快照级全局摘要，与 query/facets 的「当前过滤窗口」口径不同：
+// latestAt 是日志流新鲜度信号（采集断流时最先体现在这里），
+// severityCounts 是未过滤的全局分布（过滤到别处时 ERROR 也不会漏看）。
+
+export interface LogsSummary {
+  totalEntries: number;
+  severityCounts: Record<string, number>;
+  topServices: { service: string; count: number }[];
+  latestAt: string;
+}
+
+export function getLogsSummary(clusterId: string) {
+  return get<ObserveResponse<LogsSummary>>("/api/v2/observe/logs/summary", {
+    cluster_id: clusterId,
+  });
+}

@@ -8,8 +8,9 @@ import { EntityLink } from "@/components/aiops/EntityLink";
 import { AIAnalysisSection } from "@/components/aiops/AIAnalysisSection";
 import { RootCauseCard } from "./RootCauseCard";
 import { TimelineView } from "./TimelineView";
-import { getIncidentDetail } from "@/api/aiops";
-import type { IncidentDetail } from "@/api/aiops";
+import { getIncidentDetail, getIncidentPatterns } from "@/api/aiops";
+import { useClusterStore } from "@/store/clusterStore";
+import type { IncidentDetail, IncidentPattern } from "@/api/aiops";
 import { formatRiskScore } from "@/lib/risk";
 
 const STATE_COLORS: Record<string, string> = {
@@ -42,8 +43,11 @@ const ROLE_COLORS: Record<string, string> = {
 
 export function IncidentDetailModal({ incidentId, open, onClose }: IncidentDetailModalProps) {
   const { t } = useI18n();
+  const { currentClusterId } = useClusterStore();
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  // 历史模式（G2）：拿到详情后按 rootCause 实体查同类事件史
+  const [pattern, setPattern] = useState<IncidentPattern | null | undefined>(undefined);
 
   useEffect(() => {
     if (!incidentId || !open) {
@@ -52,11 +56,22 @@ export function IncidentDetailModal({ incidentId, open, onClose }: IncidentDetai
     }
 
     setLoading(true);
+    setPattern(undefined);
     getIncidentDetail(incidentId)
-      .then(setDetail)
+      .then((d) => {
+        setDetail(d);
+        // rootCause 字段即实体 key；查 30 天内同实体的事件史
+        if (d?.rootCause) {
+          getIncidentPatterns(currentClusterId, d.rootCause)
+            .then((ps) => setPattern(ps.find((p) => p.entityKey === d.rootCause) ?? null))
+            .catch(() => setPattern(null));
+        } else {
+          setPattern(null);
+        }
+      })
       .catch((err) => console.error("Failed to load incident detail:", err))
       .finally(() => setLoading(false));
-  }, [incidentId, open]);
+  }, [incidentId, open, currentClusterId]);
 
   if (!open) return null;
 
@@ -128,6 +143,35 @@ export function IncidentDetailModal({ incidentId, open, onClose }: IncidentDetai
 
               {/* 时间线 */}
               <TimelineView timeline={detail.timeline} />
+
+              {/* 历史模式（G2）：这个问题是不是老毛病 */}
+              <div>
+                <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                  {t.aiops.patternTitle}
+                </h4>
+                {pattern === undefined ? (
+                  <div className="text-xs text-muted opacity-60">…</div>
+                ) : pattern === null || pattern.patternCount <= 1 ? (
+                  <div className="text-xs text-muted">{t.aiops.patternFirst}</div>
+                ) : (
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                    <span className="text-muted">
+                      {t.aiops.patternRecur}:{" "}
+                      <span className="text-default font-medium tabular-nums">{pattern.patternCount}</span>
+                    </span>
+                    <span className="text-muted">
+                      {t.aiops.patternAvgDuration}:{" "}
+                      <span className="text-default tabular-nums">
+                        {formatDuration(pattern.avgDuration, t.aiops.minutes)}
+                      </span>
+                    </span>
+                    <span className="text-muted">
+                      {t.aiops.patternLast}:{" "}
+                      <span className="text-default">{new Date(pattern.lastOccurrence).toLocaleString()}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {/* AI 分析报告 */}
               <AIAnalysisSection incidentId={detail.id} incidentState={detail.state} />

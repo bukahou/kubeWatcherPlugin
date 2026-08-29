@@ -1970,6 +1970,15 @@ export interface AIOpsTranslations {
   firstAnomaly: string;
   noAnomaly: string;
   noAnomalyDetail: string;
+  depTrace: string;
+  depUpstream: string;
+  depDownstream: string;
+  depNone: string;
+  patternTitle: string;
+  patternRecur: string;
+  patternAvgDuration: string;
+  patternLast: string;
+  patternFirst: string;
   metricName: string;
   currentValue: string;
   baseline: string;
@@ -2170,6 +2179,9 @@ export interface TimeRangePickerTranslations {
 
 // Log 翻译
 export interface LogTranslations extends TimeRangePickerTranslations {
+  latestLog: string;
+  totalGlobal: string;
+  topService: string;
   pageTitle: string;
   pageDescription: string;
   searchPlaceholder: string;

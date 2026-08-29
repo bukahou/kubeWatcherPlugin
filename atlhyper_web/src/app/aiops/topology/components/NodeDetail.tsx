@@ -6,8 +6,8 @@ import { useI18n } from "@/i18n/context";
 import { RiskBadge } from "@/components/aiops/RiskBadge";
 import { EntityLink } from "@/components/aiops/EntityLink";
 import { CausalTreeNodeView } from "@/components/aiops/CausalTreeNodeView";
-import { getEntityRiskDetail } from "@/api/aiops";
-import type { EntityRiskDetail } from "@/api/aiops";
+import { getEntityRiskDetail, getGraphTrace } from "@/api/aiops";
+import type { EntityRiskDetail, GraphTraceResult } from "@/api/aiops";
 import { formatRiskScore } from "@/lib/risk";
 
 interface NodeDetailProps {
@@ -19,13 +19,20 @@ export function NodeDetail({ entityKey, clusterId }: NodeDetailProps) {
   const { t } = useI18n();
   const [detail, setDetail] = useState<EntityRiskDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // 依赖追踪（G3 接线）：与风险详情并行拉取，任一失败不影响另一个
+  const [upstream, setUpstream] = useState<GraphTraceResult | null>(null);
+  const [downstream, setDownstream] = useState<GraphTraceResult | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    setUpstream(null);
+    setDownstream(null);
     getEntityRiskDetail(clusterId, entityKey)
       .then(setDetail)
       .catch((err) => console.error("Failed to load entity detail:", err))
       .finally(() => setLoading(false));
+    getGraphTrace(clusterId, entityKey, "upstream").then(setUpstream).catch(() => {});
+    getGraphTrace(clusterId, entityKey, "downstream").then(setDownstream).catch(() => {});
   }, [clusterId, entityKey]);
 
   if (loading) {
@@ -130,6 +137,37 @@ export function NodeDetail({ entityKey, clusterId }: NodeDetailProps) {
           </div>
         </div>
       ) : null}
+
+      {/* 依赖追踪（G3）：沿依赖图实际遍历的上下游，区别于「传播路径」
+          （后者是风险传播的贡献度计算，前者是拓扑结构本身） */}
+      <div>
+        <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">{t.aiops.depTrace}</h4>
+        {[
+          { label: t.aiops.depUpstream, res: upstream },
+          { label: t.aiops.depDownstream, res: downstream },
+        ].map(({ label, res }) => {
+          // 遍历结果包含起点自身，展示时剔除
+          const others = res?.nodes.filter((n) => n.key !== entityKey) ?? null;
+          return (
+            <div key={label} className="mb-2">
+              <div className="text-[10px] text-muted mb-1">{label}</div>
+              {others === null ? (
+                <div className="text-xs text-muted opacity-60">…</div>
+              ) : others.length === 0 ? (
+                <div className="text-xs text-muted opacity-60">{t.aiops.depNone}</div>
+              ) : (
+                <div className="space-y-1">
+                  {others.map((n) => (
+                    <div key={n.key} className="text-xs">
+                      <EntityLink entityKey={n.key} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* 传播路径 */}
       {detail.propagation?.length > 0 && (

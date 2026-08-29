@@ -83,6 +83,17 @@ function aggregateOverview(events: EventLog[]): EventOverview {
  * 获取事件列表（实时，从 DataHub）
  * GET /api/v2/events?cluster_id=xxx&namespace=xxx&type=xxx
  */
+// 按资源查事件（K8s 原生事件时间线，来自 /events/by-resource）
+// 用于资源详情页：某个 Pod/Deployment 最近发生了什么
+export function getEventsByResource(params: {
+  cluster_id: string;
+  kind: string;
+  namespace?: string;
+  name: string;
+}) {
+  return get<{ events: EventLog[] }>("/api/v2/events/by-resource", { ...params });
+}
+
 export function getEventList(params: EventListParams) {
   return get<EventListResponse>("/api/v2/events", params);
 }

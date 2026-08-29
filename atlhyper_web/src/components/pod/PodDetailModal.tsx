@@ -8,7 +8,8 @@ import { useClusterStore } from "@/store/clusterStore";
 import { useI18n } from "@/i18n/context";
 import type { PodDetail } from "@/types/cluster";
 import { OverviewTab, ContainersTab, VolumesTab, NetworkTab, SchedulingTab } from "./PodDetailTabs";
-import { Box, Container, HardDrive, Network, Settings } from "lucide-react";
+import { Box, Container, HardDrive, Network, Settings, History } from "lucide-react";
+import { ResourceEventsTab } from "@/components/common/ResourceEventsTab";
 
 interface PodDetailModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ interface PodDetailModalProps {
   onViewLogs: (containerName: string) => void;
 }
 
-type TabType = "overview" | "containers" | "volumes" | "network" | "scheduling";
+type TabType = "overview" | "containers" | "volumes" | "network" | "scheduling" | "events";
 
 export function PodDetailModal({
   isOpen,
@@ -65,6 +66,7 @@ export function PodDetailModal({
     { key: "volumes", label: t.pod.volumeMounts, icon: <HardDrive className="w-4 h-4" /> },
     { key: "network", label: t.pod.network, icon: <Network className="w-4 h-4" /> },
     { key: "scheduling", label: t.pod.scheduling, icon: <Settings className="w-4 h-4" /> },
+    { key: "events", label: t.nav.event, icon: <History className="w-4 h-4" /> },
   ];
 
   return (
@@ -109,6 +111,9 @@ export function PodDetailModal({
             {activeTab === "volumes" && <VolumesTab volumes={detail.volumes || []} t={t} />}
             {activeTab === "network" && <NetworkTab detail={detail} t={t} />}
             {activeTab === "scheduling" && <SchedulingTab detail={detail} t={t} />}
+            {activeTab === "events" && (
+              <ResourceEventsTab clusterId={currentClusterId} kind="Pod" namespace={detail.namespace} name={detail.name} />
+            )}
           </div>
         </div>
       ) : null}

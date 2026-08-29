@@ -276,6 +276,26 @@ export async function getEntityBaseline(cluster: string, entityKey: string): Pro
   return { ...data, states: data.states ?? [] };
 }
 
+// 依赖图追踪（G3 接线，2026-08-29）：从某实体出发沿边遍历上/下游。
+// ⚠️ 后端参数名是 from（非 entity），与 aiops 其余端点不一致 —— 盘点时踩过
+export interface GraphTraceResult {
+  nodes: { key: string; type: string; namespace: string; name: string }[];
+  edges: { from: string; to: string; type: string; weight: number }[];
+  depth: number;
+}
+
+export async function getGraphTrace(
+  cluster: string,
+  fromKey: string,
+  direction: "upstream" | "downstream",
+  depth = 3
+): Promise<GraphTraceResult> {
+  const data = (await get<GraphTraceResult>("/api/v2/aiops/graph/trace", {
+    cluster_id: cluster, from: fromKey, direction, depth,
+  })).data;
+  return { nodes: data.nodes ?? [], edges: data.edges ?? [], depth: data.depth ?? 0 };
+}
+
 // 依赖图
 export async function getGraph(cluster: string): Promise<DependencyGraph> {
   return (await get<DependencyGraph>("/api/v2/aiops/graph", { cluster })).data;
@@ -285,6 +305,26 @@ export async function getGraph(cluster: string): Promise<DependencyGraph> {
 export async function getIncidents(params: IncidentListParams): Promise<Incident[]> {
   const resp = (await get<{ data: Incident[]; total: number }>("/api/v2/aiops/incidents", params)).data;
   return resp?.data ?? [];
+}
+
+// 历史事件模式（G2 接线，2026-08-29）：同一实体过去反复出的事件归组。
+// 回答「这个问题是不是老毛病」—— 复发次数、平均时长、上次发生时间。
+export interface IncidentPattern {
+  entityKey: string;
+  patternCount: number;
+  avgDuration: number;       // 秒
+  lastOccurrence: string;
+  commonMetrics: string[] | null;
+  incidents: Incident[];
+}
+
+export async function getIncidentPatterns(
+  cluster: string, entityKey: string, period = "30d"
+): Promise<IncidentPattern[]> {
+  const data = (await get<IncidentPattern[]>("/api/v2/aiops/incidents/patterns", {
+    cluster_id: cluster, entity: entityKey, period,
+  })).data;
+  return data ?? [];
 }
 
 export async function getIncidentDetail(id: string): Promise<IncidentDetail> {
