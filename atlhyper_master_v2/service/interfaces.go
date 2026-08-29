@@ -144,6 +144,16 @@ type QueryDeploy interface {
 	ListRepoConfigs(ctx context.Context) ([]*database.RepoConfig, error)
 }
 
+// QueryUser 用户读取能力。
+//
+// 密码校验、权限判定等业务逻辑保留在 handler —— service 层只负责
+// 数据存取，不承担认证语义（改动最小，且不把认证逻辑分散到两处）。
+type QueryUser interface {
+	GetUserByID(ctx context.Context, id int64) (*database.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*database.User, error)
+	ListUsers(ctx context.Context) ([]*database.User, error)
+}
+
 // OpsAdmin 管理写入操作（通知渠道、设置、AI Provider）
 type OpsAdmin interface {
 	CreateNotifyChannel(ctx context.Context, ch *database.NotifyChannel) error
@@ -167,6 +177,14 @@ type OpsDeploy interface {
 	DeleteGitHubInstallation(ctx context.Context) error
 }
 
+// OpsUser 用户写入能力。
+type OpsUser interface {
+	CreateUser(ctx context.Context, user *database.User) error
+	UpdateUser(ctx context.Context, user *database.User) error
+	DeleteUser(ctx context.Context, id int64) error
+	UpdateUserLastLogin(ctx context.Context, id int64, ip string) error
+}
+
 // ================================================================
 // 组合接口（向后兼容，现有代码无需修改）
 // ================================================================
@@ -180,6 +198,7 @@ type Query interface {
 	QueryOverview
 	QueryAdmin
 	QueryDeploy
+	QueryUser
 }
 
 // OpsSLO SLO 写入操作
@@ -190,6 +209,7 @@ type OpsSLO interface {
 // Ops 写入操作接口
 type Ops interface {
 	OpsDeploy
+	OpsUser
 	CreateCommand(req *model.CreateCommandRequest) (*model.CreateCommandResponse, error)
 	// ExecuteCommandSync 同步执行指令（创建 + 等待 Agent 结果）
 	ExecuteCommandSync(ctx context.Context, req *model.CreateCommandRequest, timeout time.Duration) (*command.Result, error)

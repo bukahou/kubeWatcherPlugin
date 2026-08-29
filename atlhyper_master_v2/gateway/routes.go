@@ -115,7 +115,7 @@ func (r *Router) registerRoutes() {
 	}
 
 	// 创建 Handlers — 管理 (package admin)
-	userH := adminHandler.NewUserHandler(r.database.User)
+	userH := adminHandler.NewUserHandler(r.service, r.service)
 	commandH := adminHandler.NewCommandHandler(r.service)
 	notifyH := adminHandler.NewNotifyHandler(r.service)
 	settingsH := adminHandler.NewSettingsHandler(r.service)

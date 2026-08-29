@@ -3,6 +3,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -16,14 +17,32 @@ import (
 
 var log = logger.Module("UserHandler")
 
+// UserQuery / UserOps 本 handler 所需的最小 service 能力。
+// 此前直接持有 database.UserRepository —— 绕过 service 层，
+// 违反 CLAUDE.md「Gateway 直接访问 Database」禁令。
+// 密码哈希与权限校验仍在本 handler，service 只负责数据存取。
+type UserQuery interface {
+	GetUserByID(ctx context.Context, id int64) (*database.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*database.User, error)
+	ListUsers(ctx context.Context) ([]*database.User, error)
+}
+
+type UserOps interface {
+	CreateUser(ctx context.Context, user *database.User) error
+	UpdateUser(ctx context.Context, user *database.User) error
+	DeleteUser(ctx context.Context, id int64) error
+	UpdateUserLastLogin(ctx context.Context, id int64, ip string) error
+}
+
 // UserHandler 用户管理 Handler
 type UserHandler struct {
-	userRepo database.UserRepository
+	querySvc UserQuery
+	opsSvc   UserOps
 }
 
 // NewUserHandler 创建 UserHandler
-func NewUserHandler(userRepo database.UserRepository) *UserHandler {
-	return &UserHandler{userRepo: userRepo}
+func NewUserHandler(querySvc UserQuery, opsSvc UserOps) *UserHandler {
+	return &UserHandler{querySvc: querySvc, opsSvc: opsSvc}
 }
 
 // ==================== 请求/响应结构 ====================
@@ -108,7 +127,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 查找用户
-	user, err := h.userRepo.GetByUsername(r.Context(), req.Username)
+	user, err := h.querySvc.GetUserByUsername(r.Context(), req.Username)
 	if err != nil {
 		log.Error("查询用户失败", "err", err)
 		handler.WriteError(w, http.StatusInternalServerError, "查询用户失败: "+err.Error())
@@ -143,7 +162,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if xForwardedFor := r.Header.Get("X-Forwarded-For"); xForwardedFor != "" {
 		clientIP = xForwardedFor
 	}
-	_ = h.userRepo.UpdateLastLogin(r.Context(), user.ID, clientIP)
+	_ = h.opsSvc.UpdateUserLastLogin(r.Context(), user.ID, clientIP)
 
 	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "登录成功",
@@ -180,7 +199,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 检查用户名是否已存在
-	existing, err := h.userRepo.GetByUsername(r.Context(), req.Username)
+	existing, err := h.querySvc.GetUserByUsername(r.Context(), req.Username)
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "查询用户失败")
 		return
@@ -213,7 +232,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Status:       1, // 默认启用
 	}
 
-	if err := h.userRepo.Create(r.Context(), user); err != nil {
+	if err := h.opsSvc.CreateUser(r.Context(), user); err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "创建用户失败: "+err.Error())
 		return
 	}
@@ -238,7 +257,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := h.userRepo.List(r.Context())
+	users, err := h.querySvc.ListUsers(r.Context())
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "获取用户列表失败")
 		return
@@ -290,7 +309,7 @@ func (h *UserHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 查找用户
-	user, err := h.userRepo.GetByID(r.Context(), req.UserID)
+	user, err := h.querySvc.GetUserByID(r.Context(), req.UserID)
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "查询用户失败")
 		return
@@ -302,7 +321,7 @@ func (h *UserHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 
 	// 更新角色
 	user.Role = req.Role
-	if err := h.userRepo.Update(r.Context(), user); err != nil {
+	if err := h.opsSvc.UpdateUser(r.Context(), user); err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "更新角色失败")
 		return
 	}
@@ -345,7 +364,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 检查用户是否存在
-	user, err := h.userRepo.GetByID(r.Context(), req.UserID)
+	user, err := h.querySvc.GetUserByID(r.Context(), req.UserID)
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "查询用户失败")
 		return
@@ -362,7 +381,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 删除用户
-	if err := h.userRepo.Delete(r.Context(), req.UserID); err != nil {
+	if err := h.opsSvc.DeleteUser(r.Context(), req.UserID); err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "删除用户失败")
 		return
 	}
@@ -410,7 +429,7 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 查找用户
-	user, err := h.userRepo.GetByID(r.Context(), req.UserID)
+	user, err := h.querySvc.GetUserByID(r.Context(), req.UserID)
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "查询用户失败")
 		return
@@ -428,7 +447,7 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	// 更新状态
 	user.Status = req.Status
-	if err := h.userRepo.Update(r.Context(), user); err != nil {
+	if err := h.opsSvc.UpdateUser(r.Context(), user); err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "更新状态失败")
 		return
 	}

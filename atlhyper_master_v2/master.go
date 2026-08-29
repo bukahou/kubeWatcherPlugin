@@ -223,6 +223,7 @@ func NewMaster() (*Master, error) {
 			GitHubInstall: db.GitHubInstall,
 			RepoConfig:    db.RepoConfig,
 		},
+		UserRepo: db.User,
 	})
 	log.Info("查询层初始化完成")
 
@@ -232,8 +233,11 @@ func NewMaster() (*Master, error) {
 	// 初始化部署 / GitHub 集成写入服务
 	deployOps := operations.NewDeployService(db.DeployConfig, db.GitHubInstall)
 
+	// 初始化用户写入服务
+	userOps := operations.NewUserService(db.User)
+
 	// 组合统一 Service
-	svc := service.NewService(q, cmdOps, adminOps, sloOps, deployOps)
+	svc := service.NewService(q, cmdOps, adminOps, sloOps, deployOps, userOps)
 
 	// 8. 初始化 AgentSDK
 	agentServer := agentsdk.NewServer(agentsdk.Config{

@@ -43,6 +43,9 @@ type QueryService struct {
 	deployHistoryRepo database.DeployHistoryRepository
 	githubInstallRepo database.GitHubInstallationRepository
 	repoConfigRepo    database.RepoConfigRepository
+
+	// User repository（用户管理）
+	userRepo database.UserRepository
 }
 
 // AdminRepos 管理查询所需的 Repository 集合
@@ -79,6 +82,7 @@ type QueryServiceDeps struct {
 	AIOpsAI     *enricher.Enricher              // 可选，nil = AI 增强禁用
 	AdminRepos  AdminRepos                      // 必需（管理查询）
 	DeployRepos DeployRepos                     // 可选，未启用 GitOps 时各 repo 为 nil
+	UserRepo    database.UserRepository         // 必需（用户管理）
 }
 
 // NewQueryService 创建 QueryService（全部依赖通过构造函数注入）
@@ -104,5 +108,7 @@ func NewQueryService(deps QueryServiceDeps) *QueryService {
 		deployHistoryRepo: deps.DeployRepos.DeployHistory,
 		githubInstallRepo: deps.DeployRepos.GitHubInstall,
 		repoConfigRepo:    deps.DeployRepos.RepoConfig,
+
+		userRepo: deps.UserRepo,
 	}
 }
