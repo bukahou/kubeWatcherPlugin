@@ -8,7 +8,11 @@ ARG GO_VERSION=1.24
 # -----------------------------------------------------------------------------
 # Stage 1: Build
 # -----------------------------------------------------------------------------
-FROM golang:${GO_VERSION}-alpine AS builder
+# --platform=$BUILDPLATFORM：构建阶段固定跑在【本机架构】（x86），不进 QEMU。
+# Go 交叉编译能力极强，编译 arm64 产物无需模拟目标平台 ——
+# 此前 arm64 一半整个走 QEMU 用户态模拟：单线程吃满一核（5.3GHz boost、
+# Tctl 贴 95°C 温度墙），而 16 线程总占用只有 7%，编译慢 5-10 倍。
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS builder
 
 LABEL stage=builder
 
@@ -19,8 +23,11 @@ RUN go mod download
 
 COPY . .
 
+# buildx 自动注入 TARGETARCH（amd64 / arm64）；CGO 已禁用，交叉编译零障碍
+ARG TARGETARCH
 ENV CGO_ENABLED=0
 ENV GOOS=linux
+ENV GOARCH=$TARGETARCH
 
 RUN go build -ldflags="-s -w" -o atlhyper-agent ./cmd/atlhyper_agent_v2/main.go
 

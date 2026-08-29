@@ -8,7 +8,11 @@ ARG NODE_VERSION=20
 # -----------------------------------------------------------------------------
 # Stage 1: Dependencies
 # -----------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-alpine AS deps
+# --platform=$BUILDPLATFORM：deps 与 builder 固定跑在【本机架构】(x86)，不进 QEMU。
+# next build 的产物（.next/ 下的 JS/静态文件）与 CPU 架构无关，只需构建一次。
+# 此前两个架构各跑一遍完整 npm ci + next build，arm64 那遍全程 QEMU 模拟 ——
+# 单线程吃满一核、Tctl 贴 95°C，是整个构建流程最慢的一段。
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS deps
 
 LABEL stage=deps
 
@@ -21,7 +25,7 @@ RUN npm ci --legacy-peer-deps
 # -----------------------------------------------------------------------------
 # Stage 2: Build
 # -----------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS builder
 
 LABEL stage=builder
 
@@ -64,6 +68,13 @@ RUN mkdir .next && chown nextjs:nodejs .next
 # 复制 standalone 输出
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# ⚠️ sharp 是 native addon，standalone 里带的是【构建机架构】(x64) 的二进制。
+#    本项目未使用 next/image（已核验：src 下零处引用），sharp 属 Next 默认
+#    打包进来的死代码，运行时不会被 require —— 但留着错架构的 .node 文件
+#    既是隐患也占体积，直接删掉，由 Next 在真需要时报明确错误而非静默行为异常。
+#    若将来引入 next/image：把此处改为 `npm i --os=linux --cpu=$TARGETARCH sharp`。
+RUN rm -rf ./node_modules/@img
 
 USER nextjs
 
