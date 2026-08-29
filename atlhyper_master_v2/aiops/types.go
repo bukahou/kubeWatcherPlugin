@@ -129,6 +129,10 @@ type AnomalyResult struct {
 	Score        float64 `json:"score"`
 	IsAnomaly    bool    `json:"isAnomaly"`
 	DetectedAt   int64   `json:"detectedAt"`
+
+	// AbsoluteBreach 表示该值触碰了绝对阈值（见 AbsoluteThresholds），
+	// 与统计偏离无关。上层可据此区分「相对常态异常」与「无论常态如何都不可接受」。
+	AbsoluteBreach bool `json:"absoluteBreach,omitempty"`
 }
 
 // EntityBaseline 实体基线汇总（API 响应）
@@ -270,7 +274,38 @@ const (
 	DefaultAlpha           = 0.033 // α = 2/(60+1), 窗口 60 个采样点
 	AnomalyThreshold       = 3.0   // 3σ 规则
 	SigmoidK               = 2.0   // sigmoid 斜率
+
+	// MaxDeviation 先验方差为 0 时的偏离度哨兵值。
+	// σ=0 意味着该指标至今从未波动过，此时任何变化在统计上都无穷显著
+	// （z = Δ/0）。用有限哨兵表达而非 math.Inf：Inf 会破坏 JSON 序列化，
+	// 且在 sigmoid 中无意义。取值远超 AnomalyThreshold，sigmoid 饱和为 1.0。
+	// 典型场景：restart_count 长期为 0，首次非零必须告警（零值快速通道）。
+	MaxDeviation = 100.0
 )
+
+// AbsoluteThresholds 绝对阈值兜底：超过即判异常，不看基线。
+//
+// 为什么需要（2026-08-29 压测实证）：EMA 窗口约 60 个采样点（≈40 分钟），
+// 负载在数小时内渐进爬升时，每一步都落在 3σ 内，而每一步又同时抬高 EMA 与
+// 方差 —— 温水煮青蛙。实测 desk-zero CPU 达 98%、gateway p99 达 2094ms，
+// AIOps 全程判 healthy，压测期零 incident。
+//
+// 纯统计方法优雅，但一个 SRE 平台不该在节点 CPU 98% 时说「健康」。
+// 工业界标准做法是双轨：统计检测发现「与常态不同」，静态阈值兜住
+// 「无论常态如何都不可接受」。二者互补，不可互相替代。
+//
+// 取值原则：只为「越界即有害」的指标设线，且取值保守到不会误报 ——
+// 宁可漏报也不能让告警变成噪音。计数类指标（restart_count 等）
+// 本身零基线灵敏，交给统计通道即可，不在此列。
+var AbsoluteThresholds = map[string]float64{
+	"cpu_usage":      90, // %，持续 90% 以上调度延迟已显著
+	"memory_usage":   90, // %，逼近 OOM
+	"disk_usage":     90, // %，留给运维的反应窗口
+	"psi_cpu":        50, // % 压力失速：一半时间在等 CPU
+	"psi_memory":     30, // % 内存失速比 CPU 更早致命
+	"psi_io":         50, // %
+	"apm_error_rate": 5,  // %，5% 请求失败对用户已明显可感
+}
 
 // ==================== 状态机类型 ====================
 

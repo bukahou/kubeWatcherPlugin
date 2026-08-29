@@ -92,11 +92,21 @@ export function NodeDetail({ entityKey, clusterId }: NodeDetailProps) {
               <div key={i} className="bg-[var(--background)] rounded-lg p-2.5 text-xs space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-default">{m.metricName}</span>
-                  {m.isAnomaly && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500 font-medium">
-                      {t.aiops.isAnomaly}
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1">
+                    {m.isAnomaly && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500 font-medium">
+                        {t.aiops.isAnomaly}
+                      </span>
+                    )}
+                    {m.absoluteBreach && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-600/20 text-red-600 dark:text-red-400 font-medium"
+                        title={t.aiops.absoluteBreachHint}
+                      >
+                        {t.aiops.absoluteBreach}
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex gap-3 text-muted">
                   <span>

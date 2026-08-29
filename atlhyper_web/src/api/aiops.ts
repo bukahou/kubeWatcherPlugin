@@ -96,6 +96,9 @@ export interface AnomalyResult {
   score: number;
   isAnomaly: boolean;
   detectedAt: number;
+  // 触碰绝对阈值（CPU>90% 等），与统计偏离无关。
+  // 渐进劣化会被 EMA 学成常态，此时统计通道失明，靠硬线兜底
+  absoluteBreach?: boolean;
 }
 
 export interface PropagationPath {

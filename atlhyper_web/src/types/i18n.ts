@@ -1994,6 +1994,8 @@ export interface AIOpsTranslations {
   baselineLoadFailed: string;
   deviation: string;
   isAnomaly: string;
+  absoluteBreach: string;
+  absoluteBreachHint: string;
 
   // 事件
   incidentId: string;

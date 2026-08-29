@@ -1989,6 +1989,8 @@ Deployment 已更新，新的 Pod 正在启动中
     baselineLoadFailed: "基线加载失败",
     deviation: "偏离度",
     isAnomaly: "异常",
+    absoluteBreach: "超硬线",
+    absoluteBreachHint: "触碰绝对阈值，与基线无关",
     incidentId: "事件 ID",
     incidentState: "事件状态",
     severity: "严重度",

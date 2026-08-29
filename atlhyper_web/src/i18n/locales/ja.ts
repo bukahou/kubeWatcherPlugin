@@ -1989,6 +1989,8 @@ Deployment が更新され、新しい Pod が起動中です
     baselineLoadFailed: "ベースラインの読み込みに失敗しました",
     deviation: "偏差",
     isAnomaly: "異常",
+    absoluteBreach: "閾値超過",
+    absoluteBreachHint: "絶対しきい値に到達（ベースライン非依存）",
     incidentId: "インシデント ID",
     incidentState: "インシデント状態",
     severity: "重要度",

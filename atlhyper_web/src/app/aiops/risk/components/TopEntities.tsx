@@ -161,6 +161,14 @@ export function TopEntities({ entities, clusterId, limit, onLimitChange }: TopEn
                                 {m.isAnomaly && (
                                   <span className="text-red-500 text-[10px] font-medium">{t.aiops.isAnomaly}</span>
                                 )}
+                                {m.absoluteBreach && (
+                                  <span
+                                    className="text-[10px] px-1 py-0.5 rounded bg-red-500/15 text-red-500 font-medium"
+                                    title={t.aiops.absoluteBreachHint}
+                                  >
+                                    {t.aiops.absoluteBreach}
+                                  </span>
+                                )}
                               </div>
                             ))}
                           </div>
