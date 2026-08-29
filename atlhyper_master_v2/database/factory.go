@@ -8,7 +8,12 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/mattn/go-sqlite3"
+	// modernc.org/sqlite —— 纯 Go 实现的 SQLite，不依赖 CGO。
+	// 2026-08-29 由 mattn/go-sqlite3（C 实现）换来：CGO 阻塞 Docker 交叉编译，
+	// controller 因此每次构建都要在 QEMU 里模拟 arm64，耗时 10 分钟。
+	// 驱动名是 "sqlite"（mattn 是 "sqlite3"），DSN 参数语法也不同 ——
+	// 见 openSQLite，改动受 factory_test.go 的契约测试守护。
+	_ "modernc.org/sqlite"
 
 	"AtlHyper/common/logger"
 )
@@ -55,7 +60,11 @@ func openSQLite(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_busy_timeout=5000")
+	// modernc 用 _pragma=xxx(value) 语法，而非 mattn 的 _journal_mode=WAL。
+	// 写错不会报错，只会静默退回默认（delete 模式 / 无 busy timeout）——
+	// factory_test.go 里 TestOpenSQLite_WALEnabled 与 _BusyTimeout 即为此而设。
+	db, err := sql.Open("sqlite",
+		path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, err
 	}
