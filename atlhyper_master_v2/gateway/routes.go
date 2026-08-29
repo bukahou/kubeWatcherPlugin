@@ -339,8 +339,9 @@ func (r *Router) registerRoutes() {
 	// GitHub 集成路由（需要 Admin 权限）
 	// ================================================================
 	if r.ghClient != nil {
-		githubH := settingsHandler.NewGitHubHandler(r.ghClient, r.database.GitHubInstall, r.database.RepoConfig)
-		deployH := adminHandler.NewDeployHandler(r.ghClient, r.database.DeployConfig, r.database.DeployHistory, r.database.GitHubInstall)
+		// 走 service 层，不再直连 database（CLAUDE.md 层级约束）
+		githubH := settingsHandler.NewGitHubHandler(r.ghClient, r.service, r.service)
+		deployH := adminHandler.NewDeployHandler(r.ghClient, r.service, r.service)
 		if r.deployer != nil {
 			deployH.SetDeployer(r.deployer)
 		}

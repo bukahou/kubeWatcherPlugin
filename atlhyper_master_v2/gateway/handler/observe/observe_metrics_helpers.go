@@ -6,7 +6,6 @@ import (
 	"context"
 	"time"
 
-	"AtlHyper/atlhyper_master_v2/service"
 	"AtlHyper/model_v3/cluster"
 	"AtlHyper/model_v3/metrics"
 )
@@ -20,7 +19,7 @@ import (
 // 返回: points（时序数据点）, source（"ring" | "concentrator" | ""）, error
 // source="" 表示两层都无数据
 func resolveNodeSeries(
-	querySvc service.Query, ctx context.Context,
+	querySvc ObserveQuery, ctx context.Context,
 	clusterID, nodeName, metric string, minutes int,
 ) ([]metrics.Point, string, error) {
 	// 层 1: Ring Buffer（≤15min）

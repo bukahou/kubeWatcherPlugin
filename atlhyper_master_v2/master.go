@@ -217,14 +217,23 @@ func NewMaster() (*Master, error) {
 			AIBudget:   db.AIRoleBudget,
 			AIReport:   db.AIReport,
 		},
+		DeployRepos: query.DeployRepos{
+			DeployConfig:  db.DeployConfig,
+			DeployHistory: db.DeployHistory,
+			GitHubInstall: db.GitHubInstall,
+			RepoConfig:    db.RepoConfig,
+		},
 	})
 	log.Info("查询层初始化完成")
 
 	// 初始化 SLO 写入服务
 	sloOps := operations.NewSLOService(db.SLO)
 
+	// 初始化部署 / GitHub 集成写入服务
+	deployOps := operations.NewDeployService(db.DeployConfig, db.GitHubInstall)
+
 	// 组合统一 Service
-	svc := service.NewService(q, cmdOps, adminOps, sloOps)
+	svc := service.NewService(q, cmdOps, adminOps, sloOps, deployOps)
 
 	// 8. 初始化 AgentSDK
 	agentServer := agentsdk.NewServer(agentsdk.Config{

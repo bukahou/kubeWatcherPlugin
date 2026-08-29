@@ -3,6 +3,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -13,26 +14,37 @@ import (
 )
 
 // DeployHandler 部署管理 Handler
+// DeployQuery / DeployOps 本 handler 所需的最小 service 能力。
+// 此前直接持有 database repository —— 绕过 service 层，
+// 违反 CLAUDE.md「Gateway 直接访问 Database」禁令。
+type DeployQuery interface {
+	GetDeployConfig(ctx context.Context, clusterID string) (*database.DeployConfig, error)
+	ListDeployHistory(ctx context.Context, opts database.DeployHistoryQueryOpts) ([]*database.DeployHistory, error)
+	CountDeployHistory(ctx context.Context, opts database.DeployHistoryQueryOpts) (int, error)
+	GetGitHubInstallation(ctx context.Context) (*database.GitHubInstallation, error)
+}
+
+type DeployOps interface {
+	UpsertDeployConfig(ctx context.Context, cfg *database.DeployConfig) error
+}
+
 type DeployHandler struct {
-	ghClient      github.Client
-	deployConfig  database.DeployConfigRepository
-	deployHistory database.DeployHistoryRepository
-	installRepo   database.GitHubInstallationRepository
-	deployer      deployer.Deployer
+	ghClient github.Client
+	querySvc DeployQuery
+	opsSvc   DeployOps
+	deployer deployer.Deployer
 }
 
 // NewDeployHandler 创建 DeployHandler
 func NewDeployHandler(
 	ghClient github.Client,
-	deployConfig database.DeployConfigRepository,
-	deployHistory database.DeployHistoryRepository,
-	installRepo database.GitHubInstallationRepository,
+	querySvc DeployQuery,
+	opsSvc DeployOps,
 ) *DeployHandler {
 	return &DeployHandler{
-		ghClient:      ghClient,
-		deployConfig:  deployConfig,
-		deployHistory: deployHistory,
-		installRepo:   installRepo,
+		ghClient: ghClient,
+		querySvc: querySvc,
+		opsSvc:   opsSvc,
 	}
 }
 
@@ -142,7 +154,7 @@ func (h *DeployHandler) getConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config, err := h.deployConfig.GetByCluster(r.Context(), clusterID)
+	config, err := h.querySvc.GetDeployConfig(r.Context(), clusterID)
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "获取配置失败")
 		return
@@ -188,7 +200,7 @@ func (h *DeployHandler) saveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pathsJSON, _ := json.Marshal(req.Paths)
-	if err := h.deployConfig.Upsert(r.Context(), &database.DeployConfig{
+	if err := h.opsSvc.UpsertDeployConfig(r.Context(), &database.DeployConfig{
 		ClusterID:   req.ClusterID,
 		RepoURL:     req.RepoURL,
 		Paths:       string(pathsJSON),
@@ -235,7 +247,7 @@ func (h *DeployHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, err := h.installRepo.Get(r.Context())
+	inst, err := h.querySvc.GetGitHubInstallation(r.Context())
 	if err != nil || inst == nil {
 		handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 			"data": map[string]bool{"success": false},
@@ -269,13 +281,13 @@ func (h *DeployHandler) History(w http.ResponseWriter, r *http.Request) {
 		Limit:     50,
 	}
 
-	records, err := h.deployHistory.List(r.Context(), opts)
+	records, err := h.querySvc.ListDeployHistory(r.Context(), opts)
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "获取部署历史失败")
 		return
 	}
 
-	total, _ := h.deployHistory.Count(r.Context(), opts)
+	total, _ := h.querySvc.CountDeployHistory(r.Context(), opts)
 
 	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data":  records,

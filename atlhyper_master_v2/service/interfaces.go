@@ -127,6 +127,23 @@ type QueryAdmin interface {
 	ListRecentAIReports(ctx context.Context, role string, limit, offset int) ([]*database.AIReport, int, error)
 }
 
+// QueryDeploy 部署与 GitHub 集成的读取能力。
+//
+// 独立成域（而非塞进 QueryAdmin）与 QueryOTel/QuerySLO 的划分一致：
+// 按功能域拆分，让 handler 能只依赖自己用得到的那一域。
+type QueryDeploy interface {
+	// GetDeployConfig 取某集群的 GitOps 部署配置
+	GetDeployConfig(ctx context.Context, clusterID string) (*database.DeployConfig, error)
+	// ListDeployHistory 部署历史（带分页/过滤）
+	ListDeployHistory(ctx context.Context, opts database.DeployHistoryQueryOpts) ([]*database.DeployHistory, error)
+	// CountDeployHistory 部署历史总数（与 List 同条件，用于分页）
+	CountDeployHistory(ctx context.Context, opts database.DeployHistoryQueryOpts) (int, error)
+	// GetGitHubInstallation 取 GitHub App 安装信息（全局单例）
+	GetGitHubInstallation(ctx context.Context) (*database.GitHubInstallation, error)
+	// ListRepoConfigs 已配置的仓库列表
+	ListRepoConfigs(ctx context.Context) ([]*database.RepoConfig, error)
+}
+
 // OpsAdmin 管理写入操作（通知渠道、设置、AI Provider）
 type OpsAdmin interface {
 	CreateNotifyChannel(ctx context.Context, ch *database.NotifyChannel) error
@@ -138,6 +155,16 @@ type OpsAdmin interface {
 	UpdateAISettings(ctx context.Context, cfg *database.AISettings) error
 	UpdateAIProviderRoles(ctx context.Context, id int64, roles []string) error
 	UpdateAIRoleBudget(ctx context.Context, budget *database.AIRoleBudget) error
+}
+
+// OpsDeploy 部署与 GitHub 集成的写入能力。
+type OpsDeploy interface {
+	// UpsertDeployConfig 写入/更新集群的 GitOps 部署配置
+	UpsertDeployConfig(ctx context.Context, cfg *database.DeployConfig) error
+	// UpsertGitHubInstallation 写入/更新 GitHub App 安装信息
+	UpsertGitHubInstallation(ctx context.Context, inst *database.GitHubInstallation) error
+	// DeleteGitHubInstallation 解除 GitHub App 安装
+	DeleteGitHubInstallation(ctx context.Context) error
 }
 
 // ================================================================
@@ -152,6 +179,7 @@ type Query interface {
 	QueryAIOps
 	QueryOverview
 	QueryAdmin
+	QueryDeploy
 }
 
 // OpsSLO SLO 写入操作
@@ -161,6 +189,7 @@ type OpsSLO interface {
 
 // Ops 写入操作接口
 type Ops interface {
+	OpsDeploy
 	CreateCommand(req *model.CreateCommandRequest) (*model.CreateCommandResponse, error)
 	// ExecuteCommandSync 同步执行指令（创建 + 等待 Agent 结果）
 	ExecuteCommandSync(ctx context.Context, req *model.CreateCommandRequest, timeout time.Duration) (*command.Result, error)

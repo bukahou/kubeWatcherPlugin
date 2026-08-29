@@ -11,6 +11,7 @@
 package observe
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -22,20 +23,37 @@ import (
 	"AtlHyper/atlhyper_master_v2/gateway/handler"
 	"AtlHyper/atlhyper_master_v2/model"
 	"AtlHyper/atlhyper_master_v2/service"
+	"AtlHyper/model_v3/cluster"
+	"AtlHyper/model_v3/command"
 )
 
 // ObserveHandler 可观测性查询 Handler
 //
 // Dashboard + Detail 端点（13 个）直读快照/预聚合时序，
 // 仅 TracesDetail + LogsQuery（2 个）保留 Command 机制。
+// ObserveQuery 本包所需的最小查询能力。
+//
+// 组合现成的 service.QueryOTel（本包 13 个端点里 12 个只用它）加一个
+// GetSnapshot。此前持有完整 service.Query（65 个方法）—— 违反接口隔离：
+// handler 不该看见它用不到的 AIOps / K8s / Admin 查询。
+type ObserveQuery interface {
+	service.QueryOTel
+	GetSnapshot(ctx context.Context, clusterID string) (*cluster.ClusterSnapshot, error)
+}
+
+// ObserveOps 本包所需的最小写入能力（仅 TracesDetail / LogsQuery 走 Command）。
+type ObserveOps interface {
+	ExecuteCommandSync(ctx context.Context, req *model.CreateCommandRequest, timeout time.Duration) (*command.Result, error)
+}
+
 type ObserveHandler struct {
-	svc      service.Ops
-	querySvc service.Query
+	svc      ObserveOps
+	querySvc ObserveQuery
 	cache    *observeCache
 }
 
 // NewObserveHandler 创建 ObserveHandler
-func NewObserveHandler(svc service.Ops, querySvc service.Query) *ObserveHandler {
+func NewObserveHandler(svc ObserveOps, querySvc ObserveQuery) *ObserveHandler {
 	return &ObserveHandler{
 		svc:      svc,
 		querySvc: querySvc,

@@ -16,7 +16,6 @@ import (
 	"AtlHyper/atlhyper_master_v2/gateway/handler"
 	"AtlHyper/atlhyper_master_v2/model"
 	"AtlHyper/atlhyper_master_v2/model/convert"
-	"AtlHyper/atlhyper_master_v2/service"
 	"AtlHyper/model_v3/cluster"
 	"AtlHyper/model_v3/command"
 	"AtlHyper/model_v3/metrics"
@@ -29,12 +28,12 @@ import (
 //   - ops: Command 发送（>60min 历史查询 → Agent → ClickHouse）
 //   - bus: 等待 Command 结果
 type NodeMetricsHandler struct {
-	querySvc service.Query
-	ops      service.Ops
+	querySvc ObserveQuery
+	ops      ObserveOps
 }
 
 // NewNodeMetricsHandler 创建节点指标处理器
-func NewNodeMetricsHandler(querySvc service.Query, ops service.Ops) *NodeMetricsHandler {
+func NewNodeMetricsHandler(querySvc ObserveQuery, ops ObserveOps) *NodeMetricsHandler {
 	return &NodeMetricsHandler{
 		querySvc: querySvc,
 		ops:      ops,

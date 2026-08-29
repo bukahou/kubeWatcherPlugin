@@ -37,6 +37,12 @@ type QueryService struct {
 	aiModelRepo    database.AIProviderModelRepository
 	aiBudgetRepo   database.AIRoleBudgetRepository
 	aiReportRepo   database.AIReportRepository
+
+	// Deploy repositories（部署配置 / 历史 / GitHub 集成）
+	deployConfigRepo  database.DeployConfigRepository
+	deployHistoryRepo database.DeployHistoryRepository
+	githubInstallRepo database.GitHubInstallationRepository
+	repoConfigRepo    database.RepoConfigRepository
 }
 
 // AdminRepos 管理查询所需的 Repository 集合
@@ -53,6 +59,15 @@ type AdminRepos struct {
 	AIReport   database.AIReportRepository
 }
 
+// DeployRepos 部署与 GitHub 集成所需的 Repository 集合
+// 对应 QueryDeploy 接口的所有方法所需依赖
+type DeployRepos struct {
+	DeployConfig  database.DeployConfigRepository
+	DeployHistory database.DeployHistoryRepository
+	GitHubInstall database.GitHubInstallationRepository
+	RepoConfig    database.RepoConfigRepository
+}
+
 // QueryServiceDeps QueryService 全部依赖
 // 严格限定：每个字段对应 QueryService 已有的 struct 字段，禁止新增未使用的依赖
 type QueryServiceDeps struct {
@@ -63,6 +78,7 @@ type QueryServiceDeps struct {
 	AIOpsEngine aiops.Engine                    // 可选，nil = AIOps 查询返回空
 	AIOpsAI     *enricher.Enricher              // 可选，nil = AI 增强禁用
 	AdminRepos  AdminRepos                      // 必需（管理查询）
+	DeployRepos DeployRepos                     // 可选，未启用 GitOps 时各 repo 为 nil
 }
 
 // NewQueryService 创建 QueryService（全部依赖通过构造函数注入）
@@ -83,5 +99,10 @@ func NewQueryService(deps QueryServiceDeps) *QueryService {
 		aiModelRepo:    deps.AdminRepos.AIModel,
 		aiBudgetRepo:   deps.AdminRepos.AIBudget,
 		aiReportRepo:   deps.AdminRepos.AIReport,
+
+		deployConfigRepo:  deps.DeployRepos.DeployConfig,
+		deployHistoryRepo: deps.DeployRepos.DeployHistory,
+		githubInstallRepo: deps.DeployRepos.GitHubInstall,
+		repoConfigRepo:    deps.DeployRepos.RepoConfig,
 	}
 }

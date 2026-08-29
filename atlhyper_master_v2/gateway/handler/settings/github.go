@@ -16,22 +16,35 @@ import (
 )
 
 // GitHubHandler GitHub 连接管理 Handler
+// GitHubQuery / GitHubOps 本 handler 所需的最小 service 能力。
+// 此前直接持有 database repository —— 绕过 service 层，
+// 违反 CLAUDE.md「Gateway 直接访问 Database」禁令。
+type GitHubQuery interface {
+	GetGitHubInstallation(ctx context.Context) (*database.GitHubInstallation, error)
+	ListRepoConfigs(ctx context.Context) ([]*database.RepoConfig, error)
+}
+
+type GitHubOps interface {
+	UpsertGitHubInstallation(ctx context.Context, inst *database.GitHubInstallation) error
+	DeleteGitHubInstallation(ctx context.Context) error
+}
+
 type GitHubHandler struct {
-	ghClient    github.Client
-	installRepo database.GitHubInstallationRepository
-	repoConfig  database.RepoConfigRepository
+	ghClient github.Client
+	querySvc GitHubQuery
+	opsSvc   GitHubOps
 }
 
 // NewGitHubHandler 创建 GitHubHandler
 func NewGitHubHandler(
 	ghClient github.Client,
-	installRepo database.GitHubInstallationRepository,
-	repoConfig database.RepoConfigRepository,
+	querySvc GitHubQuery,
+	opsSvc GitHubOps,
 ) *GitHubHandler {
 	return &GitHubHandler{
-		ghClient:    ghClient,
-		installRepo: installRepo,
-		repoConfig:  repoConfig,
+		ghClient: ghClient,
+		querySvc: querySvc,
+		opsSvc:   opsSvc,
 	}
 }
 
@@ -42,7 +55,7 @@ func (h *GitHubHandler) Connection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, err := h.installRepo.Get(r.Context())
+	inst, err := h.querySvc.GetGitHubInstallation(r.Context())
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "获取连接状态失败")
 		return
@@ -79,7 +92,7 @@ func (h *GitHubHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		if err == nil && len(installations) > 0 {
 			// 找到已有安装，直接注册连接
 			inst := installations[0]
-			h.installRepo.Upsert(r.Context(), &database.GitHubInstallation{
+			h.opsSvc.UpsertGitHubInstallation(r.Context(), &database.GitHubInstallation{
 				InstallationID: inst.InstallationID,
 				AccountLogin:   inst.AccountLogin,
 			})
@@ -159,7 +172,7 @@ func (h *GitHubHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		InstallationID: req.InstallationID,
 		AccountLogin:   accountLogin,
 	}
-	if err := h.installRepo.Upsert(r.Context(), inst); err != nil {
+	if err := h.opsSvc.UpsertGitHubInstallation(r.Context(), inst); err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "保存安装记录失败")
 		return
 	}
@@ -181,7 +194,7 @@ func (h *GitHubHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.installRepo.Delete(r.Context()); err != nil {
+	if err := h.opsSvc.DeleteGitHubInstallation(r.Context()); err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "断开连接失败")
 		return
 	}
@@ -199,7 +212,7 @@ func (h *GitHubHandler) Repos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 获取安装记录
-	inst, err := h.installRepo.Get(r.Context())
+	inst, err := h.querySvc.GetGitHubInstallation(r.Context())
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "获取安装记录失败")
 		return
@@ -219,7 +232,7 @@ func (h *GitHubHandler) Repos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 获取仓库映射配置
-	configs, err := h.repoConfig.List(r.Context())
+	configs, err := h.querySvc.ListRepoConfigs(r.Context())
 	if err != nil {
 		handler.WriteError(w, http.StatusInternalServerError, "获取映射配置失败")
 		return

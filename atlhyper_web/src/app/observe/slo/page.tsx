@@ -21,8 +21,8 @@ import {
   Gauge,
   Server,
 } from "lucide-react";
-import { SummaryCard, formatNumber } from "@/components/slo/common";
-import { SLOListTable } from "@/components/slo/SLOListTable";
+import { SummaryCard, formatNumber } from "./components/common";
+import { SLOListTable } from "./components/SLOListTable";
 import type { DomainSLOV2, SLOSummary } from "@/types/slo";
 
 
