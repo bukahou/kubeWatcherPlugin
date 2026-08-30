@@ -266,13 +266,24 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 		}
 	}
 
-	// 全部失败时不更新缓存，继续使用旧数据。
-	// 但新鲜度要用刚采到的 —— 否则页面拿着几分钟前的数据，却显示「数据正常」，自相矛盾。
-	if hasError && s.otelCache != nil {
-		log.Warn("OTel 查询有失败，回退到上一份快照", "freshnessAttached", snapshot.Freshness != nil)
-		stale := *s.otelCache
-		stale.Freshness = snapshot.Freshness
-		return &stale
+	// 逐信号回退：本轮取不到的信号沿用上一份已知值，成功的照常更新。
+	//
+	// 2026-08-30 修正：旧实现是「任一概览查询失败 → 丢弃整份快照」
+	// （注释写的是「全部失败」，与代码不符），一路超时就作废另外 8 路
+	// 的成功结果。更要命的是 9 路 dashboard 查询失败时连这个保护都不触发 ——
+	// 它们只 log.Warn 后 return，留下 nil 字段被写进 30s 缓存，
+	// Master 见 nil 返 404，面板空白 30 秒后突然恢复
+	// （用户报告的「有时候没数据、有时候又出现」）。
+	//
+	// 原则同 2026-08-29 的 buildNodeMetrics 修复：部分失败不丢弃全部。
+	var restored RestoredSignals
+	if s.otelCache != nil {
+		restored = restoreMissingFromPrev(snapshot, s.otelCache)
+	}
+	if hasError {
+		// 新鲜度必须反映本轮实测 —— 否则页面拿着旧数据却显示「数据正常」，自相矛盾。
+		log.Warn("OTel 概览查询有失败，相关信号已沿用上一份",
+			"freshnessAttached", snapshot.Freshness != nil)
 	}
 
 	// 更新缓存
@@ -287,7 +298,21 @@ func (s *snapshotService) getOTelSnapshot(ctx context.Context) *cluster.OTelSnap
 
 	// Concentrator: 摄入当前数据 + 输出预聚合时序
 	if s.conc != nil {
-		s.conc.Ingest(snapshot.MetricsNodes, snapshot.SLOIngress, snapshot.APMServices, now)
+		// 回退来的信号传 nil：它们不是本轮新采样点，重复摄入会让
+		// 预聚合时序把「查询失败」伪装成「值保持不变」。
+		ingestNodes := snapshot.MetricsNodes
+		if restored.MetricsNodes {
+			ingestNodes = nil
+		}
+		ingestSLO := snapshot.SLOIngress
+		if restored.SLOIngress {
+			ingestSLO = nil
+		}
+		ingestAPM := snapshot.APMServices
+		if restored.APMServices {
+			ingestAPM = nil
+		}
+		s.conc.Ingest(ingestNodes, ingestSLO, ingestAPM, now)
 		snapshot.NodeMetricsSeries = s.conc.FlushNodeSeries()
 		snapshot.SLOTimeSeries = s.conc.FlushSLOSeries()
 		snapshot.APMTimeSeries = s.conc.FlushAPMSeries()
