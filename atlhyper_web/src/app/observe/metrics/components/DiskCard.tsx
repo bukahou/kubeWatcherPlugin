@@ -58,7 +58,7 @@ export const DiskCard = memo(function DiskCard({ data }: DiskCardProps) {
 
       {/* 磁盘列表 */}
       <div className="space-y-3 sm:space-y-4">
-        {data.map((disk, idx) => {
+        {data.filter((d) => !d.mountPoint?.startsWith("/boot")).map((disk, idx) => {
           const usedBytes = disk.totalBytes - disk.availBytes;
           return (
             <div key={disk.mountPoint || `disk-${idx}`} className="p-2 sm:p-3 bg-[var(--background)] rounded-lg">

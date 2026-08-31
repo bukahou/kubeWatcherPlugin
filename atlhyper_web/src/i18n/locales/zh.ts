@@ -1845,6 +1845,7 @@ Deployment 已更新，新的 Pod 正在启动中
     system: {
       title: "系统资源",
       fileDescriptors: "文件描述符",
+    unlimited: "无限制",
       conntrackTable: "连接追踪表",
       used: "已使用",
       entropyPool: "熵池",

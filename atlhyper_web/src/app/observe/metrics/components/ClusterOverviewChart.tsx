@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, memo } from "react";
-import { TrendingUp, Clock, Loader2 } from "lucide-react";
+import { TrendingUp, Loader2 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import { getNodeMetricsHistory } from "@/datasource/metrics";
 import type { NodeMetrics, Point } from "@/types/node-metrics";
-import type { TimeWindow } from "./chartConstants";
-import { TIME_WINDOWS, METRICS } from "./chartConstants";
+import { METRICS } from "./chartConstants";
 import { MetricChart } from "./MetricChart";
 
 // ==================== Main Container ====================
@@ -14,16 +13,18 @@ import { MetricChart } from "./MetricChart";
 interface ClusterOverviewChartProps {
   nodes: NodeMetrics[];
   clusterId: string;
+  /** 时间范围（小时），由页面级 TimeRangePicker 下发（P3 统一时间控制） */
+  hours: number;
 }
 
 export const ClusterOverviewChart = memo(function ClusterOverviewChart({
   nodes,
   clusterId,
+  hours,
 }: ClusterOverviewChartProps) {
   const { t } = useI18n();
   const nm = t.nodeMetrics;
 
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>("1h");
   const [loading, setLoading] = useState(false);
   /** Per-node history: { nodeName: { metricKey: Point[] } } */
   const [historyMap, setHistoryMap] = useState<Record<string, Record<string, Point[]>>>({});
@@ -49,10 +50,6 @@ export const ClusterOverviewChart = memo(function ClusterOverviewChart({
     return Array.from(set);
   }, [topNodesByMetric]);
 
-  // Fetch hours based on window
-  const fetchHours = useMemo(() => {
-    return TIME_WINDOWS.find((w) => w.key === timeWindow)!.hours;
-  }, [timeWindow]);
 
   // Fetch history for all unique top-5 nodes across metrics
   const fetchHistory = useCallback(async () => {
@@ -60,12 +57,12 @@ export const ClusterOverviewChart = memo(function ClusterOverviewChart({
     setLoading(true);
     const map: Record<string, Record<string, Point[]>> = {};
     for (const name of allTopNodeNames) {
-      const result = await getNodeMetricsHistory(clusterId, name, fetchHours);
+      const result = await getNodeMetricsHistory(clusterId, name, hours);
       map[result.nodeName] = result.data;
     }
     setHistoryMap(map);
     setLoading(false);
-  }, [allTopNodeNames, fetchHours, clusterId]);
+  }, [allTopNodeNames, hours, clusterId]);
 
   useEffect(() => {
     fetchHistory();
@@ -92,23 +89,7 @@ export const ClusterOverviewChart = memo(function ClusterOverviewChart({
           </div>
         </div>
 
-        {/* Global time window */}
-        <div className="flex items-center gap-1">
-          <Clock className="w-4 h-4 text-muted" />
-          {TIME_WINDOWS.map((w) => (
-            <button
-              key={w.key}
-              onClick={() => setTimeWindow(w.key)}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                timeWindow === w.key
-                  ? "bg-teal-500 text-white"
-                  : "bg-[var(--background)] text-muted hover:text-default"
-              }`}
-            >
-              {w.label}
-            </button>
-          ))}
-        </div>
+
       </div>
 
       {/* 2x2 Grid */}
@@ -127,7 +108,7 @@ export const ClusterOverviewChart = memo(function ClusterOverviewChart({
               metricKey={m.key}
               nodeNames={topNodesByMetric[m.key] || []}
               historyMap={historyMap}
-              timeWindow={timeWindow}
+              hours={hours}
             />
           ))}
         </div>

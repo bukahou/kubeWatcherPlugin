@@ -8,6 +8,8 @@ import type { HardwareHealth, HardwareStatus } from "@/types/hardware";
 
 interface HardwareSummaryTilesProps {
   data: HardwareHealth | null;
+  /** bare: 不自带 grid 容器，由父级统一排版（快照带合并为一排） */
+  bare?: boolean;
 }
 
 /** 状态 → SummaryCard 的配色。计数类 tile 用「>0 即注意」的同一套语义 */
@@ -27,6 +29,7 @@ const countTone = (n: number, critical: boolean) =>
 
 export const HardwareSummaryTiles = memo(function HardwareSummaryTiles({
   data,
+  bare,
 }: HardwareSummaryTilesProps) {
   const { t } = useI18n();
   const hw = t.nodeMetrics.hardware;
@@ -36,8 +39,8 @@ export const HardwareSummaryTiles = memo(function HardwareSummaryTiles({
   const maxDiskTemp = s?.maxDiskTemp ?? null;
   const maxAwait = s?.maxDiskAwait ?? null;
 
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+  const tiles = (
+    <>
       <SummaryCard
         icon={Thermometer}
         label={hw.tiles.maxTemp}
@@ -73,6 +76,9 @@ export const HardwareSummaryTiles = memo(function HardwareSummaryTiles({
         subValue={maxAwait ? `${maxAwait.nodeName} · ${maxAwait.device}` : undefined}
         color={maxAwait ? tone(maxAwait.status) : "bg-[var(--background)] text-muted"}
       />
-    </div>
+    </>
   );
+
+  if (bare) return tiles;
+  return <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">{tiles}</div>;
 });

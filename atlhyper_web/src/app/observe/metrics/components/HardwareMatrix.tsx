@@ -1,16 +1,24 @@
 "use client";
 
-import { memo } from "react";
-import { Cpu, MemoryStick, Database, HardDrive, Thermometer, Zap, Fan, Gauge, Timer, ShieldCheck } from "lucide-react";
+import { memo, type ReactNode } from "react";
+import { Cpu, MemoryStick, Database, HardDrive, Thermometer, Zap, Fan, Gauge, Timer, ShieldCheck, ChevronDown, ChevronRight } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import type {
   HardwareHealth,
   HardwareRow,
   HardwareStatus,
 } from "@/types/hardware";
+import type { NodeMetrics, Point } from "@/types/node-metrics";
+import { NodeDetailPanel } from "./NodeDetailPanel";
 
 interface HardwareMatrixProps {
   data: HardwareHealth | null;
+  // ── 行展开下钻（2026-08-31 重构）：判定与详情同一入口 ──
+  nodes: NodeMetrics[];
+  expandedNode: string | null;
+  onToggle: (nodeName: string) => void;
+  historyCache: Record<string, Record<string, Point[]>>;
+  spanMs: number;
 }
 
 /** 状态 → 文字色。所有判定都来自后端，这里只负责上色 */
@@ -24,6 +32,9 @@ const statusChip = (s: HardwareStatus) =>
     : s === "warn"
       ? "bg-yellow-500/10 text-yellow-500"
       : "bg-green-500/10 text-green-500";
+
+/** tbody 内的键控片段（tr 对必须共键） */
+const FragmentRow = ({ children }: { children: ReactNode }) => <>{children}</>;
 
 /** 无传感器的格子：灰底占位，与「读数为 0」明确区分 */
 function NoData({ label }: { label: string }) {
@@ -48,7 +59,14 @@ function Cell({
   );
 }
 
-export const HardwareMatrix = memo(function HardwareMatrix({ data }: HardwareMatrixProps) {
+export const HardwareMatrix = memo(function HardwareMatrix({
+  data,
+  nodes,
+  expandedNode,
+  onToggle,
+  historyCache,
+  spanMs,
+}: HardwareMatrixProps) {
   const { t } = useI18n();
   const hw = t.nodeMetrics.hardware;
 
@@ -128,6 +146,13 @@ export const HardwareMatrix = memo(function HardwareMatrix({ data }: HardwareMat
   };
 
   const rows = data?.rows ?? [];
+  const nodeByName = new Map(nodes.map((n) => [n.nodeName, n]));
+
+  const uptimeStr = (seconds: number) => {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    return d > 0 ? `${d}d ${h}h` : `${h}h`;
+  };
 
   return (
     <div className="bg-card rounded-xl border border-[var(--border-color)] p-3 sm:p-5">
@@ -164,30 +189,58 @@ export const HardwareMatrix = memo(function HardwareMatrix({ data }: HardwareMat
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.nodeName}
-                  className="border-b border-[var(--border-color)] last:border-0 hover:bg-[var(--hover-bg)] transition-colors"
-                >
-                  <td className="py-2.5 pr-3">
-                    <div className="text-xs sm:text-sm text-default font-medium">{row.nodeName}</div>
-                    <div className="text-[10px] text-muted">{row.profileLabel}</div>
-                  </td>
-                  {columns.map((c) => (
-                    <td
-                      key={c.key}
-                      className={`py-2.5 px-3 whitespace-nowrap ${c.divider ? "border-l border-[var(--border-color)]" : ""}`}
+              {rows.map((row) => {
+                const expanded = expandedNode === row.nodeName;
+                const detail = nodeByName.get(row.nodeName);
+                return (
+                  <FragmentRow key={row.nodeName}>
+                    <tr
+                      className="border-b border-[var(--border-color)] last:border-0 hover:bg-[var(--hover-bg)] transition-colors cursor-pointer"
+                      onClick={() => onToggle(row.nodeName)}
                     >
-                      {renderCell(row, c.key)}
-                    </td>
-                  ))}
-                  <td className="py-2.5 pl-3">
-                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${statusChip(row.overall)}`}>
-                      {hw.status[row.overall]}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                      <td className="py-2.5 pr-3">
+                        <div className="flex items-center gap-1.5">
+                          {expanded
+                            ? <ChevronDown className="w-3.5 h-3.5 text-muted shrink-0" />
+                            : <ChevronRight className="w-3.5 h-3.5 text-muted shrink-0" />}
+                          <div>
+                            <div className="text-xs sm:text-sm text-default font-medium">{row.nodeName}</div>
+                            <div className="text-[10px] text-muted">
+                              {row.profileLabel}
+                              {row.uptime ? ` · up ${uptimeStr(row.uptime)}` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {columns.map((c) => (
+                        <td
+                          key={c.key}
+                          className={`py-2.5 px-3 whitespace-nowrap ${c.divider ? "border-l border-[var(--border-color)]" : ""}`}
+                        >
+                          {renderCell(row, c.key)}
+                        </td>
+                      ))}
+                      <td className="py-2.5 pl-3">
+                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${statusChip(row.overall)}`}>
+                          {hw.status[row.overall]}
+                        </span>
+                      </td>
+                    </tr>
+                    {expanded && detail && (
+                      <tr>
+                        <td colSpan={columns.length + 2} className="p-0 border-b border-[var(--border-color)]">
+                          <NodeDetailPanel
+                            metrics={detail}
+                            historyData={historyCache[row.nodeName] || {}}
+                            hardware={row}
+                            spanMs={spanMs}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </FragmentRow>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -44,3 +44,11 @@ export const METRICS: {
 
 /** Minimum data points for an interval to be auto-selected */
 export const MIN_AUTO_POINTS = 3;
+
+/** 页面级时间范围（小时）→ 内部窗口档位。P3 统一后由 TimeRangePicker 推导，无手动选择 */
+export function windowForHours(hours: number): TimeWindow {
+  if (hours <= 1) return "1h";
+  if (hours <= 6) return "6h";
+  if (hours <= 24) return "1d";
+  return "7d";
+}

@@ -1839,6 +1839,7 @@ interface NodeMetricsTranslations extends TimeRangePickerTranslations {
     blocked: string;
     arpEntries: string;
     fileDescriptors: string;
+  unlimited: string;
     conntrackTable: string;
     used: string;
     entropyPool: string;

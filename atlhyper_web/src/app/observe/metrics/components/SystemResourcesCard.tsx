@@ -14,7 +14,14 @@ export function SystemResourcesCard({ system }: { system: NodeSystem }) {
   const entropyOk = system.entropyBits >= 256;
 
   const items = [
-    { label: nm.system.fileDescriptors, value: fmtN(system.filefdAllocated), pct: fdPct, max: `Max: ${fmtN(system.filefdMax)}`, icon: FileText },
+    {
+      label: nm.system.fileDescriptors,
+      value: fmtN(system.filefdAllocated),
+      // 现代内核 fs.file-max 默认无限制（后端已判定），不渲染天文数字与占比
+      pct: system.filefdUnlimited ? 0 : fdPct,
+      max: system.filefdUnlimited ? `Max: ${nm.system.unlimited}` : `Max: ${fmtN(system.filefdMax)}`,
+      icon: FileText,
+    },
     { label: nm.system.conntrackTable, value: fmtN(system.conntrackEntries), pct: ctPct, max: `Limit: ${fmtN(system.conntrackLimit)}`, icon: Shield },
   ];
 

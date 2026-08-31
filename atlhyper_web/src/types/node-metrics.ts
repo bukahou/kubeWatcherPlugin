@@ -122,6 +122,7 @@ export interface NodeSystem {
   conntrackLimit: number;
   filefdAllocated: number;
   filefdMax: number;
+  filefdUnlimited?: boolean; // 后端判定：内核 fs.file-max 为 2^63-1
   entropyBits: number;
   procsRunning: number;  // 运行队列长度
   procsBlocked: number;  // D 状态（不可中断 IO）进程数

@@ -42,11 +42,6 @@ export async function getSignalFreshness(clusterId: string) {
   return res.data.data;
 }
 
-export async function getNodeComparison(clusterId: string) {
-  if (getDataSourceMode("metrics") === "mock") return mock.mockGetNodeComparison();
-  const res = await observe.getMetricsCompare(clusterId);
-  return res.data.data;
-}
 
 export async function getNodeMetricsHistory(clusterId: string, nodeName: string, hours?: number) {
   if (getDataSourceMode("metrics") === "mock") return mock.mockGetNodeMetricsHistory(nodeName, hours);

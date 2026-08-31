@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, memo, useState } from "react";
+import { useEffect, useRef, memo } from "react";
 import * as echarts from "echarts";
-import { TrendingUp, Clock } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import type { Point } from "@/types/node-metrics";
 import { useI18n } from "@/i18n/context";
 
@@ -10,20 +10,20 @@ interface ResourceChartProps {
   /** Per-metric history: { cpu: Point[], memory: Point[], disk: Point[], temp: Point[] } */
   data: Record<string, Point[]>;
   title?: string;
+  /** 时间窗（毫秒），由页面级 TimeRangePicker 下发 */
+  spanMs: number;
 }
-
-type TimeRange = "1h" | "6h" | "24h";
 
 export const ResourceChart = memo(function ResourceChart({
   data,
   title,
+  spanMs,
 }: ResourceChartProps) {
   const { t } = useI18n();
   const nm = t.nodeMetrics;
   const displayTitle = title || nm.chart.title;
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>("1h");
 
   // 获取主题颜色
   const getThemeColors = () => {
@@ -77,14 +77,26 @@ export const ResourceChart = memo(function ResourceChart({
         axisLabel: { color: colors.textColor, fontSize: 10 },
         splitLine: { show: false },
       },
-      yAxis: {
-        type: "value",
-        name: "%",
-        min: 0,
-        max: 100,
-        axisLabel: { color: colors.textColor, fontSize: 10 },
-        splitLine: { lineStyle: { color: colors.splitLineColor } },
-      },
+      // 双轴：% 系（CPU/内存/磁盘）在左，温度 °C 在右 ——
+      // 此前温度画在 % 轴上，60°C 会被读成 60%（混单位单轴反模式）
+      yAxis: [
+        {
+          type: "value",
+          name: "%",
+          min: 0,
+          max: 100,
+          axisLabel: { color: colors.textColor, fontSize: 10 },
+          splitLine: { lineStyle: { color: colors.splitLineColor } },
+        },
+        {
+          type: "value",
+          name: "°C",
+          min: 0,
+          max: 100,
+          axisLabel: { color: colors.textColor, fontSize: 10 },
+          splitLine: { show: false },
+        },
+      ],
       series: [
         {
           name: "CPU",
@@ -121,9 +133,10 @@ export const ResourceChart = memo(function ResourceChart({
           type: "line",
           smooth: true,
           showSymbol: false,
+          yAxisIndex: 1,
           data: [],
           color: "#EF4444",
-          lineStyle: { width: 2 },
+          lineStyle: { width: 2, type: "dashed" },
         },
       ],
     };
@@ -174,11 +187,8 @@ export const ResourceChart = memo(function ResourceChart({
     if (!hasAnyData) return;
 
     const now = Date.now();
-    const rangeMs = {
-      "1h": 60 * 60 * 1000,
-      "6h": 6 * 60 * 60 * 1000,
-      "24h": 24 * 60 * 60 * 1000,
-    }[timeRange];
+    // 时间窗跟随页面级 TimeRangePicker（P3 统一：一页一个时间控制点）
+    const rangeMs = spanMs;
 
     // Convert Point[] to [timestamp_ms, value][] with time filtering
     const toChartData = (points: Point[] | undefined): [number, number][] => {
@@ -206,7 +216,7 @@ export const ResourceChart = memo(function ResourceChart({
       },
       series: seriesData.map(d => ({ data: d })),
     });
-  }, [data, timeRange]);
+  }, [data, spanMs]);
 
   const hasData = Object.values(data).some(points => points && points.length > 0);
 
@@ -221,25 +231,7 @@ export const ResourceChart = memo(function ResourceChart({
           <h3 className="text-base font-semibold text-default">{displayTitle}</h3>
         </div>
 
-        {/* 时间范围选择 */}
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-muted" />
-          <div className="flex gap-1">
-            {(["1h", "6h", "24h"] as TimeRange[]).map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  timeRange === range
-                    ? "bg-teal-500 text-white"
-                    : "bg-[var(--background)] text-muted hover:text-default"
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
-        </div>
+
       </div>
 
       {/* 图表 */}

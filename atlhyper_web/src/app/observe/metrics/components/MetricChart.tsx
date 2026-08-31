@@ -5,7 +5,7 @@ import * as echarts from "echarts";
 import { useI18n } from "@/i18n/context";
 import type { Point } from "@/types/node-metrics";
 import type { TimeWindow, Interval } from "./chartConstants";
-import { PALETTE, TIME_WINDOWS, INTERVALS_BY_WINDOW } from "./chartConstants";
+import { PALETTE, INTERVALS_BY_WINDOW, windowForHours } from "./chartConstants";
 import { getThemeColors, aggregatePoints, pickAdaptiveInterval } from "./chartUtils";
 
 // ==================== Types ====================
@@ -17,7 +17,7 @@ export interface MetricChartProps {
   nodeNames: string[];
   /** Per-node history: { nodeName: { metricKey: Point[] } } */
   historyMap: Record<string, Record<string, Point[]>>;
-  timeWindow: TimeWindow;
+  hours: number;
 }
 
 // ==================== Component ====================
@@ -28,34 +28,23 @@ export const MetricChart = memo(function MetricChart({
   metricKey,
   nodeNames,
   historyMap,
-  timeWindow,
+  hours,
 }: MetricChartProps) {
   const { t } = useI18n();
   const nm = t.nodeMetrics;
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
-  const availableIntervals = INTERVALS_BY_WINDOW[timeWindow];
+  // P3 统一：桶宽全自动（按数据跨度自适应），不再提供手动选择 ——
+  // 主流做法是范围定桶宽，让用户挑采样粒度是把实现细节漏给了用户
+  const timeWindow = windowForHours(hours);
   const [intervalSec, setIntervalSec] = useState<Interval>(60);
-  /** Whether the user manually picked an interval (skip auto) */
-  const manualRef = useRef(false);
-
-  const handleIntervalClick = useCallback((sec: number) => {
-    manualRef.current = true;
-    setIntervalSec(sec);
-  }, []);
-
-  // Reset to auto mode when time window changes
-  useEffect(() => {
-    manualRef.current = false;
-  }, [timeWindow]);
 
   // Adaptive interval: auto-select based on actual data span
   useEffect(() => {
-    if (manualRef.current) return;
     const opts = INTERVALS_BY_WINDOW[timeWindow];
     const now = Date.now();
-    const windowMs = TIME_WINDOWS.find((w) => w.key === timeWindow)!.hours * 3600000;
+    const windowMs = hours * 3600000;
 
     // Compute data span across all nodes for this metric
     let minTs = Infinity;
@@ -148,8 +137,7 @@ export const MetricChart = memo(function MetricChart({
     if (!chartInstance.current) return;
 
     const now = Date.now();
-    const windowInfo = TIME_WINDOWS.find((w) => w.key === timeWindow)!;
-    const rangeMs = windowInfo.hours * 3600000;
+    const rangeMs = hours * 3600000;
 
     const series = nodeNames.map((name, i) => {
       const nodeHistory = historyMap[name] || {};
@@ -195,7 +183,7 @@ export const MetricChart = memo(function MetricChart({
       yAxis: { max: yMax },
       series,
     });
-  }, [timeWindow, intervalSec, historyMap, nodeNames, metricKey, unit]);
+  }, [hours, intervalSec, historyMap, nodeNames, metricKey, unit]);
 
   const hasData = nodeNames.some((name) => {
     const nodeHistory = historyMap[name] || {};
@@ -206,22 +194,7 @@ export const MetricChart = memo(function MetricChart({
     <div className="bg-card rounded-xl border border-[var(--border-color)] p-3">
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold text-default">{title}</span>
-        {/* Per-chart interval selector */}
-        <div className="flex gap-0.5">
-          {availableIntervals.map((opt) => (
-            <button
-              key={opt.seconds}
-              onClick={() => handleIntervalClick(opt.seconds)}
-              className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
-                intervalSec === opt.seconds
-                  ? "bg-indigo-500/20 text-indigo-500 font-medium"
-                  : "text-muted hover:text-default"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+
       </div>
       <div className="relative">
         <div ref={chartRef} style={{ width: "100%", height: "200px" }} />

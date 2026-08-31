@@ -1845,6 +1845,7 @@ Deployment が更新され、新しい Pod が起動中です
     system: {
       title: "システムリソース",
       fileDescriptors: "ファイルディスクリプタ",
+    unlimited: "無制限",
       conntrackTable: "Conntrack テーブル",
       used: "使用中",
       entropyPool: "エントロピープール",

@@ -11,7 +11,10 @@ interface NetworkCardProps {
 }
 
 /** 虚拟接口前缀列表 */
-const VIRTUAL_PREFIXES = ["veth", "docker", "br-", "cni", "flannel", "calico", "tunl", "vxlan"];
+// ⚠️ 换 CNI 时必须同步此表 —— 2026-08-31 走查发现它停在旧网络栈时代
+// （列着 flannel/calico 却没有 Cilium 的 lxc*/cilium_*），导致每个 Pod 的
+// veth 都被当物理口展示。采集层已同步 drop（collector.yaml），此表兜底旧数据。
+const VIRTUAL_PREFIXES = ["veth", "docker", "br-", "cni", "flannel", "calico", "tunl", "vxlan", "lxc", "cilium_"];
 
 /** 判断是否为虚拟/容器接口 */
 function isVirtualInterface(name: string): boolean {

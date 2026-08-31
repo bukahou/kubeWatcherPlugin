@@ -7,8 +7,6 @@ import { useClusterStore } from "@/store/clusterStore";
 import {
   RefreshCw,
   Server,
-  Cpu,
-  HardDrive,
   AlertTriangle,
   Loader2,
   WifiOff,
@@ -18,10 +16,8 @@ import {
 import {
   ClusterOverviewChart,
   SummaryCard,
-  NodeCard,
   HardwareSummaryTiles,
   HardwareMatrix,
-  NodeCompareTable,
 } from "./components";
 
 // OTel 可用性守卫
@@ -32,12 +28,11 @@ import {
   getClusterNodeMetrics,
   getNodeMetricsHistory,
   getHardwareHealth,
-  getNodeComparison,
 } from "@/datasource/metrics";
 import type { Summary } from "@/datasource/metrics";
 
 import type { NodeMetrics, Point } from "@/types/node-metrics";
-import type { HardwareHealth, NodeComparison } from "@/types/hardware";
+import type { HardwareHealth } from "@/types/hardware";
 import { useObserveTimeRange } from "@/hooks/useObserveTimeRange";
 import { useSignalFreshness } from "@/hooks/useSignalFreshness";
 import { SignalFreshnessBadge } from "@/components/observe/SignalFreshnessBadge";
@@ -59,7 +54,6 @@ function MetricsPageContent() {
   const { currentClusterId } = useClusterStore();
 
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -69,13 +63,12 @@ function MetricsPageContent() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [nodes, setNodes] = useState<NodeMetrics[]>([]);
   const [hardware, setHardware] = useState<HardwareHealth | null>(null);
-  const [comparison, setComparison] = useState<NodeComparison | null>(null);
 
   // 历史数据缓存（每个节点，按 metric 分组）
   const [historyCache, setHistoryCache] = useState<Record<string, Record<string, Point[]>>>({});
 
-  // 全局时间轴只作用于展开后的趋势图 —— 卡片与硬件矩阵永远是当前快照，
-  // 「最近 6 小时的 CPU 温度」对硬件保护没有意义，那是趋势图的事。
+  // P3 统一：全页唯一时间控制点，作用于所有趋势图（集群趋势 + 节点展开趋势）。
+  // 快照类内容（矩阵/速览）天然是当前值，不受时间范围影响 —— 这是快照的定义，无需提示。
   const { selection: timeSelection, setSelection: setTimeSelection } = useObserveTimeRange("trendOnly");
   const freshness = useSignalFreshness("metrics");
   const historyHours = Math.max(1, Math.round(toSpanMs(timeSelection) / 3_600_000));
@@ -88,15 +81,13 @@ function MetricsPageContent() {
 
     try {
       // 硬件健康与节点指标来自同一份快照，并行取；硬件接口失败不应拖垮整页
-      const [result, hw, cmp] = await Promise.all([
+      const [result, hw] = await Promise.all([
         getClusterNodeMetrics(currentClusterId),
         getHardwareHealth(currentClusterId).catch(() => null),
-        getNodeComparison(currentClusterId).catch(() => null),
       ]);
       setSummary(result.summary);
       setNodes(result.nodes);
       setHardware(hw);
-      setComparison(cmp);
       setError(null);
       setLastUpdate(new Date());
     } finally {
@@ -155,9 +146,6 @@ function MetricsPageContent() {
     }).length;
   }, [nodes]);
 
-  // 过滤后的节点列表
-  const displayedNodes = selectedNode ? nodes.filter(n => n.nodeName === selectedNode) : nodes;
-
   // Loading 状态
   if (loading) {
     return (
@@ -212,9 +200,6 @@ function MetricsPageContent() {
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <span className="text-[10px] sm:text-xs text-muted hidden lg:block" title={nm.rangeAffectsTrendOnly}>
-              {nm.rangeAffectsTrendOnly}
-            </span>
             <SignalFreshnessBadge item={freshness} />
             <TimeRangePicker value={timeSelection} onChange={setTimeSelection} t={nm} />
             <span className="text-[10px] sm:text-xs text-muted hidden sm:block">
@@ -230,72 +215,31 @@ function MetricsPageContent() {
           </div>
         </div>
 
-        {/* 集群概览卡片 */}
-        {summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <SummaryCard
-              icon={Server}
-              label={nm.summary.nodes}
-              value={`${summary.onlineNodes}/${summary.totalNodes}`}
-              subValue={`${warningNodes} ${nm.summary.warnings}`}
-              color="bg-indigo-500/10 text-indigo-500"
-            />
-            <SummaryCard
-              icon={Cpu}
-              label={nm.summary.avgCpu}
-              value={`${summary.avgCpuPct.toFixed(1)}%`}
-              subValue={`Max: ${summary.maxCpuPct.toFixed(1)}%`}
-              color={summary.avgCpuPct >= 80 ? "bg-red-500/10 text-red-500" : summary.avgCpuPct >= 60 ? "bg-yellow-500/10 text-yellow-500" : "bg-orange-500/10 text-orange-500"}
-            />
-            <SummaryCard
-              icon={HardDrive}
-              label={nm.summary.avgMemory}
-              value={`${summary.avgMemPct.toFixed(1)}%`}
-              subValue={`Max: ${summary.maxMemPct.toFixed(1)}%`}
-              color={summary.avgMemPct >= 80 ? "bg-red-500/10 text-red-500" : summary.avgMemPct >= 60 ? "bg-yellow-500/10 text-yellow-500" : "bg-green-500/10 text-green-500"}
-            />
-            <SummaryCard
-              icon={AlertTriangle}
-              label={nm.summary.warnings}
-              value={warningNodes.toString()}
-              subValue={nm.summary.nodesNeedAttention}
-              color={warningNodes > 0 ? "bg-yellow-500/10 text-yellow-500" : "bg-emerald-500/10 text-emerald-500"}
-            />
-          </div>
-        )}
-
-        {/* 硬件健康（速览 + 矩阵）*/}
-        <HardwareSummaryTiles data={hardware} />
-        <HardwareMatrix data={hardware} />
-
-        {/* 集群概览趋势图 */}
-        {nodes.length > 1 && currentClusterId && (
-          <ClusterOverviewChart nodes={nodes} clusterId={currentClusterId} />
-        )}
-
-        {/* 节点对比：先横向定位哪台不对，再展开那一台看细节 */}
-        <NodeCompareTable data={comparison} />
-
-        {/* 节点过滤 chip */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${!selectedNode ? "bg-indigo-500 text-white border-indigo-500" : "bg-card text-muted border-[var(--border-color)] hover:text-default"}`}
-            onClick={() => setSelectedNode(null)}
-          >
-            {nm.allNodes} ({nodes.length})
-          </button>
-          {nodes.map(n => (
-            <button
-              key={n.nodeName}
-              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${selectedNode === n.nodeName ? "bg-indigo-500 text-white border-indigo-500" : "bg-card text-muted border-[var(--border-color)] hover:text-default"}`}
-              onClick={() => setSelectedNode(selectedNode === n.nodeName ? null : n.nodeName)}
-            >
-              {n.nodeName}
-            </button>
-          ))}
+        {/* 快照带：集群规模/告警 + 硬件速览，合并为一排（只留有判定语义的）
+            —— 平均 CPU/内存两张纯快照已删：矩阵每行有精确值，均值无行动价值 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {summary && (
+            <>
+              <SummaryCard
+                icon={Server}
+                label={nm.summary.nodes}
+                value={`${summary.onlineNodes}/${summary.totalNodes}`}
+                subValue={`${warningNodes} ${nm.summary.warnings}`}
+                color="bg-indigo-500/10 text-indigo-500"
+              />
+              <SummaryCard
+                icon={AlertTriangle}
+                label={nm.summary.warnings}
+                value={warningNodes.toString()}
+                subValue={nm.summary.nodesNeedAttention}
+                color={warningNodes > 0 ? "bg-yellow-500/10 text-yellow-500" : "bg-emerald-500/10 text-emerald-500"}
+              />
+            </>
+          )}
+          <HardwareSummaryTiles data={hardware} bare />
         </div>
 
-        {/* 节点列表 */}
+        {/* 统一节点表：判定矩阵 + 行点击下钻（原 NodeCard 详情体） */}
         {nodes.length === 0 ? (
           <div className="text-center py-12 bg-card rounded-xl border border-[var(--border-color)]">
             <Server className="w-12 h-12 mx-auto mb-3 text-muted opacity-50" />
@@ -303,18 +247,19 @@ function MetricsPageContent() {
             <p className="text-sm text-muted">{nm.noMetricsDesc}</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {displayedNodes.map((node) => (
-              <NodeCard
-                key={node.nodeName}
-                metrics={node}
-                historyData={historyCache[node.nodeName] || {}}
-                hardware={hardware?.rows?.find((r) => r.nodeName === node.nodeName) ?? null}
-                expanded={expandedNode === node.nodeName}
-                onToggle={() => handleNodeToggle(node.nodeName)}
-              />
-            ))}
-          </div>
+          <HardwareMatrix
+            data={hardware}
+            nodes={nodes}
+            expandedNode={expandedNode}
+            onToggle={handleNodeToggle}
+            historyCache={historyCache}
+            spanMs={toSpanMs(timeSelection)}
+          />
+        )}
+
+        {/* 集群趋势（时间范围跟随页面级选择器） */}
+        {nodes.length > 1 && currentClusterId && (
+          <ClusterOverviewChart nodes={nodes} clusterId={currentClusterId} hours={historyHours} />
         )}
       </div>
     </Layout>
