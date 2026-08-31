@@ -57,6 +57,7 @@ func (r *metricsRepository) ListAllNodeMetrics(ctx context.Context) ([]metrics.N
 	// 排在后面的节点全部被 deadline 取消（2026-08-29 压测实况：
 	// 7 节点里前 2 个有数据、后 5 个全零）。并行后所有节点公平
 	// 分享同一个时间窗，慢也是一起慢，不再有位置歧视。
+	ipByName := nodeIPByName(ipMap)
 	sem := make(chan struct{}, 4)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -75,6 +76,9 @@ func (r *metricsRepository) ListAllNodeMetrics(ctx context.Context) ([]metrics.N
 			if err != nil || nm == nil {
 				return
 			}
+			// host 标识是主机名，真实 IP 从 K8s 节点信息反查；查不到留空
+			//（空可在前端隐藏，错值会误导）
+			nm.NodeIP = ipByName[nodeName]
 			mu.Lock()
 			result = append(result, *nm)
 			mu.Unlock()
@@ -205,6 +209,17 @@ func (r *metricsRepository) resolveNodeIP(ctx context.Context, nodeName string) 
 	}
 	// 如果找不到，尝试直接用 nodeName 当 IP
 	return nodeName, nil
+}
+
+// nodeIPByName 把 getIPMap 的 IP→节点名 反转为 节点名→IP。
+// 指标的 host 标识是主机名（net.host.name），NodeIP 需从 K8s 节点信息反查；
+// 此前直接拿主机名凑数，前端出现「archangel archangel」双名。
+func nodeIPByName(ipToName map[string]string) map[string]string {
+	m := make(map[string]string, len(ipToName))
+	for ip, name := range ipToName {
+		m[name] = ip
+	}
+	return m
 }
 
 // listActiveNodeIPs 从 ClickHouse 获取最近有数据的节点 IP
@@ -611,7 +626,13 @@ func applyScalarGauge(nm *metrics.NodeMetrics, name string, val float64, cnt uin
 	case "node_filefd_allocated":
 		nm.System.FilefdAllocated = int64(val)
 	case "node_filefd_maximum":
-		nm.System.FilefdMax = int64(val)
+		// 现代内核 fs.file-max 默认 2^63-1 = 无限制；
+		// 透传会让前端渲染出「Max: 9223372036854.8M」这种天文数字
+		if val >= 1e15 {
+			nm.System.FilefdUnlimited = true
+		} else {
+			nm.System.FilefdMax = int64(val)
+		}
 	case "node_entropy_available_bits":
 		nm.System.EntropyBits = int64(val)
 	case "node_procs_running":

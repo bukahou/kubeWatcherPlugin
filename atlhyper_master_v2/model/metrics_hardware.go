@@ -74,6 +74,9 @@ type HardwareSensorCell struct {
 // HardwareRow 矩阵一行 = 一个节点
 type HardwareRow struct {
 	NodeName     string `json:"nodeName"`
+	NodeIP       string `json:"nodeIP,omitempty"`
+	Uptime       int64  `json:"uptime,omitempty"` // 秒
+	Kernel       string `json:"kernel,omitempty"`
 	Profile      string `json:"profile"`
 	ProfileLabel string `json:"profileLabel"`
 	// 四大件：CPU / 内存 / 磁盘 在前，温度及其余硬件传感器在后

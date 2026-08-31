@@ -54,6 +54,9 @@ func buildHardwareRow(nm *metrics.NodeMetrics) model.HardwareRow {
 
 	row := model.HardwareRow{
 		NodeName:     nm.NodeName,
+		NodeIP:       nm.NodeIP,
+		Uptime:       nm.Uptime,
+		Kernel:       nm.Kernel,
 		Profile:      string(profile),
 		ProfileLabel: th.label,
 		Sensors:      sensorCells(nm.Temperature.Sensors, th),

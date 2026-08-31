@@ -55,3 +55,20 @@ func TestBuildHardwareRow_ZeroWithoutUnavailable_IsRealReading(t *testing.T) {
 		t.Errorf("Value = %v, want 0", row.CPUUsage.Value)
 	}
 }
+
+// 统一节点表的折叠行要显示 uptime 与内核版本（原 NodeCard 提供），
+// 由 HardwareRow 携带 —— 否则前端得 join 两个 API（CLAUDE.md 明令禁止）。
+func TestBuildHardwareRow_CarriesUptimeAndKernel(t *testing.T) {
+	nm := &metrics.NodeMetrics{
+		NodeName: "n1",
+		Uptime:   93784, // 1d 2h 3m
+		Kernel:   "6.8.0-1063-raspi",
+	}
+	row := buildHardwareRow(nm)
+	if row.Uptime != 93784 {
+		t.Errorf("Uptime = %d, want 93784", row.Uptime)
+	}
+	if row.Kernel != "6.8.0-1063-raspi" {
+		t.Errorf("Kernel = %q", row.Kernel)
+	}
+}

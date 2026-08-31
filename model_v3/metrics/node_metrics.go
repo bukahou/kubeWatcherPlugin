@@ -164,7 +164,10 @@ type NodeSystem struct {
 	ConntrackLimit   int64 `json:"conntrackLimit"`
 	FilefdAllocated  int64 `json:"filefdAllocated"`
 	FilefdMax        int64 `json:"filefdMax"`
-	EntropyBits      int64 `json:"entropyBits"`
+	// FilefdUnlimited: 内核 fs.file-max 为 2^63-1（现代内核默认，即无限制）。
+	// 语义判定在采集侧完成，前端据此渲染「无限制」而非天文数字。
+	FilefdUnlimited bool  `json:"filefdUnlimited,omitempty"`
+	EntropyBits     int64 `json:"entropyBits"`
 	// ProcsRunning / ProcsBlocked 运行队列与 D 状态进程数：
 	// Blocked 持续大于 0 说明进程卡在不可中断 IO 上，是磁盘故障的早期信号
 	ProcsRunning int64 `json:"procsRunning"`
