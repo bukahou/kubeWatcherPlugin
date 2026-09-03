@@ -319,6 +319,13 @@ B 仍待实战检验 —— 下次压测若仍压不到 90%，需人为制造条
 > 类型化错误码而非文案、准入策略可插拔等）；补了「JIT 自动建号会绕过白名单」这个判据缺口。
 > 已采纳 geass-v3 两条：存储要笨（lockedUntil 改为派生，不落库）、剥离判据（第二个消费者不加改动接入成功）。
 > 待办：等 melete / akasha 表态；落地后 atlhyper 接入（users 表加失败计数列，759 行认证代码重写）。
+>
+> ⚠️ **三轮自查新发现（比 004 自报的更严重，同样按裁决未修）**：
+> `AuthRequired` 中间件只解析 JWT 不查库，且 role 固化在 claims 里
+> → **`user/update-role` 降权、`user/update-status` 禁用、改密码，在 24h 内均不生效**。
+> admin 降为 viewer 后旧 token 仍持 admin（= 集群级 drain/delete）。这三个管理端点功能上失效。
+> 缓解只需中间件加一次查库，但按裁决不单独修，随 005 落地（抽 refresh 层时必须包含「服务端可主动吊销」）。
+> 排除的岔路：JWT 密钥存放已核实正常（私有 config 仓 + K8s Secret + required 无默认值），非缺陷。
 
 
 
