@@ -326,6 +326,13 @@ B 仍待实战检验 —— 下次压测若仍压不到 90%，需人为制造条
 > admin 降为 viewer 后旧 token 仍持 admin（= 集群级 drain/delete）。这三个管理端点功能上失效。
 > 缓解只需中间件加一次查库，但按裁决不单独修，随 005 落地（抽 refresh 层时必须包含「服务端可主动吊销」）。
 > 排除的岔路：JWT 密钥存放已核实正常（私有 config 仓 + K8s Secret + required 无默认值），非缺陷。
+>
+> ⚠️ **四轮自查再发现（同样按裁决不单独修）**：取客户端 IP 的两处实现不一致 ——
+> `middleware/audit.go` L77 取 `XFF.split(",")[0]`，`handler/admin/user.go` L162 取**整条 XFF 字符串**
+> （`last_login_ip` 存的是整条链）。且两者都直接信任 XFF（客户端可写头）。
+> 入口是 4 跳（CF Tunnel → Gateway → Next.js rewrites → controller），真实 IP 应取 `CF-Connecting-IP`。
+> 未实测项：该链路下 `[0]` 是否确为可伪造值（需发伪造头探测，会话权限已拦，未绕过）。
+> 随 005 守卫库落地时统一（库须拒绝自动探测 + 提供 `TrustCloudflare()` 类具名预设）。
 
 
 
