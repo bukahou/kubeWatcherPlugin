@@ -64,6 +64,14 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          # ⚠️ 必须显式指定 base，⛔ 不能省。
+          #    paths-filter 的 base 默认是【仓库默认分支】(main)，
+          #    只有当 base 与被推送的分支相同时，它才改用「push 前的那个 commit」比较。
+          #    所以在 main 上跑没问题（默认值恰好等于被推分支），
+          #    但在 dev 上跑会变成「dev 与 main 的全部差异」—— dev 领先多少就算进来多少，
+          #    结果永远是三个组件全命中，过滤形同虚设。
+          #    写成 github.ref_name 后，推 dev 就与 dev 的上一个 commit 比，推 main 同理。
+          base: ${{ github.ref_name }}
           filters: |
             shared: &shared
               - 'go.mod'
