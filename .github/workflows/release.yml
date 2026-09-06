@@ -137,10 +137,14 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }},mode=max
 
       # digest 要传给 ③ 才能合 manifest。用文件名承载，内容为空即可。
+      # ⚠️ 必须剥掉 `sha256:` 前缀：upload-artifact 不接受文件名里的冒号
+      #    （Windows 路径兼容限制），带冒号会在上传那步直接失败。
+      #    ③ 里再把前缀拼回去。
       - name: Export digest
         run: |
+          digest="${{ steps.build.outputs.digest }}"
           mkdir -p /tmp/digests
-          touch "/tmp/digests/${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v4
@@ -190,8 +194,9 @@ jobs:
           TAG: ${{ needs.plan.outputs.tag_prefix }}-${{ steps.sha.outputs.sha7 }}
         run: |
           cd /tmp/digests
+          # 文件名是剥了前缀的 digest（见 ② 的说明），这里拼回 sha256:
           docker buildx imagetools create -t "${IMAGE}:${TAG}" \
-            $(printf "${IMAGE}@%s " *)
+            $(printf "${IMAGE}@sha256:%s " *)
           echo "推送完成: ${IMAGE}:${TAG}"
           docker buildx imagetools inspect "${IMAGE}:${TAG}" | head -20
 

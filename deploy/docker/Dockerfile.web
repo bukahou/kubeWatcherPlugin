@@ -36,6 +36,13 @@ COPY atlhyper_web/ ./
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# ⚠️ public/ 可能为空：图标改走 Next.js 的 app/ 文件约定后，public 下已无文件，
+#    而 git 不追踪空目录 —— CI 干净检出时这个目录根本不存在，
+#    下面 runner 阶段的 `COPY --from=builder /app/public` 就会失败。
+#    本地构建看不出来（本地目录还在），只有 CI 会炸。
+#    这里兜住：无论有没有静态资源，目录一定存在。
+RUN mkdir -p public
+
 RUN npm run build
 
 # -----------------------------------------------------------------------------
