@@ -1,0 +1,79 @@
+## ============================================================
+## test —— 门禁，不产出任何东西
+##
+## 触发：
+##   - push 到 feature/** 与 dev  （开发中随时 commit，这里给快速反馈）
+##   - PR 到 main                 （dev → main 那一步的守门人）
+##
+## ⛔ 刻意【不】构建镜像：多架构镜像构建慢且占额度，
+##    feature 分支上每 commit 一次就烧一次是浪费。镜像只在 release.yml 出。
+## ============================================================
+name: test
+
+on:
+  push:
+    branches:
+      - dev
+      - "feature/**"
+      - "fix/**"
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true # 门禁可以取消：只关心最后一次的结果
+
+jobs:
+  go:
+    name: go build & vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod # 跟着 go.mod 走，⛔ 不要写死版本号
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      # go build 只看编译得过，go vet 看静态问题。
+      # 两个都跑：vet 抓得到 build 抓不到的（如 printf 参数不匹配）。
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+  web:
+    name: next build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: atlhyper_web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # 与 deploy/docker/Dockerfile.web 的 NODE_VERSION 对齐
+          cache: npm
+          cache-dependency-path: atlhyper_web/package-lock.json
+
+      # --legacy-peer-deps 与 Dockerfile.web 保持一致，
+      # 否则本地能装、CI 装不上（或反过来），排查起来很费时间。
+      - name: Install
+        run: npm ci --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
