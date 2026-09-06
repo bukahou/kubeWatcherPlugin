@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
  * API 代理中间件
  * 将 /api/v2/* 等请求代理到后端 Controller
  * API_URL 环境变量在运行时读取（类似 Kibana）
+ *
+ * ⚠️ 代理在【这里】，不在 next.config.ts —— 那里没有 rewrites 段。
+ *    src/config/env.ts 的注释曾指错文件，两处现已互相指向，避免再找错地方。
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
