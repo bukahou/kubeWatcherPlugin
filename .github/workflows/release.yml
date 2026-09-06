@@ -1,0 +1,249 @@
+## ============================================================
+## release —— 构建多架构镜像，推 Docker Hub，改 config 仓的 image tag
+##
+## 分支决定环境（同一套流程，两个出口）：
+##   push dev  → tag `dev-<sha7>`    → 写 config 仓 apps/atlhyper/dev/
+##   push main → tag `v1.0.0-<sha7>` → 写 config 仓 apps/atlhyper/prod/
+##
+## ⭐ 为什么 amd64 / arm64 拆成两个 job 而不是一次 buildx 出两个平台：
+##    一次出两个平台要靠 QEMU 在 amd64 上模拟 arm64 跑编译，而 Go 编译是
+##    CPU 密集型，QEMU 下通常慢 5~10 倍。GitHub 的 arm64 runner 对
+##    【公开仓库免费且给 4 vCPU】，所以两边都用原生机器并行跑，再合 manifest。
+##    代价是 job 数变多，但墙钟时间更短。
+##
+## ⛔ 不推 latest：tag 必须不可变，否则「线上跑的是哪个 commit」答不出来，
+##    也没法回滚。config 仓里的 tag 就是唯一事实来源。
+## ============================================================
+name: release
+
+on:
+  push:
+    branches: [dev, main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # ⛔ 不取消：每次合并都要完整跑完，否则 config 仓会停在中间状态
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAMESPACE: bukahou
+  VERSION: v1.0.0 # 生产版本基线；实际 tag 是 <VERSION>-<sha7>
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # ① 判断改了哪些组件 + 这次是 dev 还是 prod
+  # ────────────────────────────────────────────────────────────
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.pack.outputs.services }}
+      env_dir: ${{ steps.env.outputs.dir }}
+      tag_prefix: ${{ steps.env.outputs.prefix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve environment
+        id: env
+        run: |
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "dir=prod"            >> "$GITHUB_OUTPUT"
+            echo "prefix=${VERSION}"   >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=dev"             >> "$GITHUB_OUTPUT"
+            echo "prefix=dev"          >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Path filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared: &shared
+              - 'go.mod'
+              - 'go.sum'
+              - 'common/**'
+              - 'model_v3/**'
+              - 'deploy/docker/**'
+              - '.github/workflows/release.yml'
+            agent:
+              - *shared
+              - 'atlhyper_agent_v2/**'
+              - 'cmd/atlhyper_agent_v2/**'
+            controller:
+              - *shared
+              - 'atlhyper_master_v2/**'
+              - 'cmd/atlhyper_master_v2/**'
+            web:
+              - 'atlhyper_web/**'
+              - 'deploy/docker/Dockerfile.web'
+              - '.github/workflows/release.yml'
+
+      # ⚠️ web 刻意不吃 shared：它是 Next.js，与 go.mod / common / model_v3 无关。
+      #    把它塞进 shared 会让每次改 Go 代码都白白重建一次前端。
+      - name: Pack service list
+        id: pack
+        run: |
+          list=()
+          [ "${{ steps.filter.outputs.agent }}"      = "true" ] && list+=('"agent"')
+          [ "${{ steps.filter.outputs.controller }}" = "true" ] && list+=('"controller"')
+          [ "${{ steps.filter.outputs.web }}"        = "true" ] && list+=('"web"')
+          printf 'services=[%s]\n' "$(IFS=,; echo "${list[*]}")" >> "$GITHUB_OUTPUT"
+
+  # ────────────────────────────────────────────────────────────
+  # ② 每个组件 × 每个架构，各自在原生机器上构建，push by digest
+  #    （此时还没有 tag，只有 digest；tag 在 ③ 合并时才打）
+  # ────────────────────────────────────────────────────────────
+  build:
+    name: build ${{ matrix.service }}/${{ matrix.arch }}
+    needs: plan
+    if: needs.plan.outputs.services != '[]' && needs.plan.outputs.services != ''
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false # 一个架构挂了，另一个仍跑完，便于定位是不是架构相关问题
+      matrix:
+        service: ${{ fromJSON(needs.plan.outputs.services) }}
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+        # ⛔ 不需要 setup-qemu：两个架构都跑在自己的原生机器上
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: . # 与 deploy/scripts/_common.sh 一致：context 是仓库根
+          file: deploy/docker/Dockerfile.${{ matrix.service }}
+          platforms: linux/${{ matrix.arch }}
+          provenance: false # 关掉 attestation，否则 manifest 里会混进非架构条目
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/atlhyper-${{ matrix.service }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }},mode=max
+
+      # digest 要传给 ③ 才能合 manifest。用文件名承载，内容为空即可。
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${{ steps.build.outputs.digest }}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.service }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────
+  # ③ 把两个架构的 digest 合成一个 manifest list，打上 tag，
+  #    然后改 config 仓对应环境目录的 image tag
+  # ────────────────────────────────────────────────────────────
+  publish:
+    name: publish ${{ matrix.service }}
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1 # ⚠️ 串行：三个组件都要 push 同一个 config 仓，并行会一直撞
+      matrix:
+        service: ${{ fromJSON(needs.plan.outputs.services) }}
+    steps:
+      - name: Short SHA
+        id: sha
+        run: echo "sha7=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-${{ matrix.service }}-*
+          merge-multiple: true
+
+      - name: Create manifest list & push
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/atlhyper-${{ matrix.service }}
+          TAG: ${{ needs.plan.outputs.tag_prefix }}-${{ steps.sha.outputs.sha7 }}
+        run: |
+          cd /tmp/digests
+          docker buildx imagetools create -t "${IMAGE}:${TAG}" \
+            $(printf "${IMAGE}@%s " *)
+          echo "推送完成: ${IMAGE}:${TAG}"
+          docker buildx imagetools inspect "${IMAGE}:${TAG}" | head -20
+
+      - name: Setup kustomize
+        run: |
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" \
+            | tar -xz -C /tmp
+          sudo mv /tmp/kustomize /usr/local/bin/kustomize
+
+      # 改 config 仓 = 这条流水线的终点。ArgoCD（以后接）从那里同步。
+      # ⚠️ push 带重试：三个组件串行跑，但仍可能与其它项目的流水线撞。
+      - name: Update config repo
+        env:
+          GH_TOKEN: ${{ secrets.CONFIG_REPO_TOKEN }}
+          IMAGE_NAME: ${{ env.IMAGE_NAMESPACE }}/atlhyper-${{ matrix.service }}
+          TAG: ${{ needs.plan.outputs.tag_prefix }}-${{ steps.sha.outputs.sha7 }}
+          ENV_DIR: ${{ needs.plan.outputs.env_dir }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/bukahou/config.git" /tmp/config
+          cd "/tmp/config/clusters/requiem/apps/atlhyper/${ENV_DIR}"
+
+          kustomize edit set image "${IMAGE_NAME}=${IMAGE_NAME}:${TAG}"
+
+          # 记录这次 tag 出自哪个源码 commit，便于事后追溯
+          cat > "source-${{ matrix.service }}.json" <<EOF
+          {"repo":"${{ github.repository }}","sha":"${{ github.sha }}","branch":"${GITHUB_REF#refs/heads/}"}
+          EOF
+
+          cd /tmp/config
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- "clusters/requiem/apps/atlhyper/${ENV_DIR}"
+          git diff --cached --quiet && { echo "(无变化，跳过)"; exit 0; }
+          git commit -m "deploy(atlhyper/${ENV_DIR}/${{ matrix.service }}): ${TAG}"
+          for i in 1 2 3 4 5; do
+            git push && break
+            echo "push 第 $i 次失败，pull --rebase 后重试"
+            git pull --rebase || true
+            sleep $((i * 2))
+          done
+
+      - name: Summary
+        env:
+          TAG: ${{ needs.plan.outputs.tag_prefix }}-${{ steps.sha.outputs.sha7 }}
+        run: |
+          {
+            echo "### atlhyper-${{ matrix.service }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| 镜像 | \`${IMAGE_NAMESPACE}/atlhyper-${{ matrix.service }}:${TAG}\` |"
+            echo "| 架构 | linux/amd64 + linux/arm64 |"
+            echo "| 环境 | ${{ needs.plan.outputs.env_dir }} |"
+            echo "| config | \`apps/atlhyper/${{ needs.plan.outputs.env_dir }}\` 已更新 |"
+          } >> "$GITHUB_STEP_SUMMARY"
